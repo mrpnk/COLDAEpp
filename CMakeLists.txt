@@ -5,7 +5,6 @@ cmake_minimum_required (VERSION 3.8)
 
 project ("ColDAEpp")
 
-# Fügen Sie der ausführbaren Datei dieses Projekts eine Quelle hinzu.
-add_executable (ColDAEpp "ColDAEpp.cpp" "ColDAEpp.h")
+add_executable (ColDAEpp "ColDAEpp.cpp" "ColDAEpp.hpp" "linpack_d.cpp" "linpack_d.hpp" "blas0.cpp" "blas0.hpp" "blas1_d.cpp" "blas1_d.hpp" )
 
 # TODO: Fügen Sie bei Bedarf Tests hinzu, und installieren Sie Ziele.
