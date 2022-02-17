@@ -1,14 +1,8 @@
 ﻿# CMakeList.txt: CMake-Projekt für "ColDAEpp". Schließen Sie die Quelle ein, und definieren Sie
 # projektspezifische Logik hier.
 #
-cmake_minimum_required (VERSION 3.8)
 
-project ("ColDAEpp")
-
-
-file(GLOB_RECURSE SOURCES src/*.cpp)
-
-add_executable (ColDAEpp ${SOURCES})
+add_subdirectory(linpack)
 
 
 # TODO: Fügen Sie bei Bedarf Tests hinzu, und installieren Sie Ziele.

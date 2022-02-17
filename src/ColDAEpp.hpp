@@ -3,13 +3,13 @@
 
 #pragma once
 
-#include "linpack_d.hpp"
+#include "linpack/linpack_d.hpp"
+#include "fem/arr.hpp"
 
 #include <iostream>
 #include <vector>
 #include <cassert>
 #define assertm(exp, msg) assert(((void)msg, exp))
-
 
 
 template<typename T>
@@ -132,7 +132,7 @@ namespace  COLORD {
 	auto& M = MT;
 
 	auto& NY = NNY;
-	auto& NCOMP = NNY;
+	auto& NCOMP = NC;
 	auto& NDM = NCY;
 	auto& KDYM = KDY;
 }
@@ -207,1390 +207,1466 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 
 
 
+
+
+
+//**********************************************************************
+//  this package solves boundary value problems for
+//  ordinary differential equations with constraints,
+//  as described below. for more see [1].
+//
+//  COLDAE is a modification of the package COLNEW by bader and
+//  ascher [4], which in turn is a modification of COLSYS by ascher,
+//  christiansen and russell [3]. it does what colnew does plus
+//  optionally solving semi-explicit differential-algebraic equations
+//  with index at most 2.
+//**********************************************************************
+//----------------------------------------------------------------------
+//                            p a r t  1
+//        main storage allocation and program control subroutines
+//----------------------------------------------------------------------
+//
+//**********************************************************************
+//
+//     written by
+//                  uri ascher and ray spiteri,
+//                            department of computer science,
+//                            university of british columbia,
+//                            vancouver, b. c., canada   v6t 1z2
+//
+//**********************************************************************
+//
+//     purpose
+//
+//     this package solves a multi-point boundary value
+//     problem for a mixed order system of ode-s with constraints
+//     given by
+//
+//          (m(i))
+//         u       =  f  ( x; z(u(x)), y(x) )   i = 1, ... ,ncomp
+//          i          i
+//
+//             0   =  f  ( x; z(u(x)), y(x) )   i = ncomp+1,...,ncomp+ny
+//                     i
+//
+//                                          aleft .lt. x .lt. aright,
+//
+//
+//         g  ( zeta(j); z(u(zeta(j))) ) = 0   j = 1, ... ,mstar
+//          j
+//                                    mstar = m(1)+m(2)+...+m(ncomp),
+//
+//
+//         where                          t                       t
+//               u = (u , u , ... ,u     ) , y = (y ,y , ... ,y  )
+//                     1   2        ncomp          1  2        ny
+//
+//         is the exact solution vector: u are the differential solution
+//         components and y are the algebraic solution components.
+//
+//                (mi)
+//               u     is the mi=m(i) th  derivative of u
+//                i                                      i
+//
+//                                  (1)        (m1-1)       (mncomp-1)
+//               z(u(x)) = ( u (x),u  (x),...,u    (x),...,u      (x) )
+//                            1     1          1            ncomp
+//
+//                f (x,z(u),y)   is a (generally) nonlinear function of
+//                 i
+//                             z(u)=z(u(x)) and y=y(x).
 //
+//                g (zeta(j);z(u))  is a (generally) nonlinear function
+//                 j
+//                               used to represent a boundary condition.
+//
+//         the boundary points satisfy
+//               aleft .le. zeta(1) .le. .. .le. zeta(mstar) .le. aright
+//
+//         the orders mi of the differential equations satisfy
+//                            1 .le. m(i) .le. 4.
+//
+//         regarding the dae, note that:
+//         i)  with ny=0, the code is essentially identical to the ode
+//             code  colnew
+//         ii) no explicit checking of the index of the problem
+//             is provided. if the index is > 2 then the code will
+//             not work well.
+//         iii) the constraints are treated like de-s of order 0 and
+//             correspondingly the approximation to y is sought in
+//             a piecewise discontinuous polynomial space.
+//         iv) the number of boundary conditions required is independent
+//             of the index. it is the user's responsibility to ensure
+//             that these conditions are consistent with the constraints.
+//             the conditions at the left end point aleft  must include
+//             a subset equivalent to specifying the index-2
+//             constraints there.
+//         v)  for an index-2 problem in hessenberg form, the projected
+//             collocation method of ascher and petzold [2] is used.
+//         vi) if the constraints are of a mixed type (and possibly
+//             a mixed index) then coldae can transform and project
+//             appropriately -- see description of ipar(12).
 //
+//**********************************************************************
 //
-////**********************************************************************
-////  this package solves boundary value problems for
-////  ordinary differential equations with constraints,
-////  as described below. for more see [1].
-////
-////  COLDAE is a modification of the package COLNEW by bader and
-////  ascher [4], which in turn is a modification of COLSYS by ascher,
-////  christiansen and russell [3]. it does what colnew does plus
-////  optionally solving semi-explicit differential-algebraic equations
-////  with index at most 2.
-////**********************************************************************
-////----------------------------------------------------------------------
-////                            p a r t  1
-////        main storage allocation and program control subroutines
-////----------------------------------------------------------------------
-////
-////**********************************************************************
-////
-////     written by
-////                  uri ascher and ray spiteri,
-////                            department of computer science,
-////                            university of british columbia,
-////                            vancouver, b. c., canada   v6t 1z2
-////
-////**********************************************************************
-////
-////     purpose
-////
-////     this package solves a multi-point boundary value
-////     problem for a mixed order system of ode-s with constraints
-////     given by
-////
-////          (m(i))
-////         u       =  f  ( x; z(u(x)), y(x) )   i = 1, ... ,ncomp
-////          i          i
-////
-////             0   =  f  ( x; z(u(x)), y(x) )   i = ncomp+1,...,ncomp+ny
-////                     i
-////
-////                                          aleft .lt. x .lt. aright,
-////
-////
-////         g  ( zeta(j); z(u(zeta(j))) ) = 0   j = 1, ... ,mstar
-////          j
-////                                    mstar = m(1)+m(2)+...+m(ncomp),
-////
-////
-////         where                          t                       t
-////               u = (u , u , ... ,u     ) , y = (y ,y , ... ,y  )
-////                     1   2        ncomp          1  2        ny
-////
-////         is the exact solution vector: u are the differential solution
-////         components and y are the algebraic solution components.
-////
-////                (mi)
-////               u     is the mi=m(i) th  derivative of u
-////                i                                      i
-////
-////                                  (1)        (m1-1)       (mncomp-1)
-////               z(u(x)) = ( u (x),u  (x),...,u    (x),...,u      (x) )
-////                            1     1          1            ncomp
-////
-////                f (x,z(u),y)   is a (generally) nonlinear function of
-////                 i
-////                             z(u)=z(u(x)) and y=y(x).
-////
-////                g (zeta(j);z(u))  is a (generally) nonlinear function
-////                 j
-////                               used to represent a boundary condition.
-////
-////         the boundary points satisfy
-////               aleft .le. zeta(1) .le. .. .le. zeta(mstar) .le. aright
-////
-////         the orders mi of the differential equations satisfy
-////                            1 .le. m(i) .le. 4.
-////
-////         regarding the dae, note that:
-////         i)  with ny=0, the code is essentially identical to the ode
-////             code  colnew
-////         ii) no explicit checking of the index of the problem
-////             is provided. if the index is > 2 then the code will
-////             not work well.
-////         iii) the constraints are treated like de-s of order 0 and
-////             correspondingly the approximation to y is sought in
-////             a piecewise discontinuous polynomial space.
-////         iv) the number of boundary conditions required is independent
-////             of the index. it is the user's responsibility to ensure
-////             that these conditions are consistent with the constraints.
-////             the conditions at the left end point aleft  must include
-////             a subset equivalent to specifying the index-2
-////             constraints there.
-////         v)  for an index-2 problem in hessenberg form, the projected
-////             collocation method of ascher and petzold [2] is used.
-////         vi) if the constraints are of a mixed type (and possibly
-////             a mixed index) then coldae can transform and project
-////             appropriately -- see description of ipar(12).
-////
-////**********************************************************************
-////
-////     method
-////
-////        the method used to approximate the solution u is
-////     collocation at gaussian points, requiring m(i)-1 continuous
-////     derivatives in the i-th component, i = 1, ..., ncomp.
-////     here, k is the number of collocation points (stages) per
-////     subinterval and is chosen such that k .ge. max m(i).
-////     a runge-kutta-monomial solution representation is utilized.
-////     for hessenberg index-2 daes, a projection on the constraint
-////     manifold at each interval's end is used [2].
-////
-////     references
-////
-////     [1] u. ascher and r. spiteri,
-////         collocation software for boundary value differential-
-////         algebraic equations,
-////         siam j. scient. stat. comput., to appear.
-////
-////     [2] u. ascher and l. petzold,
-////         projected implicit runge-kutta methods for differential-
-////         algebraic equations,
-////         siam j. num. anal. 28 (1991), 1097-1120.
-////
-////     [3] u. ascher, j. christiansen and r.d. russell,
-////         collocation software for boundary-value odes,
-////         acm trans. math software 7 (1981), 209-222.
-////
-////     [4] g. bader and u. ascher,
-////         a new basis implementation for a mixed order
-////         boundary value ode solver,
-////         siam j. scient. stat. comput. 8 (1987), 483-500.
-////
-////     [5] u. ascher, j. christiansen and r.d. russell,
-////         a collocation solver for mixed order
-////         systems of boundary value problems,
-////         math. comp. 33 (1979), 659-679.
-////
-////     [6] u. ascher, j. christiansen and r.d. russell,
-////         colsys - a collocation code for boundary
-////         value problems,
-////         lecture notes comp.sc. 76, springer verlag,
-////         b. childs et. al. (eds.) (1979), 164-185.
-////
-////     [7] c. deboor and r. weiss,
-////         solveblok: a package for solving almost block diagonal
-////         linear systems,
-////         acm trans. math. software 6 (1980), 80-87.
-////
-////
-////**********************************************************************
-////
-////     ***************     input to coldae     ***************
-////
-////     variables
-////
-////     ncomp - no. of differential equations   (ncomp .le. 20)
-////
-////     ny   - no. of constraints     (ny .le. 20)
-////
-////     m(j) - order of the j-th differential equation
-////            ( mstar = m(1) + ... + m(ncomp) .le. 40 )
-////
-////     aleft - left end of interval
-////
-////     aright - right end of interval
-////
-////     zeta(j) - j-th side condition point (boundary point). must
-////               have  zeta(j) .le. zeta(j+1). all side condition
-////               points must be mesh points in all meshes used,
-////               see description of ipar(11) and fixpnt below.
-////
-////     ipar - an integer array dimensioned at least 11.
-////            a list of the parameters in ipar and their meaning follows
-////            some parameters are renamed in coldae; these new names are
-////            given in parentheses.
-////
-////     ipar(1)     ( = nonlin )
-////             = 0 if the problem is linear
-////             = 1 if the problem is nonlinear
-////
-////     ipar(2) = no. of collocation points per subinterval  (= k )
-////               where max m(i) .le.  k .le. 7 . if ipar(2)=0 then
-////               coldae sets  k = max ( max m(i)+1, 5-max m(i) )
-////
-////     ipar(3) = no. of subintervals in the initial mesh  ( = n ).
-////               if ipar(3) = 0 then coldae arbitrarily sets n = 5.
-////
-////     ipar(4) = no. of solution and derivative tolerances.  ( = ntol )
-////               we require  0 .lt. ntol .le. mstar.
-////
-////     ipar(5) = dimension of fspace.     ( = ndimf )
-////
-////     ipar(6) = dimension of ispace.     ( = ndimi )
-////
-////     ipar(7) -  output control ( = iprint )
-////              = -1 for full diagnostic printout
-////              = 0 for selected printout
-////              = 1 for no printout
-////
-////     ipar(8)     ( = iread )
-////             = 0 causes coldae to generate a uniform initial mesh.
-////             = 1 if the initial mesh is provided by the user.  it
-////                 is defined in fspace as follows:  the mesh
-////                 aleft=x(1).lt.x(2).lt. ... .lt.x(n).lt.x(n+1)=aright
-////                 will occupy  fspace(1), ..., fspace(n+1). the
-////                 user needs to supply only the interior mesh
-////                 points  fspace(j) = x(j), j = 2, ..., n.
-////             = 2 if the initial mesh is supplied by the user
-////                 as with ipar(8)=1, and in addition no adaptive
-////                 mesh selection is to be done.
-////
-////     ipar(9)     ( = iguess )
-////             = 0 if no initial guess for the solution is
-////                 provided.
-////             = 1 if an initial guess is provided by the user
-////                 in subroutine  guess.
-////             = 2 if an initial mesh and approximate solution
-////                 coefficients are provided by the user in  fspace.
-////                 (the former and new mesh are the same).
-////             = 3 if a former mesh and approximate solution
-////                 coefficients are provided by the user in fspace,
-////                 and the new mesh is to be taken twice as coarse;
-////                 i.e.,every second point from the former mesh.
-////             = 4 if in addition to a former initial mesh and
-////                 approximate solution coefficients, a new mesh
-////                 is provided in fspace as well.
-////                 (see description of output for further details
-////                 on iguess = 2, 3, and 4.)
-////
-////     ipar(10)= -1 if the first relax factor is RSTART
-////		(use for an extra sensitive nonlinear problem only)
-////	      =  0 if the problem is regular
-////	      =  1 if the newton iterations are not to be damped
-////                 (use for initial value problems).
-////	      =  2 if we are to return immediately upon  (a) two
-////                 successive nonconvergences, or  (b) after obtaining
-////                 error estimate for the first time.
-////
-////     ipar(11)= no. of fixed points in the mesh other than aleft
-////               and aright. ( = nfxpnt , the dimension of fixpnt)
-////               the code requires that all side condition points
-////               other than aleft and aright (see description of
-////               zeta ) be included as fixed points in fixpnt.
-////
-////     ipar(12)    ( = index )
-////                 this parameter is ignored if ny=0.
-////             = 0 if the index of the dae is not as per one of the
-////                 following cases
-////             = 1 if the index of the dae is 1. in this case the
-////                 ny x ny jacobian matrix of the constraints with
-////                 respect to the algebraic unknowns, i.e.
-////                 df(i,j), i=ncomp+1,...,ncomp+ny,
-////                          j=mstar+1,...,mstar+ny
-////                 (see description of dfsub below)
-////                 is nonsingular wherever it is evaluated. this
-////                 allows usual collocation to be safely used.
-////             = 2 if the index of the dae is 2 and it is in Hessenberg
-////                 form. in this case the
-////                 ny x ny jacobian matrix of the constraints with
-////                 respect to the algebraic unknowns is 0, and the
-////                 ny x ny matrix  CB  is nonsingular, where
-////                 (i,j) = df(i+ncomp, m(j)), i=1,...,ny,
-////                                             j=1,...,ncomp
-////                 B(i,j) = df(i,j+mstar),     i=1,...,ncomp,
-////                                             j=1,...,ny
-////                 the projected collocation method described in [2]
-////                 is then used.
-////             in case of ipar(12)=0 and ny > 0, coldae determines the
-////             appropriate projection needed at the right end of each
-////             mesh subinterval using SVD. this is the most expensive
-////             and most general option.
-////
-////     ltol  -  an array of dimension ipar(4). ltol(j) = l  specifies
-////              that the j-th tolerance in  tol  controls the error
-////              in the l-th component of z(u).   also require that
-////              1.le.ltol(1).lt.ltol(2).lt. ... .lt.ltol(ntol).le.mstar
-////
-////     tol    - an array of dimension ipar(4). tol(j) is the
-////              error tolerance on the ltol(j) -th component
-////              of z(u). thus, the code attempts to satisfy
-////              for j=1,...,ntol  on each subinterval
-////              abs(z(v)-z(u))       .le. tol(j)*abs(z(u))       +tol(j)
-////                            ltol(j)                     ltol(j)
-////
-////              if v(x) is the approximate solution vector.
-////
-////     fixpnt - an array of dimension ipar(11).   it contains
-////              the points, other than aleft and aright, which
-////              are to be included in every mesh.
-////
-////     ispace - an integer work array of dimension ipar(6).
-////              its size provides a constraint on nmax,
-////              the maximum number of subintervals. choose
-////              ipar(6) according to the formula
-////                      ipar(6)  .ge.  nmax*nsizei
-////                where
-////                      nsizei = 3 + kdm
-////                with
-////                      kdm = kdy + mstar  ;  kdy = k * (ncomp+ny) ;
-////                      nrec = no. of right end boundary conditions.
-////
-////
-////     fspace - a real work array of dimension ipar(5).
-////              its size provides a constraint on nmax.
-////              choose ipar(5) according to the formula
-////                      ipar(5)  .ge.  nmax*nsizef
-////                where
-////                      nsizef = 4 + 3 * mstar + (5+kdy) * kdm +
-////                              (2*mstar-nrec) * 2*mstar +
-////                              ncomp*(mstar+ny+2) + kdy.
-////
-////
-////     iflag - the mode of return from coldae.
-////           = 1 for normal return
-////           = 0 if the collocation matrix is singular.
-////           =-1 if the expected no. of subintervals exceeds storage
-////               specifications.
-////           =-2 if the nonlinear iteration has not converged.
-////           =-3 if there is an input data error.
-////
-////
-////**********************************************************************
-////
-////     *************    user supplied subroutines   *************
-////
-////
-////     the following subroutines must be declared external in the
-////     main program which calls coldae.
-////
-////
-////     fsub  - name of subroutine for evaluating f(x,z(u(x)),y(x)) =
-////                               t
-////             (f ,...,f        )  at a point x in (aleft,aright).  it
-////               1      ncomp+ny
-////             should have the heading
-////
-////                       subroutine fsub (x , z , y, f)
-////
-////             where f is the vector containing the value of fi(x,z(u),y)
-////             in the i-th component and y(x) = (y(1),...y(ny)) and
-////                                       z(u(x))=(z(1),...,z(mstar))
-////             are defined as above under  purpose .
-////
-////
-////     dfsub - name of subroutine for evaluating the jacobian of
-////             f(x,z(u),y) at a point x.  it should have the heading
-////
-////                       subroutine dfsub (x , z , y, df)
-////
-////             where z(u(x)) and y(x) are defined as for fsub and the
-////             (ncomp+ny) by (mstar+ny)
-////             array  df  should be filled by the partial deriv-
-////             atives of f, viz, for a particular call one calculates
-////                          df(i,j) = dfi / dzj, i=1,...,ncomp+ny
-////                                               j=1,...,mstar,
-////                          df(i,mstar+j) = dfi / dyj, i=1,...,ncomp+ny
-////                                               j=1,...,ny.
-////
-////
-////     gsub  - name of subroutine for evaluating the i-th component of
-////             g(x,z(u(x))) = g (zeta(i),z(u(zeta(i)))) at a point x =
-////                             i
-////             zeta(i) where 1.le.i.le.mstar. it should have the heading
-////
-////                       subroutine gsub (i , z , g)
-////
-////             where z(u) is as for fsub, and i and g=g  are as above.
-////                                                     i
-////             note that in contrast to f in  fsub , here
-////             only one value per call is returned in g.
-////             also, g is independent of y and, in case of a higher
-////             index dae (index = 2), should include the constraints
-////             sampled at aleft  plus independent additional constraints,
-////             or an equivalent set.
-////
-////
-////     dgsub - name of subroutine for evaluating the i-th row of
-////             the jacobian of g(x,z(u(x))).  it should have the heading
-////
-////                       subroutine dgsub (i , z , dg)
-////
-////             where z(u) is as for fsub, i as for gsub and the mstar-
-////             vector dg should be filled with the partial derivatives
-////             of g, viz, for a particular call one calculates
-////                   dg(i,j) = dgi / dzj      j=1,...,mstar.
-////
-////
-////     guess - name of subroutine to evaluate the initial
-////             approximation for  z(u(x)), y(x) and for dmval(u(x))= vector
-////             of the mj-th derivatives of u(x). it should have the
-////             heading
-////
-////                       subroutine guess (x , z , y, dmval)
-////
-////             note that this subroutine is needed only if using
-////             ipar(9) = 1, and then all  mstar  components of z,
-////             ny components of  y
-////             and  ncomp  components of  dmval  should be specified
-////             for any x,  aleft .le. x .le. aright .
-////
-////
-////**********************************************************************
-////
-////     ************   use of output from coldae   ************
-////
-////                 ***   solution evaluation   ***
-////
-////     on return from coldae, the arrays fspace and ispace
-////     contain information specifying the approximate solution.
-////     the user can produce the solution vector  z( u(x) ), y(x)  at
-////     any point x, aleft .le. x .le. aright, by the statement,
-////
-////           call appsln (x, z, y, fspace, ispace)
-////
-////     when saving the coefficients for later reference, only
-////     ispace(1),...,ispace(8+ncomp)    and
-////     fspace(1),...,fspace(ispace(8))    need to be saved as
-////     these are the quantities used by appsln.
-////
-////
-////                 ***   simple continuation   ***
-////
-////
-////     a formerly obtained solution can easily be used as the
-////     first approximation for the nonlinear iteration for a
-////     new problem by setting   (iguess =) ipar(9) = 2, 3 or 4.
-////
-////     if the former solution has just been obtained then the
-////     values needed to define the first approximation are
-////     already in ispace and fspace.
-////     alternatively, if the former solution was obtained in a
-////     previous run and its coefficients were saved then those
-////     coefficients must be put back into
-////     ispace(1),..., ispace(8+ncomp)    and
-////     fspace(1),..., fspace(ispace(8)).
-////
-////     for ipar(9) = 2 or 3 set ipar(3) = ispace(1) ( = the
-////     size of the previous mesh ).
-////
-////     for ipar(9) = 4 the user specifies a new mesh of n subintervals
-////     as follows.
-////     the values in  fspace(1),...,fspace(ispace(8))  have to be
-////     shifted by n+1 locations to  fspace(n+2),..,fspace(ispace(8)+n+1)
-////     and the new mesh is then specified in fspace(1),..., fspace(n+1).
-////     also set ipar(3) = n.
-////
-////
-////**********************************************************************
-////
-////     ***************      package subroutines      ***************
-////
-////     the following description gives a brief overview of how the
-////     procedure is broken down into the subroutines which make up
-////     the package called  coldae . for further details the
-////     user should refer to documentation in the various subroutines
-////     and to the references cited above.
-////
-////     the subroutines fall into four groups:
-////
-//// part 1 - the main storage allocation and program control subr
-////
-////     coldae - tests input values, does initialization and breaks up
-////              the work areas, fspace and ispace, into the arrays
-////              used by the program.
-////
-////     contrl - is the actual driver of the package. this routine
-////              contains the strategy for nonlinear equation solving.
-////
-////     skale  - provides scaling for the control
-////              of convergence in the nonlinear iteration.
-////
-////
-//// part 2 - mesh selection and error estimation subroutines
-////
-////     consts - is called once by  coldae  to initialize constants
-////              which are used for error estimation and mesh selection.
-////
-////     newmsh - generates meshes. it contains the test to decide
-////              whether or not to redistribute a mesh.
-////
-////     errchk - produces error estimates and checks against the
-////              tolerances at each subinterval
-////
-////
-//// part 3 - collocation system set-up subroutines
-////
-////     lsyslv - controls the set-up and solution of the linear
-////              algebraic systems of collocation equations which
-////              arise at each newton iteration.
-////
-////     gderiv - is used by lsyslv to set up the equation associated
-////              with a side condition point.
-////
-////     vwblok - is used by lsyslv to set up the equation(s) associated
-////              with a collocation point.
-////
-////     gblock - is used by lsyslv to construct a block of the global
-////              collocation matrix or the corresponding right hand
-////              side.
-////
-////
-//// part 4 - service subroutines
-////
-////     appsln - sets up a standard call to  approx .
-////
-////     approx - evaluates a piecewise polynomial solution.
-////
-////     rkbas  - evaluates the mesh independent runge-kutta basis
-////
-////     vmonde - solves a vandermonde system for given right hand
-////              side
-////
-////     horder - evaluates the highest order derivatives of the
-////              current collocation solution used for mesh refinement.
-////
-////
-//// part 5 - linear algebra  subroutines
-////
-////     to solve the global linear systems of collocation equations
-////     constructed in part 3,  coldae  uses a column oriented version
-////     of the package  solveblok originally due to de boor and weiss.
-////
-////     to solve the linear systems for static parameter condensation
-////     in each block of the collocation equations, the linpack
-////     routines  dgefa and  dgesl  are included. but these
-////     may be replaced when solving problems on vector processors
-////     or when solving large scale sparse jacobian problems.
-////----------------------------------------------------------------------
-//void COLDAE(NCOMP, NY, M, ALEFT, ARIGHT, ZETA, IPAR, LTOL,
-//    1                   TOL, FIXPNT, ISPACE, FSPACE, IFLAG,
-//    2                   FSUB, DFSUB, GSUB, DGSUB, GUESS)
-//{
-//    IMPLICIT DOUBLE PRECISION(A - H, O - Z)
-//        DIMENSION M(1), ZETA(1), IPAR(1), LTOL(1), TOL(1), DUMMY(1),
-//        1          FIXPNT(1), ISPACE(1), FSPACE(1)
-//        DIMENSION DUMMY2(840)
-//
-//        COMMON / COLOUT / PRECIS, IOUT, IPRINT
-//        COMMON / COLLOC / RHO(7), COEF(49)
-//        COMMON / COLORD / K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX, MT(20)
-//        COMMON / COLAPR / N, NOLD, NMAX, NZ, NDMZ
-//        COMMON / COLMSH / MSHFLG, MSHNUM, MSHLMT, MSHALT
-//        COMMON / COLSID / TZETA(40), TLEFT, TRIGHT, IZETA, IDUM
-//        COMMON / COLNLN / NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-//        COMMON / COLEST / TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-//        1                ROOT(40), JTOL(40), LTTOL(40), NTOL
-//
-//        EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
-//
-//        //*********************************************************************
-//        //
-//        //     the actual subroutine coldae serves as an interface with
-//        //     the package of subroutines referred to collectively as
-//        //     coldae. the subroutine serves to test some of the input
-//        //     parameters, rename some of the parameters (to make under-
-//        //     standing of the coding easier), to do some initialization,
-//        //     and to break the work areas fspace and ispace up into the
-//        //     arrays needed by the program.
-//        //
-//        //**********************************************************************
-//
-//        //  specify machine dependent output unit  iout  and compute machine
-//        //  dependent constant  precis = 100 * machine unit roundoff
-//
-//        if (IPAR(7) <= 0)  WRITE(6, 99)
-//            99  FORMAT(//,' VERSION *1* OF COLDAE .'    ,//)
-//
-//                IOUT = 6
-//                PRECIS = 1.D0
-//                10 PRECIS = PRECIS / 2.D0
-//                PRECP1 = PRECIS + 1.D0
-//                if (PRECP1 > 1.D0)                       goto 10
-//                    PRECIS = PRECIS * 100.D0
-//
-//                    //  in case incorrect input data is detected, the program returns
-//                    //  immediately with iflag=-3.
-//
-//                    IFLAG = -3
-//                    NCY = NCOMP + NY
-//                    if (NCOMP < 0 || NCOMP > 20)        return;
-//    if (NY < 0 || NY > 20)              return;
-//    if (NCY < 1 || NCY > 40)            return;
-//    for (20 i = 1, NCOMP
-//        if (M(i) < 1 || M(i) > 4)        return;
-//        20 CONTINUE
-//
-//            //  rename some of the parameters and set default values.
-//
-//            NONLIN = IPAR(1)
-//            K = IPAR(2)
-//            N = IPAR(3)
-//            if (N == 0)  N = 5
-//                IREAD = IPAR(8)
-//                IGUESS = IPAR(9)
-//                if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0
-//                    if (IGUESS >= 2 && IREAD == 0)   IREAD = 1
-//                        ICARE = IPAR(10)
-//                        NTOL = IPAR(4)
-//                        NDIMF = IPAR(5)
-//                        NDIMI = IPAR(6)
-//                        NFXPNT = IPAR(11)
-//                        IPRINT = IPAR(7)
-//                        INDEX = IPAR(12)
-//                        if (NY == 0) INDEX = 0
-//                            MSTAR = 0
-//                            MMAX = 0
-//                            for (30 i = 1, NCOMP
-//                                MMAX = MAX0(MMAX, M(i))
-//                                MSTAR = MSTAR + M(i)
-//                                MT(i) = M(i)
-//                                30 CONTINUE
-//                                if (K == 0)   K = MAX0(MMAX + 1, 5 - MMAX)
-//                                    for (40 i = 1, MSTAR
-//                                        40 TZETA(i) = ZETA(i)
-//                                        for (50 i = 1, NTOL
-//                                            LTTOL(i) = LTOL(i)
-//                                            50 TOLIN(i) = TOL(i)
-//                                            TLEFT = ALEFT
-//                                            TRIGHT = ARIGHT
-//                                            NC = NCOMP
-//                                            NNY = NY
-//                                            KD = K * NCOMP
-//                                            KDY = K * NCY
-//
-//                                            //  print the input data for checking.
-//
-//                                            if (IPRINT > -1)                         goto 80
-//                                                if (NONLIN == 0) THEN
-//                                                    WRITE(IOUT, 260) NCOMP, (M(IP), IP = 1, NCOMP)
-//                                                else
-//                                                    WRITE(IOUT, 270) NCOMP, (M(IP), IP = 1, NCOMP)
-//                                                    END if
-//                                                    WRITE(IOUT, 275) NY
-//                                                    if (NY > 0 && INDEX == 0) THEN
-//                                                        WRITE(IOUT, 276)
-//                                                    else
-//                                                        WRITE(IOUT, 278) INDEX
-//                                                        END if
-//                                                        WRITE(IOUT, 279)
-//                                                        WRITE(IOUT, 280) (ZETA(IP), IP = 1, MSTAR)
-//                                                        if (NFXPNT > 0)
-//                                                            1   WRITE(IOUT, 340) NFXPNT, (FIXPNT(IP), IP = 1, NFXPNT)
-//                                                            WRITE(IOUT, 290) K
-//                                                            WRITE(IOUT, 299)
-//                                                            WRITE(IOUT, 300) (LTOL(IP), IP = 1, NTOL)
-//                                                            WRITE(IOUT, 309)
-//                                                            WRITE(IOUT, 310) (TOL(IP), IP = 1, NTOL)
-//                                                            if (IGUESS >= 2) WRITE(IOUT, 320)
-//                                                                if (IREAD == 2) WRITE(IOUT, 330)
-//                                                                    80 CONTINUE
-//
-//                                                                    //  check for correctness of data
-//
-//                                                                    if (K < 0 || K > 7)                 return;
-//    if (N < 0)                               return;
-//    if (IREAD < 0 || IREAD > 2)         return;
-//    if (IGUESS < 0 || IGUESS > 4)       return;
-//    if (ICARE < -1 || ICARE > 2)	   return;
-//    if (INDEX < 0 || INDEX > 2)         return;
-//    if (NTOL < 0 || NTOL > MSTAR)       return;
-//    if (NFXPNT < 0)                          return;
-//    if (IPRINT < (-1) || IPRINT > 1)    return;
-//    if (MSTAR < 0 || MSTAR > 40)        return;
-//    IP = 1
-//        for (100 i = 1, MSTAR
-//            if (DABS(ZETA(i) - ALEFT) < PRECIS ||
-//                1     DABS(ZETA(i) - ARIGHT) < PRECIS)     goto 100
-//                90 if (IP > NFXPNT)                         return;
-//            if (ZETA(i) - PRECIS < FIXPNT(IP))     goto 95
-//                IP = IP + 1
-//                goto 90
-//                95 if (ZETA(i) + PRECIS < FIXPNT(IP))       return;
-//            100 CONTINUE
-//
-//                //  set limits on iterations and initialize counters.
-//                //  limit = maximum number of newton iterations per mesh.
-//                //  see subroutine  newmsh  for the roles of  mshlmt , mshflg ,
-//                //  mshnum , and  mshalt .
-//
-//                MSHLMT = 3
-//                MSHFLG = 0
-//                MSHNUM = 1
-//                MSHALT = 1
-//                LIMIT = 40
-//
-//                //  compute the maxium possible n for the given sizes of
-//                //  ispace  and  fspace.
-//
-//                NREC = 0
-//                for (110 i = 1, MSTAR
-//                    IB = MSTAR + 1 - i
-//                    if (ZETA(IB) >= ARIGHT)  NREC = i
-//                        110 CONTINUE
-//                        NFIXI = MSTAR
-//                        NSIZEI = 3 + KDY + MSTAR
-//                        NFIXF = NREC * (2 * MSTAR) + 5 * MSTAR + 3
-//                        NSIZEF = 4 + 3 * MSTAR + (KDY + 5) * (KDY + MSTAR) +
-//                        1(2 * MSTAR - NREC) * 2 * MSTAR + (MSTAR + NY + 2) * NCOMP + KDY
-//                        NMAXF = (NDIMF - NFIXF) / NSIZEF
-//                        NMAXI = (NDIMI - NFIXI) / NSIZEI
-//                        if (IPRINT < 1)  THEN
-//                            WRITE(IOUT, 350)
-//                            WRITE(IOUT, 351) NMAXF, NMAXI
-//                            ENDIF
-//                            NMAX = MIN0(NMAXF, NMAXI)
-//                            if (NMAX < N)                            return;
-//    if (NMAX < NFXPNT + 1)                     return;
-//    if (NMAX < 2 * NFXPNT + 2 && IPRINT < 1)  WRITE(IOUT, 360)
-//
-//        //  generate pointers to break up  fspace  and  ispace .
-//
-//        LXI = 1
-//        LG = LXI + NMAX + 1
-//        LXIOLD = LG + 2 * MSTAR * (NMAX * (2 * MSTAR - NREC) + NREC)
-//        LW = LXIOLD + NMAX + 1
-//        LV = LW + KDY * *2 * NMAX
-//        LFC = LV + MSTAR * KDY * NMAX
-//        LZ = LFC + (MSTAR + NY + 2) * NCOMP * NMAX
-//        LDMZ = LZ + MSTAR * (NMAX + 1)
-//        LDMV = LDMZ + KDY * NMAX
-//        LDELZ = LDMV + KDY * NMAX
-//        LDELDZ = LDELZ + MSTAR * (NMAX + 1)
-//        LDQZ = LDELDZ + KDY * NMAX
-//        LDQDMZ = LDQZ + MSTAR * (NMAX + 1)
-//        LRHS = LDQDMZ + KDY * NMAX
-//        LVALST = LRHS + KDY * NMAX + MSTAR
-//        LSLOPE = LVALST + 4 * MSTAR * NMAX
-//        LACCUM = LSLOPE + NMAX
-//        LSCL = LACCUM + NMAX + 1
-//        LDSCL = LSCL + MSTAR * (NMAX + 1)
-//        LPVTG = 1
-//        LPVTW = LPVTG + MSTAR * (NMAX + 1)
-//        LINTEG = LPVTW + KDY * NMAX
-//
-//        //  if  iguess .ge. 2, move  xiold, z, and  dmz  to their proper
-//        //  locations in  fspace.
-//
-//        if (IGUESS < 2)                          goto 160
-//            NOLD = N
-//            if (IGUESS == 4)  NOLD = ISPACE(1)
-//                NZ = MSTAR * (NOLD + 1)
-//                NDMZ = KDY * NOLD
-//                NP1 = N + 1
-//                if (IGUESS == 4)  NP1 = NP1 + NOLD + 1
-//                    for (120 i = 1, NZ
-//                        120 FSPACE(LZ + i - 1) = FSPACE(NP1 + i)
-//                        IDMZ = NP1 + NZ
-//                        for (125 i = 1, NDMZ
-//                            125 FSPACE(LDMZ + i - 1) = FSPACE(IDMZ + i)
-//                            NP1 = NOLD + 1
-//                            if (IGUESS == 4)                          goto 140
-//                                for (130 i = 1, NP1
-//                                    130 FSPACE(LXIOLD + i - 1) = FSPACE(LXI + i - 1)
-//                                    goto 160
-//                                    140 for (150 i = 1, NP1
-//                                        150 FSPACE(LXIOLD + i - 1) = FSPACE(N + 1 + i)
-//                                        160 CONTINUE
-//
-//                                        //  initialize collocation points, constants, mesh.
-//
-//                                        CALL CONSTS(K, RHO, COEF)
-//                                        if (NY == 0) THEN
-//                                            NYCB = 1
-//                                        else
-//                                            NYCB = NY
-//                                            ENDIF
-//                                            CALL NEWMSH(3 + IREAD, FSPACE(LXI), FSPACE(LXIOLD), DUMMY,
-//                                                1             DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
-//                                                2		   DUMMY2, DFSUB, DUMMY2, DUMMY2, NCOMP, NYCB)
-//
-//                                            //  determine first approximation, if the problem is nonlinear.
-//
-//                                            if (IGUESS >= 2)                            goto 230
-//                                                NP1 = N + 1
-//                                                for (210 i = 1, NP1
-//                                                    210 FSPACE(i + LXIOLD - 1) = FSPACE(i + LXI - 1)
-//                                                    NOLD = N
-//                                                    if (NONLIN == 0 || IGUESS == 1)      goto 230
-//
-//                                                        //  system provides first approximation of the solution.
-//                                                        //  choose z(j) = 0  for j=1,...,mstar.
-//
-//                                                        for (220 i = 1, NZ
-//                                                            220 FSPACE(LZ - 1 + i) = 0.0
-//                                                            for (225 i = 1, NDMZ
-//                                                                225 FSPACE(LDMZ - 1 + i) = 0.0
-//                                                                230 CONTINUE
-//                                                                if (IGUESS >= 2)  IGUESS = 0
-//                                                                    CALL CONTRL(FSPACE(LXI), FSPACE(LXIOLD), FSPACE(LZ), FSPACE(LDMZ),
-//                                                                        +FSPACE(LDMV),
-//                                                                        1     FSPACE(LRHS), FSPACE(LDELZ), FSPACE(LDELDZ), FSPACE(LDQZ),
-//                                                                        2     FSPACE(LDQDMZ), FSPACE(LG), FSPACE(LW), FSPACE(LV), FSPACE(LFC),
-//                                                                        3     FSPACE(LVALST), FSPACE(LSLOPE), FSPACE(LSCL), FSPACE(LDSCL),
-//                                                                        4     FSPACE(LACCUM), ISPACE(LPVTG), ISPACE(LINTEG), ISPACE(LPVTW),
-//                                                                        5     NFXPNT, FIXPNT, IFLAG, FSUB, DFSUB, GSUB, DGSUB, GUESS)
-//
-//                                                                    //  prepare output
-//
-//                                                                    ISPACE(1) = N
-//                                                                    ISPACE(2) = K
-//                                                                    ISPACE(3) = NCOMP
-//                                                                    ISPACE(4) = NY
-//                                                                    ISPACE(5) = MSTAR
-//                                                                    ISPACE(6) = MMAX
-//                                                                    ISPACE(7) = NZ + NDMZ + N + 2
-//                                                                    K2 = K * K
-//                                                                    ISPACE(8) = ISPACE(7) + K2 - 1
-//                                                                    for (240 i = 1, NCOMP
-//                                                                        240 ISPACE(8 + i) = M(i)
-//                                                                        for (250 i = 1, NZ
-//                                                                            250 FSPACE(N + 1 + i) = FSPACE(LZ - 1 + i)
-//                                                                            IDMZ = N + 1 + NZ
-//                                                                            for (255 i = 1, NDMZ
-//                                                                                255 FSPACE(IDMZ + i) = FSPACE(LDMZ - 1 + i)
-//                                                                                IC = IDMZ + NDMZ
-//                                                                                for (258 i = 1, K2
-//                                                                                    258 FSPACE(IC + i) = COEF(i)
-//                                                                                    return;
-//                                                                                    ----------------------------------------------------------------------
-//                                                                                    260 FORMAT(/// ' THE NUMBER OF (LINEAR) DIFF EQNS IS' , I3/ 1X,
-//                                                                                        1       16HTHEIR ORDERS ARE, 20I3)
-//                                                                                    270 FORMAT(/// 40H THE NUMBER OF (NONLINEAR) DIFF EQNS IS , I3/ 1X,
-//                                                                                        1       16HTHEIR ORDERS ARE, 20I3)
-//                                                                                    275 FORMAT(' THERE ARE', I3, ' ALGEBRAIC CONSTRAINTS')
-//                                                                                    276 FORMAT(' THE PROBLEM HAS MIXED INDEX CONSTRAINTS')
-//                                                                                    278 FORMAT(' THE INDEX IS', I2)
-//                                                                                    279 FORMAT(27H SIDE CONDITION POINTS ZETA)
-//                                                                                    280 FORMAT(8F10.6, 4(/ 8F10.6))
-//                                                                                    290 FORMAT(37H NUMBER OF COLLOC PTS PER INTERVAL IS, I3)
-//                                                                                    299 FORMAT(40H COMPONENTS OF Z REQUIRING TOLERANCES - )
-//                                                                                    300 FORMAT(100(/ 8I10))
-//                                                                                    309 FORMAT(33H CORRESPONDING ERROR TOLERANCES - )
-//                                                                                    310 FORMAT(8D10.2)
-//                                                                                    320 FORMAT(44H INITIAL MESH(ES) AND Z, DMZ PROVIDED BY USER)
-//                                                                                    330 FORMAT(27H NO ADAPTIVE MESH SELECTION)
-//                                                                                    340 FORMAT(10H THERE ARE, I5, 27H FIXED POINTS IN THE MESH - ,
-//                                                                                        1       10(6F10.6 / ))
-//                                                                                    350 FORMAT(35H THE MAXIMUM NUMBER OF SUBINTERVALS)
-//                                                                                    351 FORMAT(9H IS MIN(, I4, 23H(ALLOWED FROM FSPACE), , I4,
-//                                                                                        1       24H(ALLOWED FROM ISPACE)))
-//                                                                                    360 FORMAT(/ 53H INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE)
-//}
-//
-//
-////**********************************************************************
-////
-////   purpose
-////     this subroutine is the actual driver.  the nonlinear iteration
-////     strategy is controlled here ( see [6] ). upon convergence, errchk
-////     is called to test for satisfaction of the requested tolerances.
-////
-////   variables
-////
-////     check  - maximum tolerance value, used as part of criteria for
-////              checking for nonlinear iteration convergence
-////     relax  - the relaxation factor for damped newton iteration
-////     relmin - minimum allowable value for relax  (otherwise the
-////              jacobian is considered singular).
-////     rlxold - previous relax
-////     rstart - initial value for relax when problem is sensitive
-////     ifrz   - number of fixed jacobian iterations
-////     lmtfrz - maximum value for ifrz before performing a reinversion
-////     iter   - number of iterations (counted only when jacobian
-////              reinversions are performed).
-////     xi     - current mesh
-////     xiold  - previous mesh
-////     ipred  = 0  if relax is determined by a correction
-////            = 1  if relax is determined by a prediction
-////     ifreez = 0  if the jacobian is to be updated
-////            = 1  if the jacobian is currently fixed (frozen)
-////     iconv  = 0  if no previous convergence has been obtained
-////            = 1  if convergence on a previous mesh has been obtained
-////     icare  =-1  no convergence occurred (used for regular problems)
-////            = 0  a regular problem
-////            = 1  no damped newton
-////            = 2  used for continuation (see description of ipar(10)
-////                 in coldae).
-////     rnorm  - norm of rhs (right hand side) for current iteration
-////     rnold  - norm of rhs for previous iteration
-////     anscl  - scaled norm of newton correction
-////     anfix  - scaled norm of newton correction at next step
-////     anorm  - scaled norm of a correction obtained with jacobian fixed
-////     nz     - number of components of  z  (see subroutine approx)
-////     ndmz   - number of components of  dmz  (see subroutine approx)
-////     imesh  - a control variable for subroutines newmsh and errchk
-////            = 1  the current mesh resulted from mesh selection
-////                 or is the initial mesh.
-////            = 2  the current mesh resulted from doubling the
-////                 previous mesh
-////
-////**********************************************************************
-//void CONTRL(XI, XIOLD, Z, DMZ, DMV, RHS, DELZ, DELDMZ,
-//    1           DQZ, DQDMZ, G, W, V, FC, VALSTR, SLOPE, SCALE, DSCALE,
-//    2           ACCUM, IPVTG, INTEGS, IPVTW, NFXPNT, FIXPNT, IFLAG,
-//    3           FSUB, DFSUB, GSUB, DGSUB, GUESS)
-//{
-//
-//
-//    IMPLICIT DOUBLE PRECISION(A - H, O - Z)
-//        DIMENSION XI(1), XIOLD(1), Z(1), DMZ(1), RHS(1), DMV(1)
-//        DIMENSION G(1), W(1), V(1), VALSTR(1), SLOPE(1), ACCUM(1)
-//        DIMENSION DELZ(1), DELDMZ(1), DQZ(1), DQDMZ(1), FIXPNT(1)
-//        DIMENSION DUMMY(1), SCALE(1), DSCALE(1), FC(1), DF(800)
-//        DIMENSION FCSP(40, 60), CBSP(20, 20)
-//        DIMENSION INTEGS(1), IPVTG(1), IPVTW(1)
-//
-//        COMMON / COLOUT / PRECIS, IOUT, IPRINT
-//        COMMON / COLORD / K, NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX, M(20)
-//        COMMON / COLAPR / N, NOLD, NMAX, NZ, NDMZ
-//        COMMON / COLMSH / MSHFLG, MSHNUM, MSHLMT, MSHALT
-//        COMMON / COLSID / ZETA(40), ALEFT, ARIGHT, IZETA, IDUM
-//        COMMON / COLNLN / NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-//        COMMON / COLEST / TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-//        1                ROOT(40), JTOL(40), LTOL(40), NTOL
-//
-//        EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
-//
-//        //  constants for control of nonlinear iteration
-//
-//        RELMIN = 1. - 3
-//        RSTART = 1. - 2
-//        LMTFRZ = 4
-//
-//        //  compute the maximum tolerance
-//
-//        CHECK = 0.0
-//        for (10 i = 1, NTOL
-//            10   CHECK = DMAX1(TOLIN(i), CHECK)
-//            IMESH = 1
-//            ICONV = 0
-//            if (NONLIN == 0) ICONV = 1
-//                ICOR = 0
-//                NOCONV = 0
-//                MSING = 0
-//                ISING = 0
-//
-//                //  the main iteration begins here .
-//                //  loop 20 is executed until error tolerances are satisfied or
-//                //  the code fails (due to a singular matrix or storage limitations)
-//
-//                20      CONTINUE
-//
-//                //       initialization for a new mesh
-//
-//                ITER = 0
-//                if (NONLIN > 0)                     goto 50
-//
-//                    //       the linear case.
-//                    //       set up and solve equations
-//
-//                    CALL LSYSLV(MSING, XI, XIOLD, DUMMY, DUMMY, Z, DMZ, G,
-//                        1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 0,
-//                        2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                    //       check for a singular matrix
-//
-//                    if (ISING != 0) THEN
-//                        if (IPRINT < 1)  WRITE(IOUT, 497)
-//                            IFLAG = 0
-//                            return;
-//    END if
-//        if (MSING == 0)                      goto 400
-//            30      if (MSING < 0)                      goto 40
-//            if (IPRINT < 1)  WRITE(IOUT, 495)
-//                goto 460
-//                40      if (IPRINT < 1)  WRITE(IOUT, 490)
-//                IFLAG = 0
-//                return;
-//
-//    //       iteration loop for nonlinear case
-//    //       define the initial relaxation parameter (= relax)
-//
-//    50      RELAX = 1.D0
-//
-//        //       check for previous convergence and problem sensitivity
-//
-//        if (ICARE == (-1))  RELAX = RSTART
-//            if (ICARE == 1)     RELAX = 1.D0
-//                if (ICONV == 0)                      goto 160
-//
-//                    //       convergence on a previous mesh has been obtained.    thus
-//                    //       we have a very good initial approximation for the newton
-//                    //       process.    proceed with one full newton and then iterate
-//                    //       with a fixed jacobian.
-//
-//                    IFREEZ = 0
-//
-//                    //       evaluate right hand side and its norm  and
-//                    //       find the first newton correction
-//
-//                    CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-//                        1          W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
-//                        2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                    if (IPRINT < 0)  WRITE(IOUT, 530)
-//                        if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNOLD
-//                            goto 70
-//
-//                            //       solve for the next iterate .
-//                            //       the value of ifreez determines whether this is a full
-//                            //       newton step (=0) or a fixed jacobian iteration (=1).
-//
-//                            60      if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
-//                            RNOLD = RNORM
-//                            CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-//                                1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM,
-//                                2          3 + IFREEZ, FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                            //       check for a singular matrix
-//
-//                            70      if (MSING != 0)                      goto 30
-//                            if (ISING != 0) THEN
-//                                if (IPRINT < 1)  WRITE(IOUT, 497)
-//                                    IFLAG = 0
-//                                    return;
-//    END if
-//        if (IFREEZ == 1)                     goto 80
-//
-//            //       a full newton step
-//
-//            ITER = ITER + 1
-//            IFRZ = 0
-//            80      CONTINUE
-//
-//            //       update   z and dmz , compute new  rhs  and its norm
-//
-//            for (90 i = 1, NZ
-//                Z(i) = Z(i) + DELZ(i)
-//                90      CONTINUE
-//                for (100 i = 1, NDMZ
-//                    DMZ(i) = DMZ(i) + DELDMZ(i)
-//                    100      CONTINUE
-//                    CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-//                        1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
-//                        2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                    //       check monotonicity. if the norm of  rhs  gets smaller,
-//                    //       proceed with a fixed jacobian; else proceed cautiously,
-//                    //       as if convergence has not been obtained before (iconv=0).
-//
-//                    if (RNORM < PRECIS)                 goto 390
-//                        if (RNORM > RNOLD)                  goto 130
-//                            if (IFREEZ == 1)                     goto 110
-//                                IFREEZ = 1
-//                                goto 60
-//
-//                                //       verify that the linear convergence with fixed jacobian
-//                                //       is fast enough.
-//
-//                                110      IFRZ = IFRZ + 1
-//                                if (IFRZ >= LMTFRZ)       IFREEZ = 0
-//                                    if (RNOLD < 4.D0 * RNORM)  IFREEZ = 0
-//
-//                                        //       check convergence (iconv = 1).
-//
-//                                        for (120 IT = 1, NTOL
-//                                            INZ = LTOL(IT)
-//                                            for (120 IZ = INZ, NZ, MSTAR
-//                                                if (DABS(DELZ(IZ)) >
-//                                                    1           TOLIN(IT) * (DABS(Z(IZ)) + 1.D0))  goto 60
-//                                                    120      CONTINUE
-//
-//                                                    //       convergence obtained
-//
-//                                                    if (IPRINT < 1)  WRITE(IOUT, 560) ITER
-//                                                        goto 400
-//
-//                                                        //      convergence of fixed jacobian iteration failed.
-//
-//                                                        130      if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
-//                                                        if (IPRINT < 0)  WRITE(IOUT, 540)
-//                                                            ICONV = 0
-//                                                            if (ICARE != 1)   RELAX = RSTART
-//                                                                for (140 i = 1, NZ
-//                                                                    Z(i) = Z(i) - DELZ(i)
-//                                                                    140      CONTINUE
-//                                                                    for (150 i = 1, NDMZ
-//                                                                        DMZ(i) = DMZ(i) - DELDMZ(i)
-//                                                                        150      CONTINUE
-//
-//                                                                        //       update old mesh
-//
-//                                                                        NP1 = N + 1
-//                                                                        for (155 i = 1, NP1
-//                                                                            155        XIOLD(i) = XI(i)
-//                                                                            NOLD = N
-//
-//                                                                            ITER = 0
-//
-//                                                                            //       no previous convergence has been obtained. proceed
-//                                                                            //       with the damped newton method.
-//                                                                            //       evaluate rhs and find the first newton correction.
-//
-//                                                                            160      if (IPRINT < 0)  WRITE(IOUT, 500)
-//                                                                            CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-//                                                                                1          W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
-//                                                                                2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                                                                            //       check for a singular matrix
-//
-//                                                                            if (MSING != 0)                       goto 30
-//                                                                                if (ISING != 0) THEN
-//                                                                                    if (IPRINT < 1)  WRITE(IOUT, 497)
-//                                                                                        IFLAG = 0
-//                                                                                        return;
-//    END if
-//
-//        //       bookkeeping for first mesh
-//
-//        if (IGUESS == 1)  IGUESS = 0
-//
-//            //       find initial scaling
-//
-//            CALL SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE)
-//            RLXOLD = RELAX
-//            IPRED = 1
-//            goto 220
-//
-//            //       main iteration loop
-//
-//            170      RNOLD = RNORM
-//            if (ITER >= LIMIT)                   goto 430
-//
-//                //       update scaling
-//
-//                CALL SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE)
-//
-//                //       compute norm of newton correction with new scaling
-//
-//                ANSCL = 0.0
-//                for (180 i = 1, NZ
-//                    ANSCL = ANSCL + (DELZ(i) * SCALE(i)) * *2
-//                    180      CONTINUE
-//                    for (190 i = 1, NDMZ
-//                        ANSCL = ANSCL + (DELDMZ(i) * DSCALE(i)) * *2
-//                        190      CONTINUE
-//                        ANSCL = DSQRT(ANSCL / FLOAT(NZ + NDMZ))
-//
-//                        //       find a newton direction
-//
-//                        CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-//                            1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 3,
-//                            2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                        //       check for a singular matrix
-//
-//                        if (MSING != 0)                      goto 30
-//                            if (ISING != 0) THEN
-//                                if (IPRINT < 1)  WRITE(IOUT, 497)
-//                                    IFLAG = 0
-//                                    return;
-//    END if
-//
-//        //       predict relaxation factor for newton step.
-//
-//        if (ICARE != 1)  THEN
-//            ANDIF = 0.0
-//            for (200 i = 1, NZ
-//                ANDIF = ANDIF + ((DQZ(i) - DELZ(i)) * SCALE(i)) * *2
-//                200      CONTINUE
-//                for (210 i = 1, NDMZ
-//                    ANDIF = ANDIF + ((DQDMZ(i) - DELDMZ(i)) * DSCALE(i)) * *2
-//                    210      CONTINUE
-//                    ANDIF = DSQRT(ANDIF / FLOAT(NZ + NDMZ) + PRECIS)
-//                    RELAX = RELAX * ANSCL / ANDIF
-//                    if (RELAX > 1.D0)  RELAX = 1.D0
-//                        RLXOLD = RELAX
-//                        IPRED = 1
-//                        END if
-//                        220      ITER = ITER + 1
-//
-//                        //       determine a new  z and dmz  and find new  rhs  and its norm
-//
-//                        for (230 i = 1, NZ
-//                            Z(i) = Z(i) + RELAX * DELZ(i)
-//                            230      CONTINUE
-//                            for (240 i = 1, NDMZ
-//                                DMZ(i) = DMZ(i) + RELAX * DELDMZ(i)
-//                                240      CONTINUE
-//                                250      CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
-//                                    1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
-//                                    2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                                //       compute a fixed jacobian iterate (used to control relax)
-//
-//                                CALL LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
-//                                    1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
-//                                    2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//
-//                                //       find scaled norms of various terms used to correct relax
-//
-//                                ANORM = 0.0
-//                                ANFIX = 0.0
-//                                for (260 i = 1, NZ
-//                                    ANORM = ANORM + (DELZ(i) * SCALE(i)) * *2
-//                                    ANFIX = ANFIX + (DQZ(i) * SCALE(i)) * *2
-//                                    260      CONTINUE
-//                                    for (270 i = 1, NDMZ
-//                                        ANORM = ANORM + (DELDMZ(i) * DSCALE(i)) * *2
-//                                        ANFIX = ANFIX + (DQDMZ(i) * DSCALE(i)) * *2
-//                                        270      CONTINUE
-//                                        ANORM = DSQRT(ANORM / FLOAT(NZ + NDMZ))
-//                                        ANFIX = DSQRT(ANFIX / FLOAT(NZ + NDMZ))
-//                                        if (ICOR == 1)                         goto 280
-//                                            if (IPRINT < 0)  WRITE(IOUT, 520) ITER, RELAX, ANORM,
-//                                                1           ANFIX, RNOLD, RNORM
-//                                                goto 290
-//                                                280      if (IPRINT < 0) WRITE(IOUT, 550) RELAX, ANORM, ANFIX,
-//                                                1           RNOLD, RNORM
-//                                                290      ICOR = 0
-//
-//                                                //       check for monotonic decrease in  delz and deldmz.
-//
-//                                                if (ANFIX < PRECIS || RNORM < PRECIS)  goto 390
-//                                                    if (ANFIX > ANORM && ICARE != 1)  goto 300
-//
-//                                                        //       we have a decrease.
-//                                                        //       if  dqz  and dqdmz  small, check for convergence
-//
-//                                                        if (ANFIX <= CHECK)                    goto 350
-//
-//                                                            //       correct the predicted  relax  unless the corrected
-//                                                            //       value is within 10 percent of the predicted one.
-//
-//                                                            if (IPRED != 1)                        goto 170
-//                                                                300      if (ITER >= LIMIT)                     goto 430
-//                                                                if (ICARE == 1)                        goto 170
-//
-//                                                                    //       correct the relaxation factor.
-//
-//                                                                    IPRED = 0
-//                                                                    ARG = (ANFIX / ANORM - 1.D0) / RELAX + 1.D0
-//                                                                    if (ARG < 0.0)                       goto 170
-//                                                                        if (ARG <= .25D0 * RELAX + .125D0 * RELAX * *2)  goto 310
-//                                                                            FACTOR = -1.D0 + DSQRT(1.D0 + 8.D0 * ARG)
-//                                                                            if (DABS(FACTOR - 1.D0) < .1D0 * FACTOR)  goto 170
-//                                                                                if (FACTOR < 0.5D0)  FACTOR = 0.5D0
-//                                                                                    RELAX = RELAX / FACTOR
-//                                                                                    goto 320
-//                                                                                    310      if (RELAX >= .9D0)                     goto 170
-//                                                                                    RELAX = 1.D0
-//                                                                                    320      ICOR = 1
-//                                                                                    if (RELAX < RELMIN)                   goto 440
-//                                                                                        FACT = RELAX - RLXOLD
-//                                                                                        for (330 i = 1, NZ
-//                                                                                            Z(i) = Z(i) + FACT * DELZ(i)
-//                                                                                            330      CONTINUE
-//                                                                                            for (340 i = 1, NDMZ
-//                                                                                                DMZ(i) = DMZ(i) + FACT * DELDMZ(i)
-//                                                                                                340      CONTINUE
-//                                                                                                RLXOLD = RELAX
-//                                                                                                goto 250
-//
-//                                                                                                //       check convergence (iconv = 0).
-//
-//                                                                                                350      CONTINUE
-//                                                                                                for (360 IT = 1, NTOL
-//                                                                                                    INZ = LTOL(IT)
-//                                                                                                    for (360 IZ = INZ, NZ, MSTAR
-//                                                                                                        if (DABS(DQZ(IZ)) >
-//                                                                                                            1         TOLIN(IT) * (DABS(Z(IZ)) + 1.D0))   goto 170
-//                                                                                                            360      CONTINUE
-//
-//                                                                                                            //       convergence obtained
-//
-//                                                                                                            if (IPRINT < 1)  WRITE(IOUT, 560) ITER
-//
-//                                                                                                                //       since convergence obtained, update  z and dmz  with term
-//                                                                                                                //       from the fixed jacobian iteration.
-//
-//                                                                                                                for (370 i = 1, NZ
-//                                                                                                                    Z(i) = Z(i) + DQZ(i)
-//                                                                                                                    370      CONTINUE
-//                                                                                                                    for (380 i = 1, NDMZ
-//                                                                                                                        DMZ(i) = DMZ(i) + DQDMZ(i)
-//                                                                                                                        380      CONTINUE
-//                                                                                                                        390      if ((ANFIX < PRECIS || RNORM < PRECIS)
-//                                                                                                                            1 && IPRINT < 1)  WRITE(IOUT, 560) ITER
-//                                                                                                                        ICONV = 1
-//                                                                                                                        if (ICARE == (-1))  ICARE = 0
-//
-//                                                                                                                            //       if full output has been requested, print values of the
-//                                                                                                                            //       solution components   z  at the meshpoints and  y  at
-//                                                                                                                            //       collocation points.
-//
-//                                                                                                                            400      if (IPRINT >= 0)                     goto 420
-//                                                                                                                            for (410 j = 1, MSTAR
-//                                                                                                                                WRITE(IOUT, 610) j
-//                                                                                                                                410        WRITE(IOUT, 620) (Z(LJ), LJ = j, NZ, MSTAR)
-//                                                                                                                                for (415 j = 1, NY
-//                                                                                                                                    WRITE(IOUT, 630) j
-//                                                                                                                                    415        WRITE(IOUT, 620) (DMZ(LJ), LJ = j + NCOMP, NDMZ, KDY)
-//
-//                                                                                                                                    //       check for error tolerance satisfaction
-//
-//                                                                                                                                    420      IFIN = 1
-//                                                                                                                                    if (IMESH == 2) CALL ERRCHK(XI, Z, DMZ, VALSTR, IFIN)
-//                                                                                                                                        if (IMESH == 1 ||
-//                                                                                                                                            1          IFIN == 0 && ICARE != 2)     goto 460
-//                                                                                                                                            IFLAG = 1
-//                                                                                                                                            return;
-//
-//    //       diagnostics for failure of nonlinear iteration.
-//
-//    430      if (IPRINT < 1)  WRITE(IOUT, 570) ITER
-//        goto 450
-//        440	   if (IPRINT < 1)	THEN
-//        WRITE(IOUT, 580) RELAX
-//        WRITE(IOUT, 581) RELMIN
-//        ENDIF
-//        450      IFLAG = -2
-//        NOCONV = NOCONV + 1
-//        if (ICARE == 2 && NOCONV > 1)  return;
-//    if (ICARE == 0)  ICARE = -1
-//
-//        //       update old mesh
-//
-//        460      NP1 = N + 1
-//        for (470 i = 1, NP1
-//            470        XIOLD(i) = XI(i)
-//            NOLD = N
-//
-//            //       pick a new mesh
-//            //       check safeguards for mesh refinement
-//
-//            IMESH = 1
-//            if (ICONV == 0 || MSHNUM >= MSHLMT
-//                1 || MSHALT >= MSHLMT)  IMESH = 2
-//                if (MSHALT >= MSHLMT &&
-//                    1		MSHNUM < MSHLMT)  MSHALT = 1
-//                    if (NY == 0) THEN
-//                        NYCB = 1
-//                    else
-//                        NYCB = NY
-//                        ENDIF
-//
-//                        CALL NEWMSH(IMESH, XI, XIOLD, Z, DMZ, DMV, VALSTR,
-//                            1                  SLOPE, ACCUM, NFXPNT, FIXPNT, DF, DFSUB,
-//                            2			FCSP, CBSP, NCOMP, NYCB)
-//
-//                        //       exit if expected n is too large (but may try n=nmax once)
-//
-//                        if (N <= NMAX)                       goto 480
-//                            N = N / 2
-//                            IFLAG = -1
-//                            if (ICONV == 0 && IPRINT < 1)  WRITE(IOUT, 590)
-//                                if (ICONV == 1 && IPRINT < 1)  WRITE(IOUT, 600)
-//                                    return;
-//    480      if (ICONV == 0)  IMESH = 1
-//        if (ICARE == 1)  ICONV = 0
-//            goto 20
-//            -------------------------------------------------------------- -
-//            490 FORMAT(//35H THE GLOBAL BVP-MATRIX IS SINGULAR )
-//                495 FORMAT(//40H A LOCAL ELIMINATION MATRIX IS SINGULAR )
-//                    497 FORMAT(// 'SINGULAR PROJECTION MATRIX DUE TO INDEX > 2' )
-//                        500 FORMAT(/ 30H FULL DAMPED NEWTON ITERATION, )
-//                        510 FORMAT(13H ITERATION =, I3, 15H  NORM(RHS) =, D10.2)
-//                        520 FORMAT(13H ITERATION =, I3, 22H  RELAXATION FACTOR =, D10.2
-//                            1 / 33H NORM OF SCALED RHS CHANGES FROM, D10.2, 3H TO, D10.2
-//                            2 / 33H NORM   OF   RHS  CHANGES  FROM, D10.2, 3H TO, D10.2,
-//                            2       D10.2)
-//                        530 FORMAT(/ 27H FIXED JACOBIAN ITERATIONS, )
-//                        540 FORMAT(/ 35H SWITCH TO DAMPED NEWTON ITERATION, )
-//                        550 FORMAT(40H RELAXATION FACTOR CORRECTED TO RELAX =, D10.2
-//                            1 / 33H NORM OF SCALED RHS CHANGES FROM, D10.2, 3H TO, D10.2
-//                            2 / 33H NORM   OF   RHS  CHANGES  FROM, D10.2, 3H TO, D10.2
-//                            2, D10.2)
-//                        560 FORMAT(/ 18H CONVERGENCE AFTER, I3, 11H ITERATIONS / )
-//                        570 FORMAT(/ 22H NO CONVERGENCE AFTER, I3, 11H ITERATIONS / )
-//                        580 FORMAT(/ 37H NO CONVERGENCE.RELAXATION FACTOR =, D10.3
-//                            1, 13H IS TOO SMALL)
-//                        581 FORMAT(10H(LESS THAN, D10.3, 1H) / )
-//                        590 FORMAT(18H(NO CONVERGENCE))
-//                        600 FORMAT(50H(PROBABLY TOLERANCES TOO STRINGENT, OR NMAX TOO
-//                            1, 6HSMALL))
-//                        610 FORMAT(19H MESH VALUES FOR Z(, I2, 2H), )
-//                        620 FORMAT(1H, 5D15.7)
-//                        630 FORMAT(' VALUES AT 1st COLLOCATION POINTS FOR Y(', I2, 2H), )
-//}
+//     method
 //
+//        the method used to approximate the solution u is
+//     collocation at gaussian points, requiring m(i)-1 continuous
+//     derivatives in the i-th component, i = 1, ..., ncomp.
+//     here, k is the number of collocation points (stages) per
+//     subinterval and is chosen such that k .ge. max m(i).
+//     a runge-kutta-monomial solution representation is utilized.
+//     for hessenberg index-2 daes, a projection on the constraint
+//     manifold at each interval's end is used [2].
 //
+//     references
 //
+//     [1] u. ascher and r. spiteri,
+//         collocation software for boundary value differential-
+//         algebraic equations,
+//         siam j. scient. stat. comput., to appear.
+//
+//     [2] u. ascher and l. petzold,
+//         projected implicit runge-kutta methods for differential-
+//         algebraic equations,
+//         siam j. num. anal. 28 (1991), 1097-1120.
+//
+//     [3] u. ascher, j. christiansen and r.d. russell,
+//         collocation software for boundary-value odes,
+//         acm trans. math software 7 (1981), 209-222.
+//
+//     [4] g. bader and u. ascher,
+//         a new basis implementation for a mixed order
+//         boundary value ode solver,
+//         siam j. scient. stat. comput. 8 (1987), 483-500.
+//
+//     [5] u. ascher, j. christiansen and r.d. russell,
+//         a collocation solver for mixed order
+//         systems of boundary value problems,
+//         math. comp. 33 (1979), 659-679.
+//
+//     [6] u. ascher, j. christiansen and r.d. russell,
+//         colsys - a collocation code for boundary
+//         value problems,
+//         lecture notes comp.sc. 76, springer verlag,
+//         b. childs et. al. (eds.) (1979), 164-185.
+//
+//     [7] c. deboor and r. weiss,
+//         solveblok: a package for solving almost block diagonal
+//         linear systems,
+//         acm trans. math. software 6 (1980), 80-87.
+//
+//
+//**********************************************************************
+//
+//     ***************     input to coldae     ***************
+//
+//     variables
+//
+//     ncomp - no. of differential equations   (ncomp .le. 20)
+//
+//     ny   - no. of constraints     (ny .le. 20)
+//
+//     m(j) - order of the j-th differential equation
+//            ( mstar = m(1) + ... + m(ncomp) .le. 40 )
+//
+//     aleft - left end of interval
+//
+//     aright - right end of interval
+//
+//     zeta(j) - j-th side condition point (boundary point). must
+//               have  zeta(j) .le. zeta(j+1). all side condition
+//               points must be mesh points in all meshes used,
+//               see description of ipar(11) and fixpnt below.
+//
+//     ipar - an integer array dimensioned at least 11.
+//            a list of the parameters in ipar and their meaning follows
+//            some parameters are renamed in coldae; these new names are
+//            given in parentheses.
+//
+//     ipar(1)     ( = nonlin )
+//             = 0 if the problem is linear
+//             = 1 if the problem is nonlinear
+//
+//     ipar(2) = no. of collocation points per subinterval  (= k )
+//               where max m(i) .le.  k .le. 7 . if ipar(2)=0 then
+//               coldae sets  k = max ( max m(i)+1, 5-max m(i) )
+//
+//     ipar(3) = no. of subintervals in the initial mesh  ( = n ).
+//               if ipar(3) = 0 then coldae arbitrarily sets n = 5.
+//
+//     ipar(4) = no. of solution and derivative tolerances.  ( = ntol )
+//               we require  0 .lt. ntol .le. mstar.
+//
+//     ipar(5) = dimension of fspace.     ( = ndimf )
+//
+//     ipar(6) = dimension of ispace.     ( = ndimi )
+//
+//     ipar(7) -  output control ( = iprint )
+//              = -1 for full diagnostic printout
+//              = 0 for selected printout
+//              = 1 for no printout
+//
+//     ipar(8)     ( = iread )
+//             = 0 causes coldae to generate a uniform initial mesh.
+//             = 1 if the initial mesh is provided by the user.  it
+//                 is defined in fspace as follows:  the mesh
+//                 aleft=x(1).lt.x(2).lt. ... .lt.x(n).lt.x(n+1)=aright
+//                 will occupy  fspace(1), ..., fspace(n+1). the
+//                 user needs to supply only the interior mesh
+//                 points  fspace(j) = x(j), j = 2, ..., n.
+//             = 2 if the initial mesh is supplied by the user
+//                 as with ipar(8)=1, and in addition no adaptive
+//                 mesh selection is to be done.
+//
+//     ipar(9)     ( = iguess )
+//             = 0 if no initial guess for the solution is
+//                 provided.
+//             = 1 if an initial guess is provided by the user
+//                 in subroutine  guess.
+//             = 2 if an initial mesh and approximate solution
+//                 coefficients are provided by the user in  fspace.
+//                 (the former and new mesh are the same).
+//             = 3 if a former mesh and approximate solution
+//                 coefficients are provided by the user in fspace,
+//                 and the new mesh is to be taken twice as coarse;
+//                 i.e.,every second point from the former mesh.
+//             = 4 if in addition to a former initial mesh and
+//                 approximate solution coefficients, a new mesh
+//                 is provided in fspace as well.
+//                 (see description of output for further details
+//                 on iguess = 2, 3, and 4.)
+//
+//     ipar(10)= -1 if the first relax factor is RSTART
+//		(use for an extra sensitive nonlinear problem only)
+//	      =  0 if the problem is regular
+//	      =  1 if the newton iterations are not to be damped
+//                 (use for initial value problems).
+//	      =  2 if we are to return immediately upon  (a) two
+//                 successive nonconvergences, or  (b) after obtaining
+//                 error estimate for the first time.
+//
+//     ipar(11)= no. of fixed points in the mesh other than aleft
+//               and aright. ( = nfxpnt , the dimension of fixpnt)
+//               the code requires that all side condition points
+//               other than aleft and aright (see description of
+//               zeta ) be included as fixed points in fixpnt.
+//
+//     ipar(12)    ( = index )
+//                 this parameter is ignored if ny=0.
+//             = 0 if the index of the dae is not as per one of the
+//                 following cases
+//             = 1 if the index of the dae is 1. in this case the
+//                 ny x ny jacobian matrix of the constraints with
+//                 respect to the algebraic unknowns, i.e.
+//                 df(i,j), i=ncomp+1,...,ncomp+ny,
+//                          j=mstar+1,...,mstar+ny
+//                 (see description of dfsub below)
+//                 is nonsingular wherever it is evaluated. this
+//                 allows usual collocation to be safely used.
+//             = 2 if the index of the dae is 2 and it is in Hessenberg
+//                 form. in this case the
+//                 ny x ny jacobian matrix of the constraints with
+//                 respect to the algebraic unknowns is 0, and the
+//                 ny x ny matrix  CB  is nonsingular, where
+//                 (i,j) = df(i+ncomp, m(j)), i=1,...,ny,
+//                                             j=1,...,ncomp
+//                 B(i,j) = df(i,j+mstar),     i=1,...,ncomp,
+//                                             j=1,...,ny
+//                 the projected collocation method described in [2]
+//                 is then used.
+//             in case of ipar(12)=0 and ny > 0, coldae determines the
+//             appropriate projection needed at the right end of each
+//             mesh subinterval using SVD. this is the most expensive
+//             and most general option.
+//
+//     ltol  -  an array of dimension ipar(4). ltol(j) = l  specifies
+//              that the j-th tolerance in  tol  controls the error
+//              in the l-th component of z(u).   also require that
+//              1.le.ltol(1).lt.ltol(2).lt. ... .lt.ltol(ntol).le.mstar
+//
+//     tol    - an array of dimension ipar(4). tol(j) is the
+//              error tolerance on the ltol(j) -th component
+//              of z(u). thus, the code attempts to satisfy
+//              for j=1,...,ntol  on each subinterval
+//              abs(z(v)-z(u))       .le. tol(j)*abs(z(u))       +tol(j)
+//                            ltol(j)                     ltol(j)
+//
+//              if v(x) is the approximate solution vector.
+//
+//     fixpnt - an array of dimension ipar(11).   it contains
+//              the points, other than aleft and aright, which
+//              are to be included in every mesh.
+//
+//     ispace - an integer work array of dimension ipar(6).
+//              its size provides a constraint on nmax,
+//              the maximum number of subintervals. choose
+//              ipar(6) according to the formula
+//                      ipar(6)  .ge.  nmax*nsizei
+//                where
+//                      nsizei = 3 + kdm
+//                with
+//                      kdm = kdy + mstar  ;  kdy = k * (ncomp+ny) ;
+//                      nrec = no. of right end boundary conditions.
+//
+//
+//     fspace - a real work array of dimension ipar(5).
+//              its size provides a constraint on nmax.
+//              choose ipar(5) according to the formula
+//                      ipar(5)  .ge.  nmax*nsizef
+//                where
+//                      nsizef = 4 + 3 * mstar + (5+kdy) * kdm +
+//                              (2*mstar-nrec) * 2*mstar +
+//                              ncomp*(mstar+ny+2) + kdy.
+//
+//
+//     iflag - the mode of return from coldae.
+//           = 1 for normal return
+//           = 0 if the collocation matrix is singular.
+//           =-1 if the expected no. of subintervals exceeds storage
+//               specifications.
+//           =-2 if the nonlinear iteration has not converged.
+//           =-3 if there is an input data error.
+//
+//
+//**********************************************************************
+//
+//     *************    user supplied subroutines   *************
+//
+//
+//     the following subroutines must be declared external in the
+//     main program which calls coldae.
+//
+//
+//     fsub  - name of subroutine for evaluating f(x,z(u(x)),y(x)) =
+//                               t
+//             (f ,...,f        )  at a point x in (aleft,aright).  it
+//               1      ncomp+ny
+//             should have the heading
+//
+//                       subroutine fsub (x , z , y, f)
+//
+//             where f is the vector containing the value of fi(x,z(u),y)
+//             in the i-th component and y(x) = (y(1),...y(ny)) and
+//                                       z(u(x))=(z(1),...,z(mstar))
+//             are defined as above under  purpose .
+//
+//
+//     dfsub - name of subroutine for evaluating the jacobian of
+//             f(x,z(u),y) at a point x.  it should have the heading
+//
+//                       subroutine dfsub (x , z , y, df)
+//
+//             where z(u(x)) and y(x) are defined as for fsub and the
+//             (ncomp+ny) by (mstar+ny)
+//             array  df  should be filled by the partial deriv-
+//             atives of f, viz, for a particular call one calculates
+//                          df(i,j) = dfi / dzj, i=1,...,ncomp+ny
+//                                               j=1,...,mstar,
+//                          df(i,mstar+j) = dfi / dyj, i=1,...,ncomp+ny
+//                                               j=1,...,ny.
+//
+//
+//     gsub  - name of subroutine for evaluating the i-th component of
+//             g(x,z(u(x))) = g (zeta(i),z(u(zeta(i)))) at a point x =
+//                             i
+//             zeta(i) where 1.le.i.le.mstar. it should have the heading
+//
+//                       subroutine gsub (i , z , g)
+//
+//             where z(u) is as for fsub, and i and g=g  are as above.
+//                                                     i
+//             note that in contrast to f in  fsub , here
+//             only one value per call is returned in g.
+//             also, g is independent of y and, in case of a higher
+//             index dae (index = 2), should include the constraints
+//             sampled at aleft  plus independent additional constraints,
+//             or an equivalent set.
+//
+//
+//     dgsub - name of subroutine for evaluating the i-th row of
+//             the jacobian of g(x,z(u(x))).  it should have the heading
+//
+//                       subroutine dgsub (i , z , dg)
+//
+//             where z(u) is as for fsub, i as for gsub and the mstar-
+//             vector dg should be filled with the partial derivatives
+//             of g, viz, for a particular call one calculates
+//                   dg(i,j) = dgi / dzj      j=1,...,mstar.
+//
+//
+//     guess - name of subroutine to evaluate the initial
+//             approximation for  z(u(x)), y(x) and for dmval(u(x))= vector
+//             of the mj-th derivatives of u(x). it should have the
+//             heading
+//
+//                       subroutine guess (x , z , y, dmval)
+//
+//             note that this subroutine is needed only if using
+//             ipar(9) = 1, and then all  mstar  components of z,
+//             ny components of  y
+//             and  ncomp  components of  dmval  should be specified
+//             for any x,  aleft .le. x .le. aright .
+//
+//
+//**********************************************************************
+//
+//     ************   use of output from coldae   ************
+//
+//                 ***   solution evaluation   ***
+//
+//     on return from coldae, the arrays fspace and ispace
+//     contain information specifying the approximate solution.
+//     the user can produce the solution vector  z( u(x) ), y(x)  at
+//     any point x, aleft .le. x .le. aright, by the statement,
+//
+//           call appsln (x, z, y, fspace, ispace)
+//
+//     when saving the coefficients for later reference, only
+//     ispace(1),...,ispace(8+ncomp)    and
+//     fspace(1),...,fspace(ispace(8))    need to be saved as
+//     these are the quantities used by appsln.
+//
+//
+//                 ***   simple continuation   ***
+//
+//
+//     a formerly obtained solution can easily be used as the
+//     first approximation for the nonlinear iteration for a
+//     new problem by setting   (iguess =) ipar(9) = 2, 3 or 4.
+//
+//     if the former solution has just been obtained then the
+//     values needed to define the first approximation are
+//     already in ispace and fspace.
+//     alternatively, if the former solution was obtained in a
+//     previous run and its coefficients were saved then those
+//     coefficients must be put back into
+//     ispace(1),..., ispace(8+ncomp)    and
+//     fspace(1),..., fspace(ispace(8)).
+//
+//     for ipar(9) = 2 or 3 set ipar(3) = ispace(1) ( = the
+//     size of the previous mesh ).
+//
+//     for ipar(9) = 4 the user specifies a new mesh of n subintervals
+//     as follows.
+//     the values in  fspace(1),...,fspace(ispace(8))  have to be
+//     shifted by n+1 locations to  fspace(n+2),..,fspace(ispace(8)+n+1)
+//     and the new mesh is then specified in fspace(1),..., fspace(n+1).
+//     also set ipar(3) = n.
+//
+//
+//**********************************************************************
+//
+//     ***************      package subroutines      ***************
+//
+//     the following description gives a brief overview of how the
+//     procedure is broken down into the subroutines which make up
+//     the package called  coldae . for further details the
+//     user should refer to documentation in the various subroutines
+//     and to the references cited above.
+//
+//     the subroutines fall into four groups:
+//
+// part 1 - the main storage allocation and program control subr
+//
+//     coldae - tests input values, does initialization and breaks up
+//              the work areas, fspace and ispace, into the arrays
+//              used by the program.
+//
+//     contrl - is the actual driver of the package. this routine
+//              contains the strategy for nonlinear equation solving.
+//
+//     skale  - provides scaling for the control
+//              of convergence in the nonlinear iteration.
+//
+//
+// part 2 - mesh selection and error estimation subroutines
+//
+//     consts - is called once by  coldae  to initialize constants
+//              which are used for error estimation and mesh selection.
+//
+//     newmsh - generates meshes. it contains the test to decide
+//              whether or not to redistribute a mesh.
+//
+//     errchk - produces error estimates and checks against the
+//              tolerances at each subinterval
+//
+//
+// part 3 - collocation system set-up subroutines
+//
+//     lsyslv - controls the set-up and solution of the linear
+//              algebraic systems of collocation equations which
+//              arise at each newton iteration.
+//
+//     gderiv - is used by lsyslv to set up the equation associated
+//              with a side condition point.
+//
+//     vwblok - is used by lsyslv to set up the equation(s) associated
+//              with a collocation point.
+//
+//     gblock - is used by lsyslv to construct a block of the global
+//              collocation matrix or the corresponding right hand
+//              side.
+//
+//
+// part 4 - service subroutines
+//
+//     appsln - sets up a standard call to  approx .
+//
+//     approx - evaluates a piecewise polynomial solution.
+//
+//     rkbas  - evaluates the mesh independent runge-kutta basis
+//
+//     vmonde - solves a vandermonde system for given right hand
+//              side
+//
+//     horder - evaluates the highest order derivatives of the
+//              current collocation solution used for mesh refinement.
+//
+//
+// part 5 - linear algebra  subroutines
+//
+//     to solve the global linear systems of collocation equations
+//     constructed in part 3,  coldae  uses a column oriented version
+//     of the package  solveblok originally due to de boor and weiss.
+//
+//     to solve the linear systems for static parameter condensation
+//     in each block of the collocation equations, the linpack
+//     routines  dgefa and  dgesl  are included. but these
+//     may be replaced when solving problems on vector processors
+//     or when solving large scale sparse jacobian problems.
+//----------------------------------------------------------------------
+
+
+
+void COLDAE(int NCOMP, int NY, iarr1 M, double ALEFT, double ARIGHT, darr1 ZETA, iarr1 IPAR, iarr1 LTOL,
+	darr1 TOL, darr1 FIXPNT, iarr1 ISPACE, darr1 FSPACE, int IFLAG,
+	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+{
+	M.assertDim(1);
+	ZETA.assertDim(1);
+	IPAR.assertDim(1);
+	LTOL.assertDim(1);
+	TOL.assertDim(1);
+	darr1 DUMMY(1);
+	FIXPNT.assertDim(1);
+	ISPACE.assertDim(1);
+	FSPACE.assertDim(1);
+	darr1 DUMMY2(840);
+
+
+
+	//*********************************************************************
+	//
+	//     the actual subroutine coldae serves as an interface with
+	//     the package of subroutines referred to collectively as
+	//     coldae. the subroutine serves to test some of the input
+	//     parameters, rename some of the parameters (to make under-
+	//     standing of the coding easier), to do some initialization,
+	//     and to break the work areas fspace and ispace up into the
+	//     arrays needed by the program.
+	//
+	//**********************************************************************
+
+	//  specify machine dependent output unit  iout  and compute machine
+	//  dependent constant  precis = 100 * machine unit roundoff
+
+//if (IPAR(7) <= 0)  WRITE(6, 99)
+//	99  FORMAT(//,' VERSION *1* OF COLDAE .'    ,//)
+
+	IOUT = 6;
+	PRECIS = 1.0;
+	int PRECP1;
+	do {
+		PRECIS = PRECIS / 2.0;
+		PRECP1 = PRECIS + 1.0;
+	} while (PRECP1 > 1.0);
+
+	PRECIS = PRECIS * 100.0;
+
+	//  in case incorrect input data is detected, the program returns
+	//  immediately with iflag=-3.
+
+	IFLAG = -3;
+	int NCY = NCOMP + NY;
+	if (NCOMP < 0 || NCOMP > 20)
+		return;
+	if (NY < 0 || NY > 20)
+		return;
+	if (NCY < 1 || NCY > 40)
+		return;
+	for (int i = 1; i <= NCOMP; ++i)
+		if (M(i) < 1 || M(i) > 4)
+			return;
+
+
+	//  rename some of the parameters and set default values.
+
+	NONLIN = IPAR(1);
+	K = IPAR(2);
+	N = IPAR(3);
+	if (N == 0)  N = 5;
+	int IREAD = IPAR(8);
+	IGUESS = IPAR(9);
+	if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
+	if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
+	ICARE = IPAR(10);
+	NTOL = IPAR(4);
+	int NDIMF = IPAR(5);
+	int NDIMI = IPAR(6);
+	int NFXPNT = IPAR(11);
+	IPRINT = IPAR(7);
+	INDEX = IPAR(12);
+	if (NY == 0) INDEX = 0;
+	MSTAR = 0;
+	MMAX = 0;
+
+	for (int i = 1; i <= NCOMP; ++i) {
+		MMAX = std::max(MMAX, M(i));
+		MSTAR = MSTAR + M(i);
+		MT(i) = M(i);
+	}
+	if (K == 0)   K = std::max(MMAX + 1, 5 - MMAX);
+	for (int i = 1; i <= MSTAR; ++i)
+		TZETA(i) = ZETA(i);
+	for (int i = 1; i <= NTOL; ++i) {
+		LTTOL(i) = LTOL(i);
+		TOLIN(i) = TOL(i);
+	}
+	TLEFT = ALEFT;
+	TRIGHT = ARIGHT;
+	NC = NCOMP;
+	NNY = NY;
+	KD = K * NCOMP;
+	KDY = K * NCY;
+
+	//  print the input data for checking.
+
+	if (IPRINT <= -1)
+	{
+		if (NONLIN == 0) {
+			//WRITE(IOUT, 260) NCOMP, (M(IP), IP = 1, NCOMP)
+		}
+		else {
+			//   WRITE(IOUT, 270) NCOMP, (M(IP), IP = 1, NCOMP)
+		}
+
+		// WRITE(IOUT, 275) NY
+		if (NY > 0 && INDEX == 0) {
+			//WRITE(IOUT, 276)
+		}
+		else {
+			//WRITE(IOUT, 278) INDEX
+		}
+		// WRITE(IOUT, 279)
+		// WRITE(IOUT, 280) (ZETA(IP), IP = 1, MSTAR)
+		if (NFXPNT > 0) {
+			//WRITE(IOUT, 340) NFXPNT, (FIXPNT(IP), IP = 1, NFXPNT)
+		}
+		// WRITE(IOUT, 290) K
+		// WRITE(IOUT, 299)
+		// WRITE(IOUT, 300) (LTOL(IP), IP = 1, NTOL)
+		// WRITE(IOUT, 309)
+		// WRITE(IOUT, 310) (TOL(IP), IP = 1, NTOL)
+		if (IGUESS >= 2) {//WRITE(IOUT, 320)
+		}
+		if (IREAD == 2) {// WRITE(IOUT, 330)
+		}
+	}
+
+	//  check for correctness of data
+
+	if (K < 0 || K > 7)                return;
+	if (N < 0)                         return;
+	if (IREAD < 0 || IREAD > 2)        return;
+	if (IGUESS < 0 || IGUESS > 4)      return;
+	if (ICARE < -1 || ICARE > 2)	   return;
+	if (INDEX < 0 || INDEX > 2)        return;
+	if (NTOL < 0 || NTOL > MSTAR)      return;
+	if (NFXPNT < 0)                    return;
+	if (IPRINT < (-1) || IPRINT > 1)   return;
+	if (MSTAR < 0 || MSTAR > 40)       return;
+
+	int IP = 1;
+	for (int i = 1; i <= MSTAR; ++i) {
+		if (DABS(ZETA(i) - ALEFT) < PRECIS || DABS(ZETA(i) - ARIGHT) < PRECIS)
+			continue;
+
+		while (true) {
+			if (IP > NFXPNT)
+				return;
+			if (ZETA(i) - PRECIS < FIXPNT(IP))
+				break;
+			IP = IP + 1;
+		}
+
+		if (ZETA(i) + PRECIS < FIXPNT(IP))
+			return;
+	}
+
+	//  set limits on iterations and initialize counters.
+	//  limit = maximum number of newton iterations per mesh.
+	//  see subroutine  newmsh  for the roles of  mshlmt , mshflg ,
+	//  mshnum , and  mshalt .
+
+	MSHLMT = 3;
+	MSHFLG = 0;
+	MSHNUM = 1;
+	MSHALT = 1;
+	LIMIT = 40;
+
+	//  compute the maxium possible n for the given sizes of
+	//  ispace  and  fspace.
+
+	int NREC = 0;
+	for (int i = 1; i <= MSTAR; ++i) {
+		int IB = MSTAR + 1 - i;
+		if (ZETA(IB) >= ARIGHT)  NREC = i;
+	}
+	int NFIXI = MSTAR;
+	int NSIZEI = 3 + KDY + MSTAR;
+	int NFIXF = NREC * (2 * MSTAR) + 5 * MSTAR + 3;
+	int NSIZEF = 4 + 3 * MSTAR + (KDY + 5) * (KDY + MSTAR) + (2 * MSTAR - NREC) * 2 * MSTAR + (MSTAR + NY + 2) * NCOMP + KDY;
+	int NMAXF = (NDIMF - NFIXF) / NSIZEF;
+	int NMAXI = (NDIMI - NFIXI) / NSIZEI;
+	if (IPRINT < 1) {
+		/*WRITE(IOUT, 350)
+			WRITE(IOUT, 351) NMAXF, NMAXI*/
+	}
+	NMAX = MIN0(NMAXF, NMAXI);
+	if (NMAX < N)
+		return;
+	if (NMAX < NFXPNT + 1)                     return;
+	if (NMAX < 2 * NFXPNT + 2 && IPRINT < 1) {//WRITE(IOUT, 360)
+	}
+
+
+	//  generate pointers to break up  fspace  and  ispace .
+	int LXI = 1;
+	int LG = LXI + NMAX + 1;
+	int LXIOLD = LG + 2 * MSTAR * (NMAX * (2 * MSTAR - NREC) + NREC);
+	int  LW = LXIOLD + NMAX + 1;
+	int  LV = LW + (KDY * KDY) * NMAX;
+	int  LFC = LV + MSTAR * KDY * NMAX;
+	int  LZ = LFC + (MSTAR + NY + 2) * NCOMP * NMAX;
+	int  LDMZ = LZ + MSTAR * (NMAX + 1);
+	int  LDMV = LDMZ + KDY * NMAX;
+	int  LDELZ = LDMV + KDY * NMAX;
+	int  LDELDZ = LDELZ + MSTAR * (NMAX + 1);
+	int  LDQZ = LDELDZ + KDY * NMAX;
+	int  LDQDMZ = LDQZ + MSTAR * (NMAX + 1);
+	int  LRHS = LDQDMZ + KDY * NMAX;
+	int  LVALST = LRHS + KDY * NMAX + MSTAR;
+	int LSLOPE = LVALST + 4 * MSTAR * NMAX;
+	int  LACCUM = LSLOPE + NMAX;
+	int LSCL = LACCUM + NMAX + 1;
+	int  LDSCL = LSCL + MSTAR * (NMAX + 1);
+	int LPVTG = 1;
+	int LPVTW = LPVTG + MSTAR * (NMAX + 1);
+	int LINTEG = LPVTW + KDY * NMAX;
+
+
+	//  if  iguess .ge. 2, move  xiold, z, and  dmz  to their proper
+	//  locations in  fspace.
+	if (IGUESS >= 2) {
+		NOLD = N;
+		if (IGUESS == 4)
+			NOLD = ISPACE(1);
+		NZ = MSTAR * (NOLD + 1);
+		NDMZ = KDY * NOLD;
+		int NP1 = N + 1;
+		if (IGUESS == 4)
+			NP1 = NP1 + NOLD + 1;
+		for (int i = 1; i <= NZ; ++i)
+			FSPACE(LZ + i - 1) = FSPACE(NP1 + i);
+		int IDMZ = NP1 + NZ;
+		for (int i = 1; i <= NDMZ; ++i)
+			FSPACE(LDMZ + i - 1) = FSPACE(IDMZ + i);
+		NP1 = NOLD + 1;
+		if (IGUESS == 4) {
+			for (int i = 1; i <= NP1; ++i)
+				FSPACE(LXIOLD + i - 1) = FSPACE(N + 1 + i);
+		}
+		else {
+			for (int i = 1; i <= NP1; ++i)
+				FSPACE(LXIOLD + i - 1) = FSPACE(LXI + i - 1);
+		}
+	}
+
+	//  initialize collocation points, constants, mesh.
+
+	CONSTS(K, RHO, COEF);
+	int NYCB;
+	if (NY == 0)
+		NYCB = 1;
+	else
+		NYCB = NY;
+
+	NEWMSH(3 + IREAD, FSPACE(LXI), FSPACE(LXIOLD), DUMMY,
+		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
+		DUMMY2, dfsub, DUMMY2, DUMMY2, NCOMP, NYCB);
+
+	//  determine first approximation, if the problem is nonlinear.
+
+	if (IGUESS >= 2)
+		goto n230;
+	int NP1 = N + 1;
+	for (int i = 1; i <= NP1; ++i)
+		FSPACE(i + LXIOLD - 1) = FSPACE(i + LXI - 1);
+	NOLD = N;
+	if (NONLIN == 0 || IGUESS == 1)
+		goto n230;
+
+	//  system provides first approximation of the solution.
+	//  choose z(j) = 0  for j=1,...,mstar.
+
+	for (int i = 1; i <= NZ; ++i)
+		FSPACE(LZ - 1 + i) = 0.0;
+	for (int i = 1; i <= NDMZ; ++i)
+		FSPACE(LDMZ - 1 + i) = 0.0;
+
+
+n230:
+
+	if (IGUESS >= 2)  IGUESS = 0;
+	CONTRL(FSPACE(LXI), FSPACE(LXIOLD), FSPACE(LZ), FSPACE(LDMZ),
+		+FSPACE(LDMV),
+		FSPACE(LRHS), FSPACE(LDELZ), FSPACE(LDELDZ), FSPACE(LDQZ),
+		FSPACE(LDQDMZ), FSPACE(LG), FSPACE(LW), FSPACE(LV), FSPACE(LFC),
+		FSPACE(LVALST), FSPACE(LSLOPE), FSPACE(LSCL), FSPACE(LDSCL),
+		FSPACE(LACCUM), ISPACE(LPVTG), ISPACE(LINTEG), ISPACE(LPVTW),
+		NFXPNT, FIXPNT, IFLAG, fsub, dfsub, gsub, dgsub, guess);
+
+	//  prepare output
+	ISPACE(1) = N;
+	ISPACE(2) = K;
+	ISPACE(3) = NCOMP;
+	ISPACE(4) = NY;
+	ISPACE(5) = MSTAR;
+	ISPACE(6) = MMAX;
+	ISPACE(7) = NZ + NDMZ + N + 2;
+	int K2 = K * K;
+	ISPACE(8) = ISPACE(7) + K2 - 1;
+	for (int i = 1; i <= NCOMP; ++i)
+		ISPACE(8 + i) = M(i);
+	for (int i = 1; i <= NZ; ++i)
+		FSPACE(N + 1 + i) = FSPACE(LZ - 1 + i);
+	int IDMZ = N + 1 + NZ;
+
+	for (int i = 1; i <= NDMZ; ++i)
+		FSPACE(IDMZ + i) = FSPACE(LDMZ - 1 + i);
+	int IC = IDMZ + NDMZ;
+	for (int i = 1; i <= K2; ++i)
+		FSPACE(IC + i) = COEF(i);
+	return;
+	/*----------------------------------------------------------------------
+	260 FORMAT(/// ' THE NUMBER OF (LINEAR) DIFF EQNS IS' , I3/ 1X,
+		1       16HTHEIR ORDERS ARE, 20I3)
+	270 FORMAT(/// 40H THE NUMBER OF (NONLINEAR) DIFF EQNS IS , I3/ 1X,
+		1       16HTHEIR ORDERS ARE, 20I3)
+	275 FORMAT(' THERE ARE', I3, ' ALGEBRAIC CONSTRAINTS')
+	276 FORMAT(' THE PROBLEM HAS MIXED INDEX CONSTRAINTS')
+	278 FORMAT(' THE INDEX IS', I2)
+	279 FORMAT(27H SIDE CONDITION POINTS ZETA)
+	280 FORMAT(8F10.6, 4(/ 8F10.6))
+	290 FORMAT(37H NUMBER OF COLLOC PTS PER INTERVAL IS, I3)
+	299 FORMAT(40H COMPONENTS OF Z REQUIRING TOLERANCES - )
+	300 FORMAT(100(/ 8I10))
+	309 FORMAT(33H CORRESPONDING ERROR TOLERANCES - )
+	310 FORMAT(8D10.2)
+	320 FORMAT(44H INITIAL MESH(ES) AND Z, DMZ PROVIDED BY USER)
+	330 FORMAT(27H NO ADAPTIVE MESH SELECTION)
+	340 FORMAT(10H THERE ARE, I5, 27H FIXED POINTS IN THE MESH - ,
+		1       10(6F10.6 / ))
+	350 FORMAT(35H THE MAXIMUM NUMBER OF SUBINTERVALS)
+	351 FORMAT(9H IS MIN(, I4, 23H(ALLOWED FROM FSPACE), , I4,
+		1       24H(ALLOWED FROM ISPACE)))
+	360 FORMAT(/ 53H INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE)*/
+}
+
+
+//**********************************************************************
+//
+//   purpose
+//     this subroutine is the actual driver.  the nonlinear iteration
+//     strategy is controlled here ( see [6] ). upon convergence, errchk
+//     is called to test for satisfaction of the requested tolerances.
+//
+//   variables
+//
+//     check  - maximum tolerance value, used as part of criteria for
+//              checking for nonlinear iteration convergence
+//     relax  - the relaxation factor for damped newton iteration
+//     relmin - minimum allowable value for relax  (otherwise the
+//              jacobian is considered singular).
+//     rlxold - previous relax
+//     rstart - initial value for relax when problem is sensitive
+//     ifrz   - number of fixed jacobian iterations
+//     lmtfrz - maximum value for ifrz before performing a reinversion
+//     iter   - number of iterations (counted only when jacobian
+//              reinversions are performed).
+//     xi     - current mesh
+//     xiold  - previous mesh
+//     ipred  = 0  if relax is determined by a correction
+//            = 1  if relax is determined by a prediction
+//     ifreez = 0  if the jacobian is to be updated
+//            = 1  if the jacobian is currently fixed (frozen)
+//     iconv  = 0  if no previous convergence has been obtained
+//            = 1  if convergence on a previous mesh has been obtained
+//     icare  =-1  no convergence occurred (used for regular problems)
+//            = 0  a regular problem
+//            = 1  no damped newton
+//            = 2  used for continuation (see description of ipar(10)
+//                 in coldae).
+//     rnorm  - norm of rhs (right hand side) for current iteration
+//     rnold  - norm of rhs for previous iteration
+//     anscl  - scaled norm of newton correction
+//     anfix  - scaled norm of newton correction at next step
+//     anorm  - scaled norm of a correction obtained with jacobian fixed
+//     nz     - number of components of  z  (see subroutine approx)
+//     ndmz   - number of components of  dmz  (see subroutine approx)
+//     imesh  - a control variable for subroutines newmsh and errchk
+//            = 1  the current mesh resulted from mesh selection
+//                 or is the initial mesh.
+//            = 2  the current mesh resulted from doubling the
+//                 previous mesh
+//
+//**********************************************************************
+void CONTRL(darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 RHS, darr1 DELZ, darr1 DELDMZ,
+	darr1 DQZ, darr1 DQDMZ, darr1 G, darr1 W, darr1 V, darr1 FC, darr1 VALSTR, darr1 SLOPE, darr1 SCALE, darr1 DSCALE,
+	darr1 ACCUM, int  IPVTG, int INTEGS, int IPVTW, int NFXPNT, darr1 FIXPNT, int IFLAG,
+	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+{
+	XI.assertDim(1);
+	XIOLD.assertDim(1);
+	Z.assertDim(1);
+	DMZ.assertDim(1);
+	RHS.assertDim(1);
+	DMV.assertDim(1);
+
+	G.assertDim(1);
+	W.assertDim(1);
+	V.assertDim(1);
+	VALSTR.assertDim(1);
+	SLOPE.assertDim(1);
+	ACCUM.assertDim(1);
+
+	DELZ.assertDim(1);
+	DELDMZ.assertDim(1);
+	DQZ.assertDim(1);
+	DQDMZ.assertDim(1);
+	FIXPNT.assertDim(1);
+	darr1 DUMMY(1);
+	SCALE.assertDim(1);
+	DSCALE.assertDim(1);
+	FC.assertDim(1);
+	darr1 DF(800);
+	darr2 FCSP(40, 60);
+	darr2 CBSP(20, 20);
+	iarr1 INTEGS(1), IPVTG(1), IPVTW(1);
+
+
+	//  constants for control of nonlinear iteration
+
+	double RELMIN = 1. - 3;
+	double     RSTART = 1. - 2;
+	double LMTFRZ = 4;
+
+	//  compute the maximum tolerance
+
+	double CHECK = 0.0;
+	for (int i = 1; i <= NTOL; ++i)
+		CHECK = DMAX1(TOLIN(i), CHECK);
+	int IMESH = 1;
+	int ICONV = 0;
+	if (NONLIN == 0) ICONV = 1;
+	int ICOR = 0;
+	int NOCONV = 0;
+	int MSING = 0;
+	int ISING = 0;
+
+	//  the main iteration begins here .
+	//  loop 20 is executed until error tolerances are satisfied or
+	//  the code fails (due to a singular matrix or storage limitations)
+
+n20:
+
+	//       initialization for a new mesh
+
+	ITER = 0;
+	if (NONLIN > 0)
+		goto n50;
+
+	//       the linear case.
+	//       set up and solve equations
+	LSYSLV(MSING, XI, XIOLD, DUMMY, DUMMY, Z, DMZ, G,
+		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 0,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       check for a singular matrix
+	if (ISING != 0) {
+		if (IPRINT < 1) {// WRITE(IOUT, 497)
+		}
+		IFLAG = 0;
+		return;
+	}
+	if (MSING == 0)
+		goto 400;
+	if (MSING >= 0) {
+		if (IPRINT < 1) {
+			//WRITE(IOUT, 495)
+		}
+		goto 460;
+	}
+	if (IPRINT < 1) {
+		//WRITE(IOUT, 490)
+	}
+	IFLAG = 0;
+	return;
+
+	//       iteration loop for nonlinear case
+	//       define the initial relaxation parameter (= relax)
+
+n50:
+	RELAX = 1.0;
+
+	//       check for previous convergence and problem sensitivity
+	if (ICARE == (-1))  RELAX = RSTART;
+	if (ICARE == 1)     RELAX = 1.0;
+	if (ICONV == 0)
+		goto 160;
+
+	//       convergence on a previous mesh has been obtained.    thus
+	//       we have a very good initial approximation for the newton
+	//       process.    proceed with one full newton and then iterate
+	//       with a fixed jacobian.
+
+	IFREEZ = 0;
+
+	//       evaluate right hand side and its norm  and
+	//       find the first newton correction
+
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	if (IPRINT < 0) {
+		//WRITE(IOUT, 530)
+	}
+	if (IPRINT < 0) {
+		//WRITE(IOUT, 510) ITER, RNOLD
+	}
+	goto 70;
+
+	//       solve for the next iterate .
+	//       the value of ifreez determines whether this is a full
+	//       newton step (=0) or a fixed jacobian iteration (=1).
+
+	60:
+	if (IPRINT < 0) {
+		//WRITE(IOUT, 510) ITER, RNORM;
+	}
+	RNOLD = RNORM;
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM,
+		3 + IFREEZ, FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       check for a singular matrix
+
+	70:
+	if (MSING != 0)
+		goto 30;
+	if (ISING != 0) {
+		if (IPRINT < 1) {
+			//WRITE(IOUT, 497)
+		}
+		IFLAG = 0;
+		return;
+	}
+	if (IFREEZ != 1) {
+		//       a full newton step
+		ITER = ITER + 1;
+		IFRZ = 0;
+	}
+
+	//       update   z and dmz , compute new  rhs  and its norm
+	for (int i = 1; i <= NZ; ++i)
+		Z(i) = Z(i) + DELZ(i);
+	for (int i = 1; i <= NDMZ; ++i)
+		DMZ(i) = DMZ(i) + DELDMZ(i);
+
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       check monotonicity. if the norm of  rhs  gets smaller,
+	//       proceed with a fixed jacobian; else proceed cautiously,
+	//       as if convergence has not been obtained before (iconv=0).
+	if (RNORM < PRECIS)
+		goto 390;
+	if (RNORM > RNOLD)
+		goto 130;
+	if (IFREEZ == 1)
+		goto 110;
+	IFREEZ = 1;
+	goto 60;
+
+	//       verify that the linear convergence with fixed jacobian
+	//       is fast enough.
+
+	110:
+	IFRZ = IFRZ + 1;
+	if (IFRZ >= LMTFRZ)       IFREEZ = 0;
+	if (RNOLD < 4.0 * RNORM)  IFREEZ = 0;
+
+	//       check convergence (iconv = 1).
+	for (int IT = 1; IT <= NTOL; ++IT) {
+		INZ = LTOL(IT);
+		for (int IZ = INZ; IZ <= NZ, IZ += MSTAR) {
+			if (DABS(DELZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+				goto 60;
+		}
+	}
+
+	//       convergence obtained
+
+	if (IPRINT < 1) {// WRITE(IOUT, 560) ITER
+	}
+	goto 400;
+
+	//      convergence of fixed jacobian iteration failed.
+
+	130:
+	/*if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
+	if (IPRINT < 0)  WRITE(IOUT, 540)*/
+	ICONV = 0;
+	if (ICARE != 1)   RELAX = RSTART;
+	for (int i = 1; i <= NZ; ++i)
+		Z(i) = Z(i) - DELZ(i);
+	for (int i = 1; i <= NDMZ; ++i)
+		DMZ(i) = DMZ(i) - DELDMZ(i);
+
+
+	//       update old mesh
+	int NP1 = N + 1;
+	for (int i = 1; i <= NP1; ++i)
+		XIOLD(i) = XI(i);
+	NOLD = N;
+
+	ITER = 0;
+
+	//       no previous convergence has been obtained. proceed
+	//       with the damped newton method.
+	//       evaluate rhs and find the first newton correction.
+
+	160:
+	//if (IPRINT < 0)  WRITE(IOUT, 500)
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       check for a singular matrix
+	if (MSING != 0)
+		goto 30;
+	if (ISING != 0) {
+		//if (IPRINT < 1)  WRITE(IOUT, 497)
+		IFLAG = 0;
+		return;
+	}
+
+	//       bookkeeping for first mesh
+	if (IGUESS == 1) 
+		IGUESS = 0;
+
+	//       find initial scaling
+	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
+	RLXOLD = RELAX;
+	IPRED = 1;
+	goto 220;
+
+	170:
+	//       main iteration loop
+	RNOLD = RNORM;
+	if (ITER >= LIMIT)
+		goto 430;
+
+	//       update scaling
+	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
+
+	//       compute norm of newton correction with new scaling
+	ANSCL = 0.0;
+	for (int i = 1; i <= NZ; ++i)
+		ANSCL = ANSCL + pow(DELZ(i) * SCALE(i), 2);
+
+	for (int i = 1; i <= NDMZ; ++i)
+		ANSCL = ANSCL + pow(DELDMZ(i) * DSCALE(i), 2);
+
+	ANSCL = sqrt(ANSCL / float(NZ + NDMZ));
+
+	//       find a newton direction
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 3,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       check for a singular matrix
+	if (MSING != 0)
+		goto 30;
+
+	if (ISING != 0) {
+		//if (IPRINT < 1)  WRITE(IOUT, 497)
+		IFLAG = 0;
+		return;
+	}
+
+	//       predict relaxation factor for newton step.
+	if (ICARE != 1) {
+		double ANDIF = 0.0;
+		for (int i = 1; i <= NZ; ++i)
+			ANDIF = ANDIF + pow((DQZ(i) - DELZ(i)) * SCALE(i), 2);
+
+		for (int i = 1; i <= NDMZ; ++i)
+			ANDIF = ANDIF + pow((DQDMZ(i) - DELDMZ(i)) * DSCALE(i), 2);
+
+		ANDIF = sqrt(ANDIF / float(NZ + NDMZ) + PRECIS);
+		RELAX = RELAX * ANSCL / ANDIF;
+		if (RELAX > 1.0)  RELAX = 1.0;
+		RLXOLD = RELAX;
+		IPRED = 1;
+	}
+	220:
+		ITER = ITER + 1;
+
+	//       determine a new  z and dmz  and find new  rhs  and its norm
+	for (int i = 1; i <= NZ; ++i)
+		Z(i) = Z(i) + RELAX * DELZ(i);
+
+	for (int i = 1; i <= NDMZ; ++i)
+		DMZ(i) = DMZ(i) + RELAX * DELDMZ(i);
+
+	250:
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
+			FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       compute a fixed jacobian iterate (used to control relax)
+	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
+		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
+		FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING);
+
+	//       find scaled norms of various terms used to correct relax
+	double ANORM = 0.0;
+	double ANFIX = 0.0;
+	for (int i = 1; NZ; ++i) {
+		ANORM = ANORM + pow(DELZ(i) * SCALE(i), 2);
+		ANFIX = ANFIX + pow(DQZ(i) * SCALE(i), 2);
+	}
+	for (int i = 1; NDMZ; ++i) {
+		ANORM = ANORM + pow(DELDMZ(i) * DSCALE(i), 2);
+		ANFIX = ANFIX + pow(DQDMZ(i) * DSCALE(i), 2);
+	}
+	ANORM = sqrt(ANORM / float(NZ + NDMZ));
+	ANFIX = sqrt(ANFIX / float(NZ + NDMZ));
+	if (ICOR == 1){
+		//if (IPRINT < 0) WRITE(IOUT, 550) RELAX, ANORM, ANFIX,  RNOLD, RNORM
+	}
+	else {
+		//if (IPRINT < 0)  WRITE(IOUT, 520) ITER, RELAX, ANORM, ANFIX, RNOLD, RNORM
+	}
+
+	ICOR = 0;
+
+	//       check for monotonic decrease in  delz and deldmz.
+
+	if (ANFIX < PRECIS || RNORM < PRECIS) 
+		goto 390;
+	if (ANFIX <= ANORM || ICARE == 1) {
+		//       we have a decrease.
+		//       if  dqz  and dqdmz  small, check for convergence
+		if (ANFIX <= CHECK)
+			goto 350;
+
+		//       correct the predicted  relax  unless the corrected
+		//       value is within 10 percent of the predicted one.
+		if (IPRED != 1)
+			goto 170;
+	}
+	if (ITER >= LIMIT)
+		goto 430;
+	if (ICARE == 1)
+		goto 170;
+
+	//       correct the relaxation factor.
+	IPRED = 0;
+	double ARG = (ANFIX / ANORM - 1.0) / RELAX + 1.0;
+	if (ARG < 0.0)
+		goto 170;
+	if (ARG > .25 * RELAX + .125 * RELAX * RELAX) {
+		double FACTOR = -1.0 + sqrt(1.0 + 8.0 * ARG);
+		if (DABS(FACTOR - 1.0) < .10 * FACTOR)
+			goto 170;
+		if (FACTOR < 0.50)
+			FACTOR = 0.5;
+		RELAX = RELAX / FACTOR;
+	}
+	else {
+		if (RELAX >= .9)
+			goto 170;
+		RELAX = 1.0;
+	}
+	ICOR = 1;
+	if (RELAX >= RELMIN) {
+		double FACT = RELAX - RLXOLD;
+		for (int i = 1; NZ; ++i)
+			Z(i) = Z(i) + FACT * DELZ(i);
+
+		for (int i = 1; NDMZ; ++i) {
+			DMZ(i) = DMZ(i) + FACT * DELDMZ(i);
+		}
+		RLXOLD = RELAX;
+		goto 250;
+
+
+		//       check convergence (iconv = 0).
+		350:
+
+		for (int IT = 1, ; IT <= NTOL; ++IT) {
+			INZ = LTOL(IT);
+			for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
+				if (DABS(DQZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+					goto 170;
+			}
+		}
+		//       convergence obtained
+
+		//if (IPRINT < 1)  WRITE(IOUT, 560) ITER
+
+		//       since convergence obtained, update  z and dmz  with term
+		//       from the fixed jacobian iteration.
+		for (int i = 1; i <= NZ; ++i)
+			Z(i) = Z(i) + DQZ(i);
+
+		for (int i = 1; i <= NDMZ; ++i)
+			DMZ(i) = DMZ(i) + DQDMZ(i);
+
+		390:
+
+		//if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1)  WRITE(IOUT, 560) ITER
+		ICONV = 1;
+		if (ICARE == (-1))  ICARE = 0;
+
+		400:
+
+		//       if full output has been requested, print values of the
+		//       solution components   z  at the meshpoints and  y  at
+		//       collocation points.
+		if (IPRINT >= 0)
+			goto 420;
+		//for (j = 1, MSTAR) WRITE(IOUT, 610) j
+
+		//WRITE(IOUT, 620) (Z(LJ), LJ = j, NZ, MSTAR)
+		for (int j = 1; j <= NY; ++j) {
+			//WRITE(IOUT, 630) j
+			//WRITE(IOUT, 620) (DMZ(LJ), LJ = j + NCOMP, NDMZ, KDY)
+		}
+
+		420:
+
+		//       check for error tolerance satisfaction
+		IFIN = 1;
+		if (IMESH == 2)
+			ERRCHK(XI, Z, DMZ, VALSTR, IFIN);
+		if (IMESH == 1 || IFIN == 0 && ICARE != 2)
+			goto 460;
+		IFLAG = 1;
+		return;
+
+		
+		430:
+		// diagnostics for failure of nonlinear iteration.
+		//if (IPRINT < 1)  WRITE(IOUT, 570) ITER
+	}
+	else {
+		if (IPRINT < 1) {
+			/*	WRITE(IOUT, 580) RELAX
+					WRITE(IOUT, 581) RELMIN*/
+		}
+	}
+
+	IFLAG = -2;
+	NOCONV = NOCONV + 1;
+	if (ICARE == 2 && NOCONV > 1)
+		return;
+	if (ICARE == 0)  ICARE = -1
+
+	460:
+
+	//       update old mesh
+	NP1 = N + 1;
+	for (int i = 1; i <= NP1; ++i)
+		XIOLD(i) = XI(i);
+	NOLD = N;
+
+	//       pick a new mesh
+	//       check safeguards for mesh refinement
+	IMESH = 1;
+	if (ICONV == 0 || MSHNUM >= MSHLMT || MSHALT >= MSHLMT) 
+		IMESH = 2;
+	if (MSHALT >= MSHLMT && MSHNUM < MSHLMT) 
+		MSHALT = 1;
+	if (NY == 0)
+		NYCB = 1;
+	else
+		NYCB = NY;
+
+
+	NEWMSH(IMESH, XI, XIOLD, Z, DMZ, DMV, VALSTR,
+		SLOPE, ACCUM, NFXPNT, FIXPNT, DF, DFSUB,
+		FCSP, CBSP, NCOMP, NYCB);
+
+	//       exit if expected n is too large (but may try n=nmax once)
+	if (N > NMAX)
+	{
+		N = N / 2;
+		IFLAG = -1;
+		// if (ICONV == 0 && IPRINT < 1)  WRITE(IOUT, 590)
+		// if (ICONV == 1 && IPRINT < 1)  WRITE(IOUT, 600)
+		return;
+	}
+	if (ICONV == 0)  IMESH = 1;
+	if (ICARE == 1)  ICONV = 0;
+	goto 20;
+	//-------------------------------------------------------------- -
+	//490 FORMAT(//35H THE GLOBAL BVP-MATRIX IS SINGULAR )
+	//    495 FORMAT(//40H A LOCAL ELIMINATION MATRIX IS SINGULAR )
+	//        497 FORMAT(// 'SINGULAR PROJECTION MATRIX DUE TO INDEX > 2' )
+	//            500 FORMAT(/ 30H FULL DAMPED NEWTON ITERATION, )
+	//            510 FORMAT(13H ITERATION =, I3, 15H  NORM(RHS) =, D10.2)
+	//            520 FORMAT(13H ITERATION =, I3, 22H  RELAXATION FACTOR =, D10.2
+	//                1 / 33H NORM OF SCALED RHS CHANGES FROM, D10.2, 3H TO, D10.2
+	//                2 / 33H NORM   OF   RHS  CHANGES  FROM, D10.2, 3H TO, D10.2,
+	//                2       D10.2)
+	//            530 FORMAT(/ 27H FIXED JACOBIAN ITERATIONS, )
+	//            540 FORMAT(/ 35H SWITCH TO DAMPED NEWTON ITERATION, )
+	//            550 FORMAT(40H RELAXATION FACTOR CORRECTED TO RELAX =, D10.2
+	//                1 / 33H NORM OF SCALED RHS CHANGES FROM, D10.2, 3H TO, D10.2
+	//                2 / 33H NORM   OF   RHS  CHANGES  FROM, D10.2, 3H TO, D10.2
+	//                2, D10.2)
+	//            560 FORMAT(/ 18H CONVERGENCE AFTER, I3, 11H ITERATIONS / )
+	//            570 FORMAT(/ 22H NO CONVERGENCE AFTER, I3, 11H ITERATIONS / )
+	//            580 FORMAT(/ 37H NO CONVERGENCE.RELAXATION FACTOR =, D10.3
+	//                1, 13H IS TOO SMALL)
+	//            581 FORMAT(10H(LESS THAN, D10.3, 1H) / )
+	//            590 FORMAT(18H(NO CONVERGENCE))
+	//            600 FORMAT(50H(PROBABLY TOLERANCES TOO STRINGENT, OR NMAX TOO
+	//                1, 6HSMALL))
+	//            610 FORMAT(19H MESH VALUES FOR Z(, I2, 2H), )
+	//            620 FORMAT(1H, 5D15.7)
+	//            630 FORMAT(' VALUES AT 1st COLLOCATION POINTS FOR Y(', I2, 2H), )
+}
+
+
+
 //
 //
 //
@@ -1622,15 +1698,15 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //
 //        COMMON / COLORD / K, NCOMP, NY, NCY, ID1, KD, ID3, MMAX, M(20)
 //
-//        BASM(1) = 1.D0
+//        BASM(1) = 1.0
 //        for (50 j = 1, N
 //            IZ = 1
 //            H = XI(j + 1) - XI(j)
 //            for (10 l = 1, MMAX
-//                BASM(l + 1) = BASM(l) * H / FLOAT(l)
+//                BASM(l + 1) = BASM(l) * H / float(l)
 //                10    CONTINUE
 //                for (40 ICOMP = 1, NCOMP
-//                    SCAL = (DABS(Z(IZ, j)) + DABS(Z(IZ, j + 1))) * .5D0 + 1.D0
+//                    SCAL = (DABS(Z(IZ, j)) + DABS(Z(IZ, j + 1))) * .5D0 + 1.0
 //                    MJ = M(ICOMP)
 //                    for (20 l = 1, MJ
 //                        SCALE(IZ, j) = BASM(l) / SCAL
@@ -1642,7 +1718,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                            30      CONTINUE
 //                            40    CONTINUE
 //                            for (45 ICOMP = 1 + NCOMP, NCY
-//                                SCAL = 1.D0 / (DABS(DMZ(ICOMP, j)) + 1.D0)
+//                                SCAL = 1.0 / (DABS(DMZ(ICOMP, j)) + 1.0)
 //                                for (45 IDMZ = ICOMP, KDY, NCY
 //                                    DSCALE(IDMZ, j) = SCAL
 //                                    45    CONTINUE
@@ -1813,7 +1889,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                            //       new mesh - this is xi(iright) and the (j-1)st fixed
 //                            //       point is in xi(ileft)
 //
-//                            NMIN = (XRIGHT - ALEFT) / (ARIGHT - ALEFT) * FLOAT(N) + 1.5D0
+//                            NMIN = (XRIGHT - ALEFT) / (ARIGHT - ALEFT) * float(N) + 1.5D0
 //                            if (NMIN > N - NFXPNT + j)  NMIN = N - NFXPNT + j
 //                                IRIGHT = MAX0(ILEFT + 1, NMIN)
 //                                60      XI(IRIGHT) = XRIGHT
@@ -1823,9 +1899,9 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //
 //                                NREGN = IRIGHT - ILEFT - 1
 //                                if (NREGN == 0)                      goto 80
-//                                    DX = (XRIGHT - XLEFT) / FLOAT(NREGN + 1)
+//                                    DX = (XRIGHT - XLEFT) / float(NREGN + 1)
 //                                    for (70 i = 1, NREGN
-//                                        70      XI(ILEFT + i) = XLEFT + FLOAT(i) * DX
+//                                        70      XI(ILEFT + i) = XLEFT + float(i) * DX
 //                                        80      ILEFT = IRIGHT
 //                                        XLEFT = XRIGHT
 //                                        90 CONTINUE
@@ -1861,12 +1937,12 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //
 //        KSTORE = 1
 //        for (130 i = 1, NOLD
-//            HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.D0
+//            HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0
 //            X = XIOLD(i) + HD6
 //            CALL APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE(1, 1),
 //                +DUMMY, XIOLD, NOLD, Z, DMZ,
 //                1         K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
-//            X = X + 4.D0 * HD6
+//            X = X + 4.0 * HD6
 //            KSTORE = KSTORE + 3 * MSTAR
 //            CALL APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE(1, 4),
 //                +DUMMY, XIOLD, NOLD, Z, DMZ,
@@ -1882,7 +1958,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //            140 KSTORE = 1
 //            for (150 i = 1, N
 //                X = XI(i)
-//                HD6 = (XI(i + 1) - XI(i)) / 6.D0
+//                HD6 = (XI(i + 1) - XI(i)) / 6.0
 //                for (150 j = 1, 4
 //                    X = X + HD6
 //                    if (j == 3)  X = X + HD6
@@ -1899,7 +1975,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //
 //                        j = 2
 //                        for (170 i = 1, N
-//                            XI(j) = (XIOLD(i) + XIOLD(i + 1)) / 2.D0
+//                            XI(j) = (XIOLD(i) + XIOLD(i + 1)) / 2.0
 //                            XI(j + 1) = XIOLD(i + 1)
 //                            170 j = j + 2
 //                            N = N2
@@ -2020,12 +2096,12 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                CALL HORDER(2, D2, HIOLD, DMV, NCOMP, NCY, K)
 //                                                                                                                ACCUM(1) = 0.0
 //                                                                                                                SLOPE(1) = 0.0
-//                                                                                                                ONEOVH = 2.D0 / (XIOLD(3) - XIOLD(1))
+//                                                                                                                ONEOVH = 2.0 / (XIOLD(3) - XIOLD(1))
 //                                                                                                                for (190 j = 1, NTOL
 //                                                                                                                    JJ = JTOL(j)
 //                                                                                                                    JZ = LTOL(j)
 //                                                                                                                    190 SLOPE(1) = DMAX1(SLOPE(1), (DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) *
-//                                                                                                                        1           ONEOVH / (1.D0 + DABS(Z(JZ)))) * *ROOT(j))
+//                                                                                                                        1           ONEOVH / (1.0 + DABS(Z(JZ)))) * *ROOT(j))
 //                                                                                                                    SLPHMX = SLOPE(1) * (XIOLD(2) - XIOLD(1))
 //                                                                                                                    ACCUM(2) = SLPHMX
 //                                                                                                                    IFLIP = 1
@@ -2039,7 +2115,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                            1        CALL HORDER(i, D1, HIOLD, DMV, NCOMP, NCY, K)
 //                                                                                                                            if (IFLIP == 1)
 //                                                                                                                                1        CALL HORDER(i, D2, HIOLD, DMV, NCOMP, NCY, K)
-//                                                                                                                                ONEOVH = 2.D0 / (XIOLD(i + 1) - XIOLD(i - 1))
+//                                                                                                                                ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1))
 //                                                                                                                                SLOPE(i) = 0.0
 //
 //                                                                                                                                //       evaluate function to be equidistributed
@@ -2048,7 +2124,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                                    JJ = JTOL(j)
 //                                                                                                                                    JZ = LTOL(j) + (i - 1) * MSTAR
 //                                                                                                                                    SLOPE(i) = DMAX1(SLOPE(i), (DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) *
-//                                                                                                                                        1                  ONEOVH / (1.D0 + DABS(Z(JZ)))) * *ROOT(j))
+//                                                                                                                                        1                  ONEOVH / (1.0 + DABS(Z(JZ)))) * *ROOT(j))
 //                                                                                                                                    200      CONTINUE
 //
 //                                                                                                                                    //       accumulate approximate integral of function to be
@@ -2059,12 +2135,12 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                                    ACCUM(i + 1) = ACCUM(i) + TEMP
 //                                                                                                                                    IFLIP = -IFLIP
 //                                                                                                                                    210 CONTINUE
-//                                                                                                                                    AVRG = ACCUM(NOLD + 1) / FLOAT(NOLD)
+//                                                                                                                                    AVRG = ACCUM(NOLD + 1) / float(NOLD)
 //                                                                                                                                    DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS)
 //
 //                                                                                                                                    //  naccum=expected n to achieve .1x user requested tolerances
 //
-//                                                                                                                                    NACCUM = ACCUM(NOLD + 1) + 1.D0
+//                                                                                                                                    NACCUM = ACCUM(NOLD + 1) + 1.0
 //                                                                                                                                    if (IPRINT < 0)  WRITE(IOUT, 350) DEGEQU, NACCUM
 //
 //                                                                                                                                        //  decide if mesh selection is worthwhile (otherwise, halve)
@@ -2115,7 +2191,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                                                                                230      CONTINUE
 //                                                                                                                                                                                240      CONTINUE
 //                                                                                                                                                                                ACCR = ACCUM(LNEW) + (FIXPNT(i) - XIOLD(LNEW)) * SLOPE(LNEW - 1)
-//                                                                                                                                                                                NREGN = (ACCR - ACCL) / ACCUM(NOLDP1) * FLOAT(N) - .5D0
+//                                                                                                                                                                                NREGN = (ACCR - ACCL) / ACCUM(NOLDP1) * float(N) - .5D0
 //                                                                                                                                                                                NREGN = MIN0(NREGN, N - IN - NFXP1 + i)
 //                                                                                                                                                                                XI(IN + NREGN + 1) = FIXPNT(i)
 //                                                                                                                                                                                goto 260
@@ -2124,7 +2200,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                                                                                                                                                                NREGN = N - IN
 //                                                                                                                                                                                260      if (NREGN == 0)                      goto 300
 //                                                                                                                                                                                TEMP = ACCL
-//                                                                                                                                                                                TSUM = (ACCR - ACCL) / FLOAT(NREGN + 1)
+//                                                                                                                                                                                TSUM = (ACCR - ACCL) / float(NREGN + 1)
 //                                                                                                                                                                                for (290 j = 1, NREGN
 //                                                                                                                                                                                    IN = IN + 1
 //                                                                                                                                                                                    TEMP = TEMP + TSUM
@@ -2241,7 +2317,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                        30      CONTINUE
 //                        JTOL(i) = JCOMP
 //                        WGTMSH(i) = 1.D1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i)
-//                        ROOT(i) = 1.D0 / FLOAT(K + MTOT - LTOLI + 1)
+//                        ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1)
 //                        40 CONTINUE
 //
 //                        //  specify collocation points
@@ -2286,7 +2362,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                        //  map (-1,1) to (0,1) by  t = .5 * (1. + x)
 //
 //                        for (130 j = 1, K
-//                            RHO(j) = .5D0 * (1.D0 + RHO(j))
+//                            RHO(j) = .5D0 * (1.0 + RHO(j))
 //                            130 CONTINUE
 //
 //                            //  now find runge-kutta coeffitients b, acol and asave
@@ -2295,17 +2371,17 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                            for (140 j = 1, K
 //                                for (135 i = 1, K
 //                                    135      COEF(i, j) = 0.0
-//                                    COEF(j, j) = 1.D0
+//                                    COEF(j, j) = 1.0
 //                                    CALL VMONDE(RHO, COEF(1, j), K)
 //                                    140 CONTINUE
-//                                    CALL RKBAS(1.D0, COEF, K, MMAX, B, DUMMY, 0)
+//                                    CALL RKBAS(1.0, COEF, K, MMAX, B, DUMMY, 0)
 //                                    for (150 i = 1, K
 //                                        CALL RKBAS(RHO(i), COEF, K, MMAX, ACOL(1, i), DUMMY, 0)
 //                                        150 CONTINUE
-//                                        CALL RKBAS(1.D0 / 6.D0, COEF, K, MMAX, ASAVE(1, 1), DUMMY, 0)
-//                                        CALL RKBAS(1.D0 / 3.D0, COEF, K, MMAX, ASAVE(1, 2), DUMMY, 0)
-//                                        CALL RKBAS(2.D0 / 3.D0, COEF, K, MMAX, ASAVE(1, 3), DUMMY, 0)
-//                                        CALL RKBAS(5.D0 / 6.D0, COEF, K, MMAX, ASAVE(1, 4), DUMMY, 0)
+//                                        CALL RKBAS(1.0 / 6.0, COEF, K, MMAX, ASAVE(1, 1), DUMMY, 0)
+//                                        CALL RKBAS(1.0 / 3.0, COEF, K, MMAX, ASAVE(1, 2), DUMMY, 0)
+//                                        CALL RKBAS(2.0 / 3.0, COEF, K, MMAX, ASAVE(1, 3), DUMMY, 0)
+//                                        CALL RKBAS(5.0 / 6.0, COEF, K, MMAX, ASAVE(1, 4), DUMMY, 0)
 //                                        return;
 //}
 //
@@ -2373,7 +2449,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //
 //                KNEW = (4 * (i - 1) + 2) * MSTAR + 1
 //                KSTORE = (2 * (i - 1) + 1) * MSTAR + 1
-//                X = XI(i) + (XI(i + 1) - XI(i)) * 2.D0 / 3.D0
+//                X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0
 //                CALL APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE(1, 3),
 //                    +DUMMY, XI, N, Z, DMZ,
 //                    1            K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
@@ -2385,7 +2461,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                    20      CONTINUE
 //                    KNEW = (4 * (i - 1) + 1) * MSTAR + 1
 //                    KSTORE = 2 * (i - 1) * MSTAR + 1
-//                    X = XI(i) + (XI(i + 1) - XI(i)) / 3.D0
+//                    X = XI(i) + (XI(i + 1) - XI(i)) / 3.0
 //                    CALL APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE(1, 2),
 //                        +DUMMY, XI, N, Z, DMZ,
 //                        1            K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
@@ -2410,7 +2486,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                                    LTOLJ = LTOL(j)
 //                                    LTJZ = LTOLJ + (i - 1) * MSTAR
 //                                    if (ERR(LTOLJ) >
-//                                        1          TOLIN(j) * (DABS(Z(LTJZ)) + 1.D0))  IFIN = 0
+//                                        1          TOLIN(j) * (DABS(Z(LTJZ)) + 1.0))  IFIN = 0
 //                                        50      CONTINUE
 //                                        60 CONTINUE
 //                                        if (IPRINT >= 0)                          return;
@@ -2783,7 +2859,7 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 //                        //       assembly process completed
 //
 //                        if (MODE == 0 || MODE == 3)           goto 300
-//                            RNORM = DSQRT(RNORM / FLOAT(NZ + NDMZ))
+//                            RNORM = sqrt(RNORM / float(NZ + NDMZ))
 //                            if (MODE == 2)                            return;
 //
 //    //  solve the linear system.
@@ -3634,17 +3710,15 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 	Z.assertDim(1);
 	DMZ.assertDim(1);
 	darr1 BM(4);
-	//.assertDim(1);
+	COEF.assertDim(1);
 	YVAL.assertDim(1);
 
 	int IZ, ILEFT, l, IRIGHT;
 
 	switch (MODE) {//10, 30, 80, 90), MODE
 	case 1:
-		//  mode = 1, retrieve  z(u(x))  directly for x = xi(i).
-
-
 	n10:
+		//  mode = 1, retrieve  z(u(x))  directly for x = xi(i).
 		X = XI(i);
 		IZ = (i - 1) * MSTAR;
 		for (int j = 1; j <= MSTAR; ++j) {
@@ -3654,10 +3728,8 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 		return;
 
 	case 2:
-		//  mode = 2, locate i so  xi(i).le.x.lt.xi(i + 1)
-
 	n30:
-
+		//  mode = 2, locate i so  xi(i).le.x.lt.xi(i + 1)
 		if (X >= XI(1) - COLOUT::PRECIS && X <= XI(N + 1) + COLOUT::PRECIS)
 			goto n40;
 		/*if (IPRINT < 1)
@@ -3691,8 +3763,6 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 	case 3:
 		//  mode = 2 or 3, compute mesh independent rk - basis.
 	n80: {
-
-
 		double S = (X - XI(i)) / (XI(i + 1) - XI(i));
 		RKBAS(S, wrap(COEF), k, MMAX, A, DM, MODM);
 	}
@@ -3700,15 +3770,14 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 
 
 	case 4:
-		//  mode = 2, 3, or 4, compute mesh dependent rk - basis.
 	n90:
+		//  mode = 2, 3, or 4, compute mesh dependent rk - basis.
 		BM(1) = X - XI(i);
 
 		for (l = 2; l <= MMAX; ++l)
 			BM(l) = BM(1) / float(l);
 
 		//  evaluate  z(u(x)).
-
 		int IR = 1;
 		int NCY = NCOMP + NY;
 		IZ = (i - 1) * MSTAR + 1;
@@ -3735,7 +3804,6 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 			return;
 
 		//  for modm = 1 evaluate  y(j) = j - th component of y.
-
 		for (int JCOMP = 1; JCOMP <= NY; JCOMP++)
 			YVAL(JCOMP) = 0.0;
 		for (int j = 1; j <= k; ++k) {
@@ -3750,7 +3818,6 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 			return;
 
 		//  for modm = 2 evaluate  dmval(j) = mj - th derivative of uj.
-
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP)
 			DMVAL(JCOMP) = 0.0;
 		for (int j = 1; j <= k; ++j) {
