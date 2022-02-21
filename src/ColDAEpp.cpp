@@ -1,42 +1,26 @@
-﻿// ColDAEpp.cpp: Definiert den Einstiegspunkt für die Anwendung.
-//
-
-#include "ColDAEpp.hpp"
-
-using namespace std;
+﻿#include "ColDAEpp.hpp"
 
 
-
-
-
-#include <vector>
-
-
-#include <iostream>
-
-void test(int& sdf) {
+void fsub(double x, dar1 z, dar1 y, dar1 f) {
 
 }
+void dfsub(double x, dar1 z, dar1 y, dar2 df) {
+
+}
+void gsub(int i, dar1 z, double& g) {
+
+}
+void dgsub(int i, dar1 z, dar1 dg) {
+
+}
+void guess(double x, dar1 z, dar1 y, dar1 dmval) {
+
+}
+
+
 int main()
 {
-	arrData1<int> ad = { 3,4,56,6 };
-
-	arrRef1<int> ar = ad;
-	for (auto a : ar)
-		std::cout << a << " ";
-	std::cout << std::endl;
-	arrRef1<int> ar2 = ad.sub(3);
-	for (auto a : ar2)
-		std::cout << a << " " ;
-	std::cout << std::endl;
-
-	test(ar(1));
-
-	ar(1) = 567;
-	ad(1) = 567;
-
-	for (auto a : ar)
-		std::cout << a << " ";
+	//COLDAE();
 
 	std::cin.get();
 	return 0;

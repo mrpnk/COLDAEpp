@@ -13,10 +13,11 @@
 
 
 
-template<typename T> class arrRef2;
+
 
 template<typename T>
 class arrRef1 {
+	template<typename T> friend class arrRef2;
 protected:
 	T* data;
 	int size;
@@ -37,7 +38,8 @@ public:
 	}
 
 	arrRef1(arrRef2<T> const& ar2) {
-		// TODOD
+		data = ar2.data;
+		size = ar2.size1 * ar2.size2;
 	}
 
 
@@ -71,17 +73,27 @@ public:
 
 template<typename T>
 class arrRef2 {
+	template<typename T> friend class arrRef1;
 protected:
 	T* data;
 	int size1, size2;
 	arrRef2(){}
 public:
 	void assertDim(int s1, int s2) {
-		assertm(size1 == s1, "Dimension 1 does not match!");
-		assertm(size2 == s2, "Dimension 2 does not match!");
+		if (s1 == 0 && s2 == 0) {
+			// The reference comes from a one-dimensional and the dimensions are not yet specified.
+			// In this case we set the dimensions now.
+			size1 = s1;
+			size2 = s2;
+		}
+		else {
+			assertm(size1 == s1, "Dimension 1 does not match!");
+			assertm(size2 == s2, "Dimension 2 does not match!");
+		}
 	}
 	arrRef2(arrRef1<T> const& ar1) {
-		// TODO implement
+		data = ar1.data;
+		size1 = size2 = 0; // set the matrix size to 0,0. It will be specified later (hopefully)
 	}
 	T& operator()(int idx1, int idx2) {
 		return data[(idx2 - 1)*size1 + (idx1-1)];
@@ -223,23 +235,6 @@ using dgsub_t = void (*)(int i, dar1 z, dar1 dg);
 using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
-
-//void fsub(double x, darr1 z, darr1 y, darr1 f) {
-//
-//}
-//void dfsub(double x, darr1 z, darr1 y, darr2 df) {
-//
-//}
-//void gsub(int i, darr1 z, darr1 g) {
-//
-//}
-//void dgsub(int i, darr1 z, darr2 dg) {
-//
-//}
-//void guess(double x, darr1 z, darr1 y, darr1 dmval) {
-//
-//}
-//
 
 
 //------------------------------------------------------------------------------------------------------
@@ -1256,12 +1251,12 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	dad2 FCSP(40, 60), CBSP(20, 20);
 	double RNORM, RNOLD;
 
-	//  constants for control of nonlinear iteration
+	// constants for control of nonlinear iteration
 	double RELMIN = 1. - 3;
 	double RSTART = 1. - 2;
 	double LMTFRZ = 4;
 
-	//  compute the maximum tolerance
+	// compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
 		CHECK = DMAX1(TOLIN(i), CHECK);
@@ -1279,17 +1274,17 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 while(true){
 
-	//       initialization for a new mesh
+	// initialization for a new mesh
 	ITER = 0;
 	if (NONLIN <= 0) {
 
-		//       the linear case.
-		//       set up and solve equations
+		// the linear case.
+		// set up and solve equations
 		LSYSLV(MSING, XI, XIOLD, DUMMY, DUMMY, Z, DMZ, G,
 			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 0,
 			fsub, dfsub, gsub, dgsub, guess, ISING);
 
-		//       check for a singular matrix
+		// check for a singular matrix
 		if (ISING != 0) {
 			if (IPRINT < 1) {// WRITE(IOUT, 497)
 			}
@@ -1316,7 +1311,7 @@ while(true){
 	//       define the initial relaxation parameter (= relax)
 	double RELAX = 1.0;
 
-	//       check for previous convergence and problem sensitivity
+	// check for previous convergence and problem sensitivity
 	if (ICARE == -1) 
 		RELAX = RSTART;
 	if (ICARE == 1)  
@@ -1346,9 +1341,9 @@ while(true){
 	}
 	goto n70;
 
-	//       solve for the next iterate .
-	//       the value of ifreez determines whether this is a full
-	//       newton step (=0) or a fixed jacobian iteration (=1).
+	// solve for the next iterate .
+	// the value of ifreez determines whether this is a full
+	// newton step (=0) or a fixed jacobian iteration (=1).
 
 n60:
 	if (IPRINT < 0) {
@@ -1361,7 +1356,7 @@ n60:
 
 	
 n70:
-	//       check for a singular matrix
+	// check for a singular matrix
 	if (MSING != 0)
 		goto n30;
 	if (ISING != 0) {
@@ -1378,7 +1373,7 @@ n70:
 		IFRZ = 0;
 	}
 
-	//       update   z and dmz , compute new  rhs  and its norm
+	// update   z and dmz , compute new  rhs  and its norm
 	for (int i = 1; i <= NZ; ++i)
 		Z(i) = Z(i) + DELZ(i);
 	for (int i = 1; i <= NDMZ; ++i)
@@ -1408,7 +1403,7 @@ n110:
 	if (IFRZ >= LMTFRZ)       IFREEZ = 0;
 	if (RNOLD < 4.0 * RNORM)  IFREEZ = 0;
 
-	//       check convergence (iconv = 1).
+	// check convergence (iconv = 1).
 	for (int IT = 1; IT <= NTOL; ++IT) {
 		int INZ = LTOL(IT);
 		for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
@@ -1417,15 +1412,13 @@ n110:
 		}
 	}
 
-	//       convergence obtained
-
+	// convergence obtained
 	if (IPRINT < 1) {// WRITE(IOUT, 560) ITER
 	}
 	goto n400;
 
-	//      convergence of fixed jacobian iteration failed.
-
 n130:
+	// convergence of fixed jacobian iteration failed.
 	/*if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
 	if (IPRINT < 0)  WRITE(IOUT, 540)*/
 	ICONV = 0;
@@ -1436,20 +1429,17 @@ n130:
 		DMZ(i) = DMZ(i) - DELDMZ(i);
 
 
-
 	// update old mesh
 	int NP1 = N + 1;
 	for (int i = 1; i <= NP1; ++i)
 		XIOLD(i) = XI(i);
 	NOLD = N;
-
 	ITER = 0;
 
-	//       no previous convergence has been obtained. proceed
-	//       with the damped newton method.
-	//       evaluate rhs and find the first newton correction.
-
 n160:
+	// no previous convergence has been obtained. proceed
+	// with the damped newton method.
+	// evaluate rhs and find the first newton correction.
 	//if (IPRINT < 0)  WRITE(IOUT, 500)
 	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
 		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
@@ -1566,7 +1556,6 @@ n250:
 	ICOR = 0;
 
 	// check for monotonic decrease in  delz and deldmz.
-
 	if (ANFIX < PRECIS || RNORM < PRECIS)
 		goto n390;
 	if (ANFIX <= ANORM || ICARE == 1) {
@@ -1922,7 +1911,7 @@ void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALS
 	int NFXP1 = NFXPNT + 1;
 	switch (MODE) {
 	case 5:
-		//  mode=5   set mshlmt=1 so that no mesh selection is performed
+		// mode=5   set mshlmt=1 so that no mesh selection is performed
 		MSHLMT = 1;
 
 		[[fallthrough]];
@@ -1990,10 +1979,10 @@ void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALS
 	}
 n100:
 	case 2: {
-		//  mode=2  halve the current mesh (i.e. double its size)
+		// mode=2  halve the current mesh (i.e. double its size)
 		int N2 = 2 * N;
 
-		//  check that n does not exceed storage limitations
+		// check that n does not exceed storage limitations
 		if (N2 > NMAX) {
 			//  if possible, try with n=nmax. redistribute first.
 			if (MODE != 2) {
@@ -2056,7 +2045,7 @@ n100:
 		break;
 	}
 	case 1: {
-		//  mode=1  we do mesh selection if it is deemed worthwhile
+		// mode=1  we do mesh selection if it is deemed worthwhile
 
 		if (NOLD == 1)
 			goto n100;
@@ -2358,7 +2347,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		 2.936 - 9, 3.593 - 8, 7.001 - 16, 3.363 - 15, 3.921 - 14,
 		 4.028 - 13, 5.646 - 12, 7.531 - 11, 1.129 - 9 };
 
-	//  assign weights for error estimate
+	// assign weights for error estimate
 	double KOFF = K * (K + 1) / 2;
 	int IZ = 1;
 	for (int j = 1; j <= NCOMP; ++j) {
@@ -2369,7 +2358,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		}
 	}
 
-	//  assign array values for mesh selection: wgtmsh, jtol, and root
+	// assign array values for mesh selection: wgtmsh, jtol, and root
 	int JCOMP = 1;
 	int MTOT = M(1);
 	for (int i = 1; i <= NTOL; ++i) {
@@ -2385,7 +2374,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1);
 	}
 
-	//  specify collocation points
+	// pecify collocation points
 	switch (K) {
 	case 1: RHO(1) = 0.0;
 		break;
@@ -2436,13 +2425,13 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		break;
 	}
 
-	//  map (-1,1) to (0,1) by  t = .5 * (1. + x)
+	// map (-1,1) to (0,1) by  t = .5 * (1. + x)
 	for (int j = 1; K; ++j)
 		RHO(j) = .50 * (1.0 + RHO(j));
 
 
-	//  now find runge-kutta coeffitients b, acol and asave
-	//  the values of asave are to be used in  newmsh  and errchk .
+	// now find runge-kutta coeffitients b, acol and asave
+	// the values of asave are to be used in  newmsh  and errchk .
 	for (int j = 1; j <= K; ++j) {
 		for (int i = 1; i <= K; ++i)
 			COEF(i, j) = 0.0;
@@ -3139,7 +3128,7 @@ void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int 
 	dad2 HA(7, 4);
 
 
-	//  initialize  wi
+	// initialize  wi
 	int I1 = (JJ - 1) * NCY;
 	for (int ID = 1 + I1; ID <= NCOMP + I1; ++ID)
 		WI(ID, ID) = 1.0;
@@ -3173,7 +3162,7 @@ void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int 
 	I1 = I0 + 1;
 	int I2 = I0 + NCY;
 
-	//  evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh
+	// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh
 	if (NONLIN != 0 && ITER <= 0){
 		for (int j = 1; j <= MSTAR + NY; ++j) {
 			if (j <= MSTAR)
