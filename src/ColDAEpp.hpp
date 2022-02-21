@@ -12,117 +12,129 @@
 #define assertm(exp, msg) assert(((void)msg, exp))
 
 
-template<typename T, int D>
-class arrRef {
 
+template<typename T> class arrRef2;
+
+template<typename T>
+class arrRef1 {
+protected:
+	T* data;
+	int size;
+	arrRef1(){}
+public:
+	void assertDim(int dim0) {
+		assertm(size == dim0, "Dimension 1 does not match!");
+	}
+
+	T& operator()(int idx) {
+		return data[idx - 1];
+	}
+	arrRef1 sub(int idx) {
+		arrRef1 s;
+		s.data = data + (idx - 1);
+		s.size = size - (idx - 1);
+		return s;
+	}
+
+	arrRef1(arrRef2<T> const& ar2) {
+		// TODOD
+	}
+
+
+	T* begin() const { return data; }
+	T* end() const { return data + size; }
+
+	T* contiguous() {
+		return data;
+	}
 };
 
 template<typename T>
-class arr1 {
-    int offx = 0;
-    std::vector<T> data;
+class arrData1 : public arrRef1<T> {
+	std::vector<T> mydata;
 public:
-    arr1(int size = 0) {
-        data.resize(size);
-    }
-	arr1(std::initializer_list<T> l) {
-		data.clear();
-		data.insert(data.end(), l.begin(), l.end());
+	arrData1(int s = 0) {
+		mydata.resize(s);
+		data = mydata.data();
+		size = mydata.size();
 	}
-    void assertDim(int dim0) { assertm(data.size() - offx == dim0, "Dimension 0 does not match!"); }
-    T& operator()(int idx) { return data[idx - 1 + offx]; }
-    arr1 sub(int ox) {
-        arr1 s = *this;
-        s.offx = offx + ox - 1;
-        return s;
-    }
-    void mergeSub(arr1 sub) {
-        std::copy(sub.data().begin() + sub.offx, sub.data.end(), data.begin() + sub.offx);
-    }
-	T* continuous() {
-		return data.data();
+	arrData1(std::initializer_list<T> l) {
+		mydata.clear();
+		mydata.insert(mydata.end(), l.begin(), l.end());
+		data = mydata.data();
+		size = mydata.size();
 	}
+
 };
 
+
+
 template<typename T>
-class arr2 {
-
-	int offx = 0, offy = 0;
-	std::vector<std::vector<T>> data;
+class arrRef2 {
+protected:
+	T* data;
+	int size1, size2;
+	arrRef2(){}
 public:
-	arr2() {}
-	arr2(int sizex, int sizey) {
-		data.resize(sizex);
-		for (auto& a : data)
-			a.resize(sizey);
+	void assertDim(int s1, int s2) {
+		assertm(size1 == s1, "Dimension 1 does not match!");
+		assertm(size2 == s2, "Dimension 2 does not match!");
 	}
-	arr2(arr1<T> const& a1) {
-		// interpret the memory of the one-dimensional array as a two-dimensional one
-		// TODO implement this
+	arrRef2(arrRef1<T> const& ar1) {
+		// TODO implement
 	}
-
-	void assertDim(int dim0, int dim1) {
-		assertm(data.size() - offx == dim0, "Dimension 0 does not match!");
-		for (auto& a : data)
-			assertm(a.size() - offy == dim1, "Dimension 1 does not match!");
+	T& operator()(int idx1, int idx2) {
+		return data[(idx2 - 1)*size1 + (idx1-1)];
 	}
-	T& operator()(int x, int y) { return data[x - 1 + offx][y - 1 + offy]; }
-	arr2 sub(int ox, int oy) {
-		arr2 s = *this;
-		s.offx = offx + ox - 1;
-		s.offy = offy + oy - 1;
+	arrRef2 sub(int idx1, int idx2) {
+		arrRef2 s;
+		s.data = data + (idx2 - 1) * size1 + (idx1 - 1);
+		s.size1 = size1 - (idx1 - 1);
+		s.size2 = size2 - (idx2 - 1);
 		return s;
 	}
 	T* contiguous() {
-		return nullptr; // TODO to be implemented
+		return data;
+	}
+};
+
+template<typename T>
+class arrData2 : public arrRef2<T> {
+	std::vector<T> mydata;
+public:
+	arrData2(){}
+	arrData2(int s1, int s2) {
+		mydata.resize(s1*s2);
+		data = mydata.data();
+		size1 = s1;
+		size2 = s2;
 	}
 };
 
 
 
+using dad1 = arrData1<double>;
+using iad1 = arrData1<int>;
+using dar1 = arrRef1<double>;
+using iar1 = arrRef1<int>; 
+
+using dad2 = arrData2<double>;
+using iad2 = arrData2<int>;
+using dar2 = arrRef2<double>;
+using iar2 = arrRef2<int>;
 
 
-//template<typename T>
-//arr1<T> wrap(T elem) {
-//    arr2<T> vec;
-//    vec.data = { elem };
-//    return vec;
-//}
-//
-//template<typename T>
-//arr2<T> wrap(arr1<T> vec) {
-//    arr2<T> mat;
-//    mat.data = { vec.data };
-//    mat.offy = vec.offx;
-//    return mat;
-//}
-//
-//template<typename T>
-//arr1<T> unwrap(arr2<T> mat) {
-//    arr1<T> vec;
-//    vec.data = mat.data[0];
-//    vec.offx = mat.offy;
-//    return vec;
-//}
-//
-
-
-using darr1 = arr1<double>;
-using darr2 = arr2<double>;
-using iarr1 = arr1<int>;
-using iarr2 = arr2<int>;
-
-
-void DGEFA(darr2 a, int lda, int n, iarr1 ipvt, int info) {
-	info = dgefa(a.contiguous(), lda, n, ipvt.continuous());
+// The three functions from Linpack
+void DGEFA(dar2 a, int lda, int n, iar1 ipvt, int info) {
+	info = dgefa(a.contiguous(), lda, n, ipvt.contiguous());
 }
-void DGESL(darr2 a, int lda, int n, iarr1 ipvt, darr1 b, int job) {
-	dgesl(a.contiguous(), lda, n, ipvt.continuous(),b.continuous(), job);
+void DGESL(dar2 a, int lda, int n, iar1 ipvt, dar1 b, int job) {
+	dgesl(a.contiguous(), lda, n, ipvt.contiguous(),b.contiguous(), job);
 }
-void DSVDC(darr2 x, int lda, int n, int p, darr1 s, darr1 e,
-	darr2 u, int ldu, darr2 v, int ldv, darr1 work, int job, int info) {
-	info = dsvdc(x.contiguous(), lda, n, p, s.continuous(), e.continuous(),u.contiguous(),
-		ldu, v.contiguous(), ldv, work.continuous(), job);
+void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
+	dar2 u, int ldu, dar2 v, int ldv, dar1 work, int job, int info) {
+	info = dsvdc(x.contiguous(), lda, n, p, s.contiguous(), e.contiguous(),u.contiguous(),
+		ldu, v.contiguous(), ldv, work.contiguous(), job);
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -133,14 +145,15 @@ int MIN0(int x, int y) { return std::min(x, y); }
 int MIN0(int x, int y, int z) { return std::min(x, std::min(z, y)); }
 
 
-namespace  COLOUT { double PRECIS; int IOUT, IPRINT; }
-namespace  COLLOC {
-	darr1 RHO(7), COEF(49);
+namespace COLOUT {
+	double PRECIS; int IOUT, IPRINT; 
 }
-
-namespace  COLORD {
+namespace COLLOC {
+	dad1 RHO(7), COEF(49);
+}
+namespace COLORD {
 	int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX;
-	iarr1 MT(20);
+	iad1 MT(20);
 
 	// aliases
 	auto& NCD = NC;
@@ -155,14 +168,14 @@ namespace  COLORD {
 	auto& KDYM = KDY;
 	auto& NCDUM = NC;
 }
-namespace  COLAPR {
+namespace COLAPR {
 	int N, NOLD, NMAX, NZ, NDMZ;
 }
-namespace  COLMSH {
+namespace COLMSH {
 	int MSHFLG, MSHNUM, MSHLMT, MSHALT;
 }
-namespace  COLSID {
-	darr1 TZETA(40);
+namespace COLSID {
+	dad1 TZETA(40);
 	double TLEFT, TRIGHT;
 	int IZETA, IDUM;
 
@@ -171,21 +184,21 @@ namespace  COLSID {
 	auto& ALEFT = TLEFT;
 	auto& ARIGHT = TRIGHT;
 }
-namespace  COLNLN {
+namespace COLNLN {
 	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 }
-namespace  COLEST {
-	darr1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
+namespace COLEST {
+	dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
 		ROOT(40);
-	iarr1 JTOL(40), LTTOL(40);
+	iad1 JTOL(40), LTTOL(40);
 	int NTOL;
 
 	// aliases
 	auto& LTOL = LTTOL;
 	auto& TOL = TTL;
 }
-namespace  COLBAS {
-	darr2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+namespace COLBAS {
+	dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 }
 
 
@@ -203,11 +216,11 @@ using namespace COLEST;
 using namespace COLBAS;
 
 
-using fsub_t = void (*)(double x, darr1 z, darr1 y, darr1 f);
-using dfsub_t = void (*)(double x, darr1 z, darr1 y, darr2 df);
-using gsub_t = void (*)(int i, darr1 z, darr1 g);
-using dgsub_t = void (*)(int i, darr1 z, darr2 dg);
-using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
+using fsub_t = void (*)(double x, dar1 z, dar1 y, dar1 f);
+using dfsub_t = void (*)(double x, dar1 z, dar1 y, dar2 df);
+using gsub_t = void (*)(int i, dar1 z, double& g);
+using dgsub_t = void (*)(int i, dar1 z, dar1 dg);
+using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
 
@@ -234,54 +247,54 @@ using guess_t = void (*)(double x, darr1 z, darr1 y, darr1 dmval);
 
 
 
-void CONTRL(darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 RHS, darr1 DELZ, darr1 DELDMZ,
-	darr1 DQZ, darr1 DQDMZ, darr1 G, darr1 W, darr1 V, darr1 FC, darr1 VALSTR, darr1 SLOPE, darr1 SCALE, darr1 DSCALE,
-	darr1 ACCUM, iarr1 IPVTG, iarr1 INTEGS, iarr1 IPVTW, int NFXPNT, darr1 FIXPNT, int IFLAG,
+void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
+	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
+	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int IFLAG,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess);
 
-void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE, darr2 DSCALE);
+void SKALE(int N, int MSTAR, int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE);
 
-void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 VALSTR,
-	darr1 SLOPE, darr1, int NFXPNT, darr1 FIXPNT, darr2 DF, dfsub_t dfsub,
-	darr2 FC, darr2 CB, int NCOMP, int NYCB);
+void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
+	dar1 SLOPE, dar1, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
+	dar2 FC, dar2 CB, int NCOMP, int NYCB);
 
-void CONSTS(int K, darr1 RHO, darr2 COEF);
+void CONSTS(int K, dar1 RHO, dar2 COEF);
 
-void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN);
+void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN);
 
-void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, darr1 DELDMZ,
-	darr1 G, darr1 W, darr1 V, darr1 FC, darr1 RHS, darr1 DMZO,
-	iarr2 INTEGS, iarr1 IPVTG, iarr1 IPVTW, double RNORM,
+void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DELDMZ,
+	dar1 G, dar1 W, dar1 V, dar1 FC, dar1 RHS, dar1 DMZO,
+	iar2 INTEGS, iar1 IPVTG, iar1 IPVTW, double RNORM,
 	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
 	dgsub_t dgsub, guess_t guess, int ISING);
 
-void GDERIV(darr2 GI, int NROW, int IROW, darr1 ZVAL, darr1 DGZ, int MODE, dgsub_t dgsub);
+void GDERIV(dar2 GI, int NROW, int IROW, dar1 ZVAL, dar1 DGZ, int MODE, dgsub_t dgsub);
 
-void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, int KDY, darr1 ZVAL,
-	darr1 YVAL, darr2 DF, darr2 ACOL, darr1 DMZO, int NCY, dfsub_t dfsub, int MSING);
+void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int KDY, dar1 ZVAL,
+	dar1 YVAL, dar2 DF, dar2 ACOL, dar1 DMZO, int NCY, dfsub_t dfsub, int MSING);
 
-void PRJSVD(darr2 FC, darr2 DF, darr2 D, darr2 U, darr2 V,
-	int NCOMP, int NCY, int NY, iarr1 IPVTCB, int ISING, int MODE);
+void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
+	int NCOMP, int NCY, int NY, iar1 IPVTCB, int ISING, int MODE);
 
-void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY, darr1 RHSZ, darr1 RHSDMZ,
-	iarr1 IPVTW, int MODE, int MODL, double XI1, darr1 ZVAL, darr1 YVAL, darr1 F, darr2 DF, darr2 CB, iarr1 IPVTCB,
-	darr2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY);
+void GBLOCK(double H, dar2 GI, int NROW, int IROW, dar1 WI, dar2 VI, int KDY, dar1 RHSZ, dar1 RHSDMZ,
+	iar1 IPVTW, int MODE, int MODL, double XI1, dar1 ZVAL, dar1 YVAL, dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB,
+	dar2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY);
 
-void RKBAS(double S, darr2 COEF, int k, int M, darr2 RKB, darr1 DM, int MODE);
+void RKBAS(double S, dar2 COEF, int k, int M, dar2 RKB, dar1 DM, int MODE);
 
-void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 XI,
-	int N, darr1 Z, darr1 DMZ, int k, int NCOMP, int NY, int MMAX, iarr1 M,
-	int MSTAR, int MODE, darr1 DMVAL, int MODM);
-
-
-
-void VMONDE(darr1 RHO, darr1 COEF, int k);
-void HORDER(int i, darr1 UHIGH, double HI, darr1 DMZ, int NCOMP, int NCY, int k);
-void DMZSOL(int KDY, int MSTAR, int N, darr2 V, darr1 Z, darr2 DMZ);
+void APPROX(int i, double X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
+	int N, dar1 Z, dar1 DMZ, int k, int NCOMP, int NY, int MMAX, iar1 M,
+	int MSTAR, int MODE, dar1 DMVAL, int MODM);
 
 
-void FCBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 SCRTCH, int INFO);
-void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X);
+
+void VMONDE(dar1 RHO, dar1 COEF, int k);
+void HORDER(int i, dar1 UHIGH, double HI, dar1 DMZ, int NCOMP, int NCY, int k);
+void DMZSOL(int KDY, int MSTAR, int N, dar2 V, dar1 Z, dar2 DMZ);
+
+
+void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int INFO);
+void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X);
 
 //------------------------------------------------------------------------------------------------------
 
@@ -816,8 +829,8 @@ void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X);
 
 
 
-void COLDAE(int NCOMP, int NY, iarr1 M, double ALEFT, double ARIGHT, darr1 ZETA, iarr1 IPAR, iarr1 LTOL,
-	darr1 TOL, darr1 FIXPNT, iarr1 ISPACE, darr1 FSPACE, int IFLAG,
+void COLDAE(int NCOMP, int NY, iar1 M, double ALEFT, double ARIGHT, dar1 ZETA, iar1 IPAR, iar1 LTOL,
+	dar1 TOL, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int IFLAG,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	M.assertDim(1);
@@ -825,11 +838,11 @@ void COLDAE(int NCOMP, int NY, iarr1 M, double ALEFT, double ARIGHT, darr1 ZETA,
 	IPAR.assertDim(1);
 	LTOL.assertDim(1);
 	TOL.assertDim(1);
-	darr1 DUMMY(1);
+	dad1 DUMMY(1);
 	FIXPNT.assertDim(1);
 	ISPACE.assertDim(1);
 	FSPACE.assertDim(1);
-	darr1 DUMMY2(840);
+	dad1 DUMMY2(840);
 
 
 
@@ -1078,7 +1091,7 @@ void COLDAE(int NCOMP, int NY, iarr1 M, double ALEFT, double ARIGHT, darr1 ZETA,
 	else
 		NYCB = NY;
 
-	NEWMSH(3 + IREAD, FSPACE(LXI), FSPACE(LXIOLD), DUMMY,
+	NEWMSH(3 + IREAD, FSPACE.sub(LXI), FSPACE.sub(LXIOLD), DUMMY,
 		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
 		DUMMY2, dfsub, DUMMY2, DUMMY2, NCOMP, NYCB);
 
@@ -1105,11 +1118,11 @@ void COLDAE(int NCOMP, int NY, iarr1 M, double ALEFT, double ARIGHT, darr1 ZETA,
 n230:
 
 	if (IGUESS >= 2)  IGUESS = 0;
-	CONTRL(FSPACE(LXI), FSPACE(LXIOLD), FSPACE(LZ), FSPACE(LDMZ), FSPACE(LDMV),
-		FSPACE(LRHS), FSPACE(LDELZ), FSPACE(LDELDZ), FSPACE(LDQZ),
-		FSPACE(LDQDMZ), FSPACE(LG), FSPACE(LW), FSPACE(LV), FSPACE(LFC),
-		FSPACE(LVALST), FSPACE(LSLOPE), FSPACE(LSCL), FSPACE(LDSCL),
-		FSPACE(LACCUM), ISPACE(LPVTG), ISPACE(LINTEG), ISPACE(LPVTW),
+	CONTRL(FSPACE.sub(LXI), FSPACE.sub(LXIOLD), FSPACE.sub(LZ), FSPACE.sub(LDMZ), FSPACE.sub(LDMV),
+		FSPACE.sub(LRHS), FSPACE.sub(LDELZ), FSPACE.sub(LDELDZ), FSPACE.sub(LDQZ),
+		FSPACE.sub(LDQDMZ), FSPACE.sub(LG), FSPACE.sub(LW), FSPACE.sub(LV), FSPACE.sub(LFC),
+		FSPACE.sub(LVALST), FSPACE.sub(LSLOPE), FSPACE.sub(LSCL), FSPACE.sub(LDSCL),
+		FSPACE.sub(LACCUM), ISPACE.sub(LPVTG), ISPACE.sub(LINTEG), ISPACE.sub(LPVTW),
 		NFXPNT, FIXPNT, IFLAG, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
@@ -1207,9 +1220,9 @@ n230:
 //                 previous mesh
 //
 //**********************************************************************
-void CONTRL(darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 RHS, darr1 DELZ, darr1 DELDMZ,
-	darr1 DQZ, darr1 DQDMZ, darr1 G, darr1 W, darr1 V, darr1 FC, darr1 VALSTR, darr1 SLOPE, darr1 SCALE, darr1 DSCALE,
-	darr1 ACCUM, iarr1 IPVTG, iarr1 INTEGS, iarr1 IPVTW, int NFXPNT, darr1 FIXPNT, int IFLAG,
+void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
+	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
+	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int IFLAG,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	XI.assertDim(1);
@@ -1231,27 +1244,24 @@ void CONTRL(darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 RHS, dar
 	DQZ.assertDim(1);
 	DQDMZ.assertDim(1);
 	FIXPNT.assertDim(1);
-	darr1 DUMMY(1);
+	
 	SCALE.assertDim(1);
 	DSCALE.assertDim(1);
 	FC.assertDim(1);
-	darr1 DF(800);
-	darr2 FCSP(40, 60);
-	darr2 CBSP(20, 20);
 	INTEGS.assertDim(1);
 	IPVTG.assertDim(1);
 	IPVTW.assertDim(1);
 
+	dad1 DUMMY(1), DF(800);
+	dad2 FCSP(40, 60), CBSP(20, 20);
 	double RNORM, RNOLD;
 
 	//  constants for control of nonlinear iteration
-
 	double RELMIN = 1. - 3;
-	double     RSTART = 1. - 2;
+	double RSTART = 1. - 2;
 	double LMTFRZ = 4;
 
 	//  compute the maximum tolerance
-
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
 		CHECK = DMAX1(TOLIN(i), CHECK);
@@ -1427,7 +1437,7 @@ n130:
 
 
 
-	//       update old mesh
+	// update old mesh
 	int NP1 = N + 1;
 	for (int i = 1; i <= NP1; ++i)
 		XIOLD(i) = XI(i);
@@ -1445,7 +1455,7 @@ n160:
 		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
 		fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	//       check for a singular matrix
+	// check for a singular matrix
 	if (MSING != 0)
 		goto n30;
 	if (ISING != 0) {
@@ -1454,26 +1464,26 @@ n160:
 		return;
 	}
 
-	//       bookkeeping for first mesh
+	// bookkeeping for first mesh
 	if (IGUESS == 1)
 		IGUESS = 0;
 
-	//       find initial scaling
+	// find initial scaling
 	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
 	double RLXOLD = RELAX;
 	int IPRED = 1;
 	goto n220;
 
 n170:
-	//       main iteration loop
+	// main iteration loop
 	RNOLD = RNORM;
 	if (ITER >= LIMIT)
 		goto n430;
 
-	//       update scaling
+	// update scaling
 	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
 
-	//       compute norm of newton correction with new scaling
+	// compute norm of newton correction with new scaling
 	double ANSCL = 0.0;
 	for (int i = 1; i <= NZ; ++i)
 		ANSCL = ANSCL + pow(DELZ(i) * SCALE(i), 2);
@@ -1483,12 +1493,12 @@ n170:
 
 	ANSCL = sqrt(ANSCL / float(NZ + NDMZ));
 
-	//       find a newton direction
+	// find a newton direction
 	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
 		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 3,
 		fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	//       check for a singular matrix
+	// check for a singular matrix
 	if (MSING != 0)
 		goto n30;
 
@@ -1498,7 +1508,7 @@ n170:
 		return;
 	}
 
-	//       predict relaxation factor for newton step.
+	// predict relaxation factor for newton step.
 	if (ICARE != 1) {
 		double ANDIF = 0.0;
 		for (int i = 1; i <= NZ; ++i)
@@ -1516,7 +1526,7 @@ n170:
 n220:
 	ITER = ITER + 1;
 
-	//       determine a new  z and dmz  and find new  rhs  and its norm
+	// determine a new  z and dmz  and find new  rhs  and its norm
 	for (int i = 1; i <= NZ; ++i)
 		Z(i) = Z(i) + RELAX * DELZ(i);
 
@@ -1528,12 +1538,12 @@ n250:
 		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
 		fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	//       compute a fixed jacobian iterate (used to control relax)
+	// compute a fixed jacobian iterate (used to control relax)
 	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
 		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
 		fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	//       find scaled norms of various terms used to correct relax
+	// find scaled norms of various terms used to correct relax
 	double ANORM = 0.0;
 	double ANFIX = 0.0;
 	for (int i = 1; NZ; ++i) {
@@ -1555,7 +1565,7 @@ n250:
 
 	ICOR = 0;
 
-	//       check for monotonic decrease in  delz and deldmz.
+	// check for monotonic decrease in  delz and deldmz.
 
 	if (ANFIX < PRECIS || RNORM < PRECIS)
 		goto n390;
@@ -1575,7 +1585,7 @@ n250:
 	if (ICARE == 1)
 		goto n170;
 
-	//       correct the relaxation factor.
+	// correct the relaxation factor.
 	IPRED = 0;
 	double ARG = (ANFIX / ANORM - 1.0) / RELAX + 1.0;
 	if (ARG < 0.0)
@@ -1682,7 +1692,7 @@ n250:
 
 n460:
 
-	//       update old mesh
+	// update old mesh
 	NP1 = N + 1;
 	for (int i = 1; i <= NP1; ++i)
 		XIOLD(i) = XI(i);
@@ -1706,7 +1716,7 @@ n460:
 		SLOPE, ACCUM, NFXPNT, FIXPNT, DF, dfsub,
 		FCSP, CBSP, NCOMP, NYCB);
 
-	//       exit if expected n is too large (but may try n=nmax once)
+	// exit if expected n is too large (but may try n=nmax once)
 	if (N > NMAX)
 	{
 		N = N / 2;
@@ -1767,7 +1777,7 @@ n460:
 //            dscale = scaling vector for dmz
 //
 //**********************************************************************
-void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE, darr2 DSCALE)
+void SKALE(int N, int MSTAR, int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 {
 
 	Z.assertDim(MSTAR, 1);
@@ -1775,9 +1785,7 @@ void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE,
 	DMZ.assertDim(KDY, N);
 	DSCALE.assertDim(KDY, N);
 	XI.assertDim(1);
-	darr1 BASM(5);
-
-	//COMMON / COLORD / K, NCOMP, NY, NCY, ID1, KD, ID3, MMAX, M(20)
+	dad1 BASM(5);
 
 	BASM(1) = 1.0;
 	for (int j = 1; j <= N; ++j) {
@@ -1890,9 +1898,9 @@ void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE,
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 VALSTR,
-	darr1 SLOPE, darr1, int NFXPNT, darr1 FIXPNT, darr2 DF, dfsub_t dfsub,
-	darr2 FC, darr2 CB, int NCOMP, int NYCB)
+void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
+	dar1 SLOPE, dar1, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
+	dar2 FC, dar2 CB, int NCOMP, int NYCB)
 {
 	SLOPE.assertDim(1);
 	XI.assertDim(1);
@@ -1906,15 +1914,8 @@ void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr
 	DF.assertDim(NCY, 1);
 	CB.assertDim(NYCB, NYCB);
 
-	darr1 D1(40), D2(40), ACCUM(1);
-	darr1 DUMMY(1);
-	darr1 ZVAL(40);
-	darr1 YVAL(40);
-	darr1 A(28);
-	iarr1 IPVTCB(40);
-	darr1 BCOL(40);
-	darr1 U(400);
-	darr1 V(400);
+	dad1 D1(40), D2(40), ACCUM(1), DUMMY(1), ZVAL(40), YVAL(40), A(28), BCOL(40), U(400), V(400);
+	iad1 IPVTCB(40);
 
 	int ISING = 0;
 
@@ -1924,7 +1925,7 @@ void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr
 		//  mode=5   set mshlmt=1 so that no mesh selection is performed
 		MSHLMT = 1;
 
-		[[fallthrough]]
+		[[fallthrough]];
 	case 4: {
 		//  mode=4   the user-specified initial mesh is already in place.
 		if (IGUESS >= 2) {
@@ -2015,11 +2016,11 @@ n100:
 			for (int i = 1; i <= NOLD; ++i) {
 				double HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0;
 				double X = XIOLD(i) + HD6;
-				APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, 1), DUMMY, XIOLD,
+				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 1), DUMMY, XIOLD,
 					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 				X = X + 4.0 * HD6;
 				KSTORE = KSTORE + 3 * MSTAR;
-				APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, 4), DUMMY, XIOLD,
+				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 4), DUMMY, XIOLD,
 					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 				KSTORE = KSTORE + MSTAR;
 			}
@@ -2036,7 +2037,7 @@ n100:
 					X = X + HD6;
 					if (j == 3)
 						X = X + HD6;
-					APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 					KSTORE = KSTORE + MSTAR;
 				}
 			}
@@ -2338,11 +2339,11 @@ n100:
 //              points
 //
 //**********************************************************************
-void CONSTS(int K, darr1 RHO, darr2 COEF)
+void CONSTS(int K, dar1 RHO, dar2 COEF)
 {
 	RHO.assertDim(7);
 	COEF.assertDim(K, 1);
-	darr1 CNSTS1(28), CNSTS2(28), DUMMY(1);
+	dad1 CNSTS1(28), CNSTS2(28), DUMMY(1);
 
 	CNSTS1 = { .250, .625 - 1, 7.2169 - 2, 1.8342 - 2,
 		 1.9065 - 2, 5.8190 - 2, 5.4658 - 3, 5.3370 - 3, 1.8890 - 2,
@@ -2446,7 +2447,7 @@ void CONSTS(int K, darr1 RHO, darr2 COEF)
 		for (int i = 1; i <= K; ++i)
 			COEF(i, j) = 0.0;
 		COEF(j, j) = 1.0;
-		VMONDE(RHO, COEF(1, j), K);
+		VMONDE(RHO, COEF.sub(1, j), K);
 	}
 	RKBAS(1.0, COEF, K, MMAX, B, DUMMY, 0);
 	for (int i = 1; i <= K; ++i)
@@ -2484,29 +2485,17 @@ void CONSTS(int K, darr1 RHO, darr2 COEF)
 //                 the array valstr. (0 for no, 1 for yes)
 //
 //**********************************************************************
-void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
+void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 {
-	darr1 ERR(40);
-	darr1 ERREST(40);
-	darr1 DUMMY(1);
 	XI.assertDim(1);
 	Z.assertDim(1);
 	DMZ.assertDim(1);
 	VALSTR.assertDim(1);
-	/*
-			COMMON / COLOUT / PRECIS, IOUT, IPRINT
-			COMMON / COLORD / K, NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX, M(20)
-			COMMON / COLAPR / N, NOLD, NMAX, NZ, NDMZ
-			COMMON / COLMSH / MSHFLG, MSHNUM, MSHLMT, MSHALT
-			COMMON / COLBAS / B(28), ACOL(28, 7), ASAVE(28, 4)
-			COMMON / COLEST / TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-			1                ROOT(40), JTOL(40), LTOL(40), NTOL
+	dad1 ERR(40), ERREST(40), DUMMY(1);
+	
 
-		*/
-
-		//  error estimates are to be generated and tested
-		//  to see if the tolerance requirements are satisfied.
-
+	//  error estimates are to be generated and tested
+	//  to see if the tolerance requirements are satisfied.
 	IFIN = 1;
 	int MSHFLG = 1;
 	for (int j = 1; j <= MSTAR; ++j)
@@ -2524,11 +2513,10 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 		//       for an error estimate. the routine  newmsh
 		//       filled in the needed values of the old solution
 		//       in valstr.
-
 		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
 		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
 		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
-		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 		for (int l = 1; l<= MSTAR;++l) {
 			ERR(l) = WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2537,7 +2525,7 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
 		KSTORE = 2 * (i - 1) * MSTAR + 1;
 		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
-		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = ERR(l) + WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2645,9 +2633,9 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 //
 //
 //*********************************************************************
-void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, darr1 DELDMZ,
-	darr1 G, darr1 W, darr1 V, darr1 FC, darr1 RHS, darr1 DMZO,
-	iarr2 INTEGS, iarr1 IPVTG, iarr1 IPVTW, double RNORM,
+void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DELDMZ,
+	dar1 G, dar1 W, dar1 V, dar1 FC, dar1 RHS, dar1 DMZO,
+	iar2 INTEGS, iar1 IPVTG, iar1 IPVTW, double RNORM,
 	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
 	dgsub_t dgsub, guess_t guess, int ISING)
 {
@@ -2667,9 +2655,9 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 	IPVTW.assertDim(1);
 	FC.assertDim(1);
 
-	darr1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
-	darr1 DUMMY(1), Y(1), AT(28), CB(400);
-	iarr1 IPVTCB(20);
+	dad1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
+	dad1 DUMMY(1), Y(1), AT(28), CB(400);
+	iad1 IPVTCB(20);
 
 	int NYCB;
 	if (NY == 0)
@@ -2796,7 +2784,7 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 					goto n160;
 
 				// use initial approximation provided by the user.
-				guess(XCOL, ZVAL, YVAL, DMZO(IRHS));
+				guess(XCOL, ZVAL, YVAL, DMZO.sub(IRHS));
 				goto n170;
 
 
@@ -2805,7 +2793,7 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 					// find  rhs  values
 					APPROX(IOLD, XCOL, ZVAL, YVAL, AT, COEF, XIOLD,
 						NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2,
-						DMZO(IRHS), 2);
+						DMZO.sub(IRHS), 2);
 
 				n170:
 					fsub(XCOL, ZVAL, YVAL, F);
@@ -2827,7 +2815,7 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 						break;
 
 					// fill in  rhs  values (and accumulate its norm).
-					fsub(XCOL, ZVAL, DMZ(IRHS + NCOMP), F);
+					fsub(XCOL, ZVAL, DMZ.sub(IRHS + NCOMP), F);
 					for (int JJ = 1; JJ <= NCY; ++JJ) {
 						double VALUE = F(JJ);
 						if (JJ <= NCOMP)
@@ -2840,12 +2828,12 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 
 					// the linear case
 				n200:
-					fsub(XCOL, ZVAL, YVAL, RHS(IRHS));
+					fsub(XCOL, ZVAL, YVAL, RHS.sub(IRHS));
 					IRHS = IRHS + NCY;
 				}
 				// fill in ncy rows of  w and v
-				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW(IDMZ), KDY,
-					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO(IDMZO), NCY, dfsub, MSING);
+				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW.sub(IDMZ), KDY,
+					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO.sub(IDMZO), NCY, dfsub, MSING);
 				if (MSING != 0)
 					return;
 			}
@@ -2881,8 +2869,8 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 				fsub(XI1, ZVAL, YVAL, F);
 			}
 
-			GBLOCK(H, G.sub(IG), NROW, IZETA, W(IW), V.sub(IV), KDY, DUMMY,
-				DELDMZ(IDMZ), IPVTW(IDMZ), 1, MODE, XI1, ZVAL, YVAL, F,
+			GBLOCK(H, G.sub(IG), NROW, IZETA, W.sub(IW), V.sub(IV), KDY, DUMMY,
+				DELDMZ.sub(IDMZ), IPVTW.sub(IDMZ), 1, MODE, XI1, ZVAL, YVAL, F,
 				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NCOMP, NYCB, NCY);
 			if (ISING != 0)
 				return;
@@ -2972,8 +2960,8 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 				IZET = IZET + 1;
 			}
 			double H = XI(i + 1) - XI(i);
-			GBLOCK(H, G.sub(1), NROW, IZETA, W(IW), V.sub(1), KDY, DELZ(IZ), DELDMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
-				XI1, ZVAL, YVAL, FC(IFC + INFC), DF, CB,
+			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW), V.sub(1), KDY, DELZ.sub(IZ), DELDMZ.sub(IDMZ), IPVTW.sub(IDMZ), 2, MODE,
+				XI1, ZVAL, YVAL, FC.sub(IFC + INFC), DF, CB,
 				IPVTCB, FC.sub(IFC), dfsub, ISING, NCOMP, NYCB, NCY);
 			IZ = IZ + MSTAR;
 			IDMZ = IDMZ + KDY;
@@ -3018,9 +3006,9 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 				IZET = IZET + 1;
 			}
 			double H = XI(i + 1) - XI(i);
-			GBLOCK(H, G.sub(1), NROW, IZETA, W(IW), DF, KDY,
-				Z(IZ), DMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
-				XI1, ZVAL, YVAL, FC(IFC + INFC + NCOMP),
+			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW), DF, KDY,
+				Z.sub(IZ), DMZ.sub(IDMZ), IPVTW.sub(IDMZ), 2, MODE,
+				XI1, ZVAL, YVAL, FC.sub(IFC + INFC + NCOMP),
 				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING,
 				NCOMP, NYCB, NCY);
 			IZ = IZ + MSTAR;
@@ -3066,12 +3054,12 @@ void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, da
 //      dg     - the derivatives of the side condition.
 //
 //**********************************************************************
-void GDERIV(darr2 GI, int NROW, int IROW, darr1 ZVAL, darr1 DGZ, int MODE, dgsub_t dgsub)
+void GDERIV(dar2 GI, int NROW, int IROW, dar1 ZVAL, dar1 DGZ, int MODE, dgsub_t dgsub)
 {
 	GI.assertDim(NROW, 1);
 	ZVAL.assertDim(1);
 	DGZ.assertDim(1);
-	darr1 DG(40);
+	dad1 DG(40);
 
 
 	//  zero jacobian dg
@@ -3135,8 +3123,8 @@ void GDERIV(darr2 GI, int NROW, int IROW, darr1 ZVAL, darr1 DGZ, int MODE, dgsub
 //      jcomp  - counter for the component being dealt with.
 //
 //**********************************************************************
-void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, int KDY, darr1 ZVAL,
-	darr1 YVAL, darr2 DF, darr2 ACOL, darr1 DMZO, int NCY, dfsub_t dfsub, int MSING)
+void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int KDY, dar1 ZVAL,
+	dar1 YVAL, dar2 DF, dar2 ACOL, dar1 DMZO, int NCY, dfsub_t dfsub, int MSING)
 {
 	WI.assertDim(KDY, 1);
 	VI.assertDim(KDY, 1);
@@ -3147,8 +3135,8 @@ void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, i
 	ACOL.assertDim(7, 4);
 	YVAL.assertDim(1);
 
-	darr1 BASM(5);
-	darr2 HA(7, 4);
+	dad1 BASM(5);
+	dad2 HA(7, 4);
 
 
 	//  initialize  wi
@@ -3251,7 +3239,7 @@ void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, i
 	if (MSING != 0)
 		return;
 	for (int j = 1; j <= MSTAR; ++j)
-		DGESL(WI, KDY, KDY, IPVTW, VI(1, j), 0);
+		DGESL(WI, KDY, KDY, IPVTW, VI.sub(1, j), 0);
 }
 
 
@@ -3272,34 +3260,25 @@ void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, i
 //                 (then fc consists of only ncomp columns)
 //
 //**********************************************************************
-void PRJSVD(darr2 FC, darr2 DF, darr2 D, darr2 U, darr2 V,
-	int NCOMP, int NCY, int NY, iarr1 IPVTCB, int ISING, int MODE)
+void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
+	int NCOMP, int NCY, int NY, iar1 IPVTCB, int ISING, int MODE)
 {
 	FC.assertDim(NCOMP, 1);
 	DF.assertDim(NCY, 1);
 	D.assertDim(NY, NY);
 	U.assertDim(NY, NY);
 	V.assertDim(NY, NY);
-	darr1 WORK(20);
-	darr1 S(21);
-	darr1 E(20);
 	IPVTCB.assertDim(1);
 
-
-	/*  COMMON / COLORD / K, NCD, NYD, NCYD, MSTAR, KD, KDUM, MMAX, M(20)
-	  COMMON / COLOUT / PRECIS, IOUT, IPRINT
-	  COMMON / COLEST / TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-	  1                ROOT(40), JTOL(40), LTOL(40), NTOL*/
+	dad1 WORK(20), S(21), E(20);
 
 
-	  //  compute the maximum tolerance
-
+	//  compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= COLEST::NTOL; ++i)
 		CHECK = DMAX1(COLEST::TOLIN(i), CHECK);
 
 	//  construct d and find its svd
-
 	for (int i = 1; i <= NY; ++i)
 		for (int j = 1; j <= NY; ++j)
 			D(i, j) = DF(i + NCOMP, j + MSTAR);
@@ -3309,7 +3288,6 @@ void PRJSVD(darr2 FC, darr2 DF, darr2 D, darr2 U, darr2 V,
 	DSVDC(D, NY, NY, NY, S, E, U, NY, V, NY, WORK, JOB, INFO);
 
 	//  determine rank of d
-
 	S(NY + 1) = 0;
 	int IRANK = 0;
 
@@ -3449,12 +3427,10 @@ void PRJSVD(darr2 FC, darr2 DF, darr2 D, darr2 U, darr2 V,
 //fc - projection matrices
 //
 //* *********************************************************************
-void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY, darr1 RHSZ, darr1 RHSDMZ,
-	iarr1 IPVTW, int MODE, int MODL, double XI1, darr1 ZVAL, darr1 YVAL, darr1 F, darr2 DF, darr2 CB, iarr1 IPVTCB,
-	darr2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY)
-{
-	darr2 HB(7, 4);
-	darr1 BASM(5);
+void GBLOCK(double H, dar2 GI, int NROW, int IROW, dar1 WI, dar2 VI, int KDY, dar1 RHSZ, dar1 RHSDMZ,
+	iar1 IPVTW, int MODE, int MODL, double XI1, dar1 ZVAL, dar1 YVAL, dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB,
+	dar2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY)
+{	
 	GI.assertDim(NROW, 1);
 	WI.assertDim(1);
 	VI.assertDim(KDY, 1);
@@ -3468,9 +3444,9 @@ void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY,
 	CB.assertDim(NYCB, NYCB);
 	IPVTCB.assertDim(1);
 	FC.assertDim(NCOMP, 1);
-	darr1 BCOL(40);
-	darr1 U(400);
-	darr1 V(400);
+
+	dad2 HB(7, 4);
+	dad1 BASM(5), BCOL(40), U(400), V(400);
 
 	//  compute local basis
 	double FACT = 1.0;
@@ -3682,12 +3658,12 @@ variables
 			these are evaluated if mode > 0.
 
 * **********************************************************************/
-void RKBAS(double S, darr2 COEF, int k, int M, darr2 RKB, darr1 DM, int MODE)
+void RKBAS(double S, dar2 COEF, int k, int M, dar2 RKB, dar1 DM, int MODE)
 {
     COEF.assertDim(k, 1);
 	RKB.assertDim(7, 1);
 	DM.assertDim(1);
-	darr1 T(10);
+	dad1 T(10);
 
 	if (k != 1) {
 		int KPM1 = k + M - 1;
@@ -3758,23 +3734,21 @@ void RKBAS(double S, darr2 COEF, int k, int M, darr2 RKB, darr1 DM, int MODE)
 //     dmval - the mth derivatives of u(x)
 //
 // * *********************************************************************
-void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 XI,
-	int N, darr1 Z, darr1 DMZ, int k, int NCOMP, int NY, int MMAX, iarr1 M,
-	int MSTAR, int MODE, darr1 DMVAL, int MODM)
+void APPROX(int i, double X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
+	int N, dar1 Z, dar1 DMZ, int k, int NCOMP, int NY, int MMAX, iar1 M,
+	int MSTAR, int MODE, dar1 DMVAL, int MODM)
 {
 	ZVAL.assertDim(1);
 	DMVAL.assertDim(1);
 	XI.assertDim(1);
 	M.assertDim(1);
 	A.assertDim(7, 1);
-	darr1 DM(7);
-
 	Z.assertDim(1);
 	DMZ.assertDim(1);
-	darr1 BM(4);
 	COEF.assertDim(1);
 	YVAL.assertDim(1);
-
+	
+	dad1 BM(4), DM(7);
 	int IZ, ILEFT, l, IRIGHT;
 
 	switch (MODE) {//10, 30, 80, 90), MODE
@@ -3817,13 +3791,13 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 					break;
 			}
 		}
-		[[fallthrough]]
+		[[fallthrough]];
 	case 3:	 {
 		//  mode = 2 or 3, compute mesh independent rk - basis.
 		double S = (X - XI(i)) / (XI(i + 1) - XI(i));
 		RKBAS(S, COEF, k, MMAX, A, DM, MODM);
 		}
-		[[fallthrough]]
+		[[fallthrough]];
 	case 4:
 		//  mode = 2, 3, or 4, compute mesh dependent rk - basis.
 		BM(1) = X - XI(i);
@@ -3905,22 +3879,21 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 //           from the work arrays  ispaceand fspace .
 //
 //*****************************************************************
-void APPSLN(double X, darr1 Z, darr1 Y, darr1 FSPACE, iarr1 ISPACE) {
+void APPSLN(double X, dar1 Z, dar1 Y, dar1 FSPACE, iar1 ISPACE) {
 	Z.assertDim(1);
 	Y.assertDim(1);
 	FSPACE.assertDim(1);
 	ISPACE.assertDim(1);
 
-	darr1 A(28);
-	darr1 DUMMY(1);
+	dad1 A(28), DUMMY(1);
 
 	int IS6 = ISPACE(7);
 	int IS5 = ISPACE(1) + 2;
 	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
 	int i = 1;
-	APPROX(i, X, Z, Y, A, FSPACE(IS6), FSPACE(1), ISPACE(1),
-		FSPACE(IS5), FSPACE(IS4), ISPACE(2), ISPACE(3),
-		ISPACE(4), ISPACE(6), ISPACE(9), ISPACE(5), 2,
+	APPROX(i, X, Z, Y, A, FSPACE.sub(IS6), FSPACE.sub(1), ISPACE(1),
+		FSPACE.sub(IS5), FSPACE.sub(IS4), ISPACE(2), ISPACE(3),
+		ISPACE(4), ISPACE(6), ISPACE.sub(9), ISPACE(5), 2,
 		DUMMY, 1);
 }
 
@@ -3933,7 +3906,7 @@ purpose
 		with  v(i, j) = rho(j) * *(i - 1) / (i - 1)!.
 
 * **********************************************************************/
-void VMONDE(darr1 RHO, darr1 COEF, int k)
+void VMONDE(dar1 RHO, dar1 COEF, int k)
 {
 	int i, IFAC, j, KM1, KMI;
 	RHO.assertDim(k);
@@ -3979,7 +3952,7 @@ variables
 						j
 
 * **********************************************************************/
-void HORDER(int i, darr1 UHIGH, double HI, darr1 DMZ, int NCOMP, int NCY, int k)
+void HORDER(int i, dar1 UHIGH, double HI, dar1 DMZ, int NCOMP, int NCY, int k)
 {
 	UHIGH.assertDim(1);
 	DMZ.assertDim(1);
@@ -4013,7 +3986,7 @@ purpose
 		dmz(i) = dmz(i) + v(i) * z(i), i = 1, ..., n
 
 * **********************************************************************/
-void DMZSOL(int KDY, int MSTAR, int N, darr2 V, darr1 Z, darr2 DMZ)
+void DMZSOL(int KDY, int MSTAR, int N, dar2 V, dar1 Z, dar2 DMZ)
 {
 	V.assertDim(KDY, 1);
 	DMZ.assertDim(KDY, 1);
@@ -4069,7 +4042,7 @@ void DMZSOL(int KDY, int MSTAR, int N, darr2 V, darr1 Z, darr2 DMZ)
 //
 // * *********************************************************************
 //
-void FACTRB(darr2 W, iarr1 IPIVOT, darr1 D, int NROW, int NCOL, int LAST, int INFO)
+void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, int NROW, int NCOL, int LAST, int INFO)
 {
 	IPIVOT.assertDim(NROW);
 	int i, j, k, l, KP1;
@@ -4201,7 +4174,7 @@ n30:
 //
 // * ********************************************************************
 //
-void SHIFTB(darr2 AI, int NROWI, int NCOLI, int LAST, darr2 AI1, int NROWI1, int NCOLI1)
+void SHIFTB(dar2 AI, int NROWI, int NCOLI, int LAST, dar2 AI1, int NROWI1, int NCOLI1)
 {
 	int j, JMAX, JMAXP1, M, MMAX;
 	AI.assertDim(NROWI, NCOLI);
@@ -4260,7 +4233,7 @@ void SHIFTB(darr2 AI, int NROWI, int NCOLI, int LAST, darr2 AI1, int NROWI1, int
 // = n if the pivot element in the nth gauss step is zero.
 //
 //**********************************************************************
-void FCBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 SCRTCH, int INFO)
+void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int INFO)
 {
 	INTEGS.assertDim(3, NBLOKS);
 	IPIVOT.assertDim(1);
@@ -4284,7 +4257,7 @@ n10:
 	//       carry out elimination on the i - th block until next block
 	//       enters, i.e., for columns 1, ..., last  of i - th block.
 
-	FACTRB(BLOKS.sub(INDEX), IPIVOT(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
+	FACTRB(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
 
 	//       check for having reached a singular block or the last block
 
@@ -4327,7 +4300,7 @@ n20:
 //*********************************************************************
 //
 // W(NROW, NCOL), X(NCOL)
-void SUBBAK(darr2 W, int NROW, int NCOL, int LAST, darr1 X)
+void SUBBAK(dar2 W, int NROW, int NCOL, int LAST, dar1 X)
 {
 	W.assertDim(NROW, NCOL);
 	X.assertDim(NCOL);
@@ -4384,7 +4357,7 @@ n60:
 //*********************************************************************
 //
 //int IPIVOT(LAST), W(NROW, LAST), X(NROW),
-void SUBFOR(darr2 W, iarr1 IPIVOT, int NROW, int LAST, darr1 X)
+void SUBFOR(dar2 W, iar1 IPIVOT, int NROW, int LAST, dar1 X)
 {
 	IPIVOT.assertDim(LAST);
 	W.assertDim(NROW, LAST);
@@ -4428,7 +4401,7 @@ void SUBFOR(darr2 W, iarr1 IPIVOT, int NROW, int LAST, darr1 X)
 //
 //*********************************************************************
 //
-void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X)
+void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X)
 {
 	INTEGS.assertDim(3, NBLOKS);
 	IPIVOT.assertDim(1);
