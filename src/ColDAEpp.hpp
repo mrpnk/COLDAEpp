@@ -18,16 +18,22 @@
 template<typename T>
 class arrRef1 {
 	template<typename T> friend class arrRef2;
+	template<typename T> friend class arrData1;
 protected:
 	T* data;
 	int size;
 	arrRef1(){}
 public:
 	void assertDim(int dim0) {
+		if (dim0 == 1) return; // we assume that DIMENSION(1) does not give the actual dimension and only makes sure it is an array
+
+		if (size > dim0) return; // allow downsizing
+
 		assertm(size == dim0, "Dimension 1 does not match!");
 	}
 
 	T& operator()(int idx) {
+		assertm(idx>=1 && idx <= size,"Dimension 1 index out of range!");
 		return data[idx - 1];
 	}
 	arrRef1 sub(int idx) {
@@ -66,7 +72,13 @@ public:
 		data = mydata.data();
 		size = mydata.size();
 	}
-
+	arrData1(arrRef1<T> const& ar1) {
+		// copy from another existing data
+		mydata.resize(ar1.size);
+		std::copy(ar1.begin(), ar1.end(), mydata.begin());
+		data = mydata.data();
+		size = mydata.size();
+	}
 };
 
 
@@ -80,7 +92,7 @@ protected:
 	arrRef2(){}
 public:
 	void assertDim(int s1, int s2) {
-		if (s1 == 0 && s2 == 0) {
+		if (size1 == 0 && size2 == 0) {
 			// The reference comes from a one-dimensional and the dimensions are not yet specified.
 			// In this case we set the dimensions now.
 			size1 = s1;
@@ -96,6 +108,8 @@ public:
 		size1 = size2 = 0; // set the matrix size to 0,0. It will be specified later (hopefully)
 	}
 	T& operator()(int idx1, int idx2) {
+		assertm(idx1 >= 1 && idx1 <= size1, "Dimension 1 index out of range!");
+		assertm(idx2 >= 1 && idx2 <= size2, "Dimension 2 index out of range!");
 		return data[(idx2 - 1)*size1 + (idx1-1)];
 	}
 	arrRef2 sub(int idx1, int idx2) {
@@ -200,8 +214,7 @@ namespace COLNLN {
 	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 }
 namespace COLEST {
-	dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-		ROOT(40);
+	dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);
 	iad1 JTOL(40), LTTOL(40);
 	int NTOL;
 
@@ -214,24 +227,21 @@ namespace COLBAS {
 }
 
 
-
-
-
-using namespace COLOUT;
-using namespace COLLOC;
-using namespace COLORD;
-using namespace COLAPR;
-using namespace COLMSH;
-using namespace COLSID;
-using namespace COLNLN;
-using namespace COLEST;
-using namespace COLBAS;
+//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+//using namespace COLLOC; // dad1 RHO(7), COEF(49);
+//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 
 using fsub_t = void (*)(double x, dar1 z, dar1 y, dar1 f);
 using dfsub_t = void (*)(double x, dar1 z, dar1 y, dar2 df);
 using gsub_t = void (*)(int i, dar1 z, double& g);
-using dgsub_t = void (*)(int i, dar1 z, dar1 dg);
+using dgsub_t = void (*)(int i, dar1 z, dar2 dg);
 using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
@@ -240,56 +250,56 @@ using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 //------------------------------------------------------------------------------------------------------
 
 
-
-
-void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
-	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
-	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int IFLAG,
-	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess);
-
-void SKALE(int N, int MSTAR, int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE);
-
-void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
-	dar1 SLOPE, dar1, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
-	dar2 FC, dar2 CB, int NCOMP, int NYCB);
-
-void CONSTS(int K, dar1 RHO, dar2 COEF);
-
-void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN);
-
-void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DELDMZ,
-	dar1 G, dar1 W, dar1 V, dar1 FC, dar1 RHS, dar1 DMZO,
-	iar2 INTEGS, iar1 IPVTG, iar1 IPVTW, double RNORM,
-	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
-	dgsub_t dgsub, guess_t guess, int ISING);
-
-void GDERIV(dar2 GI, int NROW, int IROW, dar1 ZVAL, dar1 DGZ, int MODE, dgsub_t dgsub);
-
-void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int KDY, dar1 ZVAL,
-	dar1 YVAL, dar2 DF, dar2 ACOL, dar1 DMZO, int NCY, dfsub_t dfsub, int MSING);
-
-void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
-	int NCOMP, int NCY, int NY, iar1 IPVTCB, int ISING, int MODE);
-
-void GBLOCK(double H, dar2 GI, int NROW, int IROW, dar1 WI, dar2 VI, int KDY, dar1 RHSZ, dar1 RHSDMZ,
-	iar1 IPVTW, int MODE, int MODL, double XI1, dar1 ZVAL, dar1 YVAL, dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB,
-	dar2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY);
-
-void RKBAS(double S, dar2 COEF, int k, int M, dar2 RKB, dar1 DM, int MODE);
-
-void APPROX(int i, double X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
-	int N, dar1 Z, dar1 DMZ, int k, int NCOMP, int NY, int MMAX, iar1 M,
-	int MSTAR, int MODE, dar1 DMVAL, int MODM);
-
-
-
-void VMONDE(dar1 RHO, dar1 COEF, int k);
-void HORDER(int i, dar1 UHIGH, double HI, dar1 DMZ, int NCOMP, int NCY, int k);
-void DMZSOL(int KDY, int MSTAR, int N, dar2 V, dar1 Z, dar2 DMZ);
-
-
-void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int INFO);
-void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X);
+//
+//
+//void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
+//	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
+//	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int& IFLAG,
+//	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess);
+//
+//void SKALE(int N, int MSTAR, int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE);
+//
+//void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
+//	dar1 SLOPE, dar1, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
+//	dar2 FC, dar2 CB, int NCOMP, int NYCB);
+//
+//void CONSTS(int K, dar1 RHO, dar2 COEF);
+//
+//void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN);
+//
+//void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DELDMZ,
+//	dar1 G, dar1 W, dar1 V, dar1 FC, dar1 RHS, dar1 DMZO,
+//	iar2 INTEGS, iar1 IPVTG, iar1 IPVTW, double RNORM,
+//	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
+//	dgsub_t dgsub, guess_t guess, int ISING);
+//
+//void GDERIV(dar2 GI, int NROW, int IROW, dar1 ZVAL, dar1 DGZ, int MODE, dgsub_t dgsub);
+//
+//void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int KDY, dar1 ZVAL,
+//	dar1 YVAL, dar2 DF, dar2 ACOL, dar1 DMZO, int NCY, dfsub_t dfsub, int MSING);
+//
+//void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
+//	int NCOMP, int NCY, int NY, iar1 IPVTCB, int ISING, int MODE);
+//
+//void GBLOCK(double H, dar2 GI, int NROW, int IROW, dar1 WI, dar2 VI, int KDY, dar1 RHSZ, dar1 RHSDMZ,
+//	iar1 IPVTW, int MODE, int MODL, double XI1, dar1 ZVAL, dar1 YVAL, dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB,
+//	dar2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY);
+//
+//void RKBAS(double S, dar2 COEF, int k, int M, dar2 RKB, dar1 DM, int MODE);
+//
+//void APPROX(int i, double X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
+//	int N, dar1 Z, dar1 DMZ, int k, int NCOMP, int NY, int MMAX, iar1 M,
+//	int MSTAR, int MODE, dar1 DMVAL, int MODM);
+//
+//
+//
+//void VMONDE(dar1 RHO, dar1 COEF, int k);
+//void HORDER(int i, dar1 UHIGH, double HI, dar1 DMZ, int NCOMP, int NCY, int k);
+//void DMZSOL(int KDY, int MSTAR, int N, dar2 V, dar1 Z, dar2 DMZ);
+//
+//
+//void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int INFO);
+//void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X);
 
 //------------------------------------------------------------------------------------------------------
 
@@ -823,9 +833,11 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X);
 //----------------------------------------------------------------------
 
 
+class cda{
+public:
 
 void COLDAE(int NCOMP, int NY, iar1 M, double ALEFT, double ARIGHT, dar1 ZETA, iar1 IPAR, iar1 LTOL,
-	dar1 TOL, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int IFLAG,
+	dar1 TOL, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	M.assertDim(1);
@@ -833,11 +845,33 @@ void COLDAE(int NCOMP, int NY, iar1 M, double ALEFT, double ARIGHT, dar1 ZETA, i
 	IPAR.assertDim(1);
 	LTOL.assertDim(1);
 	TOL.assertDim(1);
-	dad1 DUMMY(1);
 	FIXPNT.assertDim(1);
 	ISPACE.assertDim(1);
 	FSPACE.assertDim(1);
-	dad1 DUMMY2(840);
+
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	
+
+	/*COLORD::NCOMP = NCOMP;
+	COLORD::NY = NY;
+	COLORD::M = M;
+
+	COLSID::ALEFT = ALEFT;
+	COLSID::ARIGHT = ARIGHT;
+	COLSID::IZETA = IZETA;
+	
+	COLEST::LTOL = LTOL;
+	COLEST::TOL = TOL;*/
+	
+
+	dad1 DUMMY(1), DUMMY2(840);
 
 
 
@@ -872,8 +906,8 @@ void COLDAE(int NCOMP, int NY, iar1 M, double ALEFT, double ARIGHT, dar1 ZETA, i
 	//  in case incorrect input data is detected, the program returns
 	//  immediately with iflag=-3.
 
-	IFLAG = -3;
-	int NCY = NCOMP + NY;
+	iflag = -3;
+	NCY = NCOMP + NY;
 	if (NCOMP < 0 || NCOMP > 20)
 		return;
 	if (NY < 0 || NY > 20)
@@ -1118,7 +1152,7 @@ n230:
 		FSPACE.sub(LDQDMZ), FSPACE.sub(LG), FSPACE.sub(LW), FSPACE.sub(LV), FSPACE.sub(LFC),
 		FSPACE.sub(LVALST), FSPACE.sub(LSLOPE), FSPACE.sub(LSCL), FSPACE.sub(LDSCL),
 		FSPACE.sub(LACCUM), ISPACE.sub(LPVTG), ISPACE.sub(LINTEG), ISPACE.sub(LPVTW),
-		NFXPNT, FIXPNT, IFLAG, fsub, dfsub, gsub, dgsub, guess);
+		NFXPNT, FIXPNT, iflag, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
 	ISPACE(1) = N;
@@ -1166,6 +1200,7 @@ n230:
 		1       24H(ALLOWED FROM ISPACE)))
 	360 FORMAT(/ 53H INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE)*/
 }
+
 
 
 //**********************************************************************
@@ -1217,7 +1252,7 @@ n230:
 //**********************************************************************
 void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
 	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
-	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int IFLAG,
+	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, int NFXPNT, dar1 FIXPNT, int& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	XI.assertDim(1);
@@ -1239,7 +1274,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	DQZ.assertDim(1);
 	DQDMZ.assertDim(1);
 	FIXPNT.assertDim(1);
-	
+
 	SCALE.assertDim(1);
 	DSCALE.assertDim(1);
 	FC.assertDim(1);
@@ -1247,6 +1282,14 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	IPVTG.assertDim(1);
 	IPVTW.assertDim(1);
 
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	
 	dad1 DUMMY(1), DF(800);
 	dad2 FCSP(40, 60), CBSP(20, 20);
 	double RNORM, RNOLD;
@@ -1272,451 +1315,451 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	//  loop 20 is executed until error tolerances are satisfied or
 	//  the code fails (due to a singular matrix or storage limitations)
 
-while(true){
+	while (true) {
 
-	// initialization for a new mesh
-	ITER = 0;
-	if (NONLIN <= 0) {
+		// initialization for a new mesh
+		ITER = 0;
+		if (NONLIN <= 0) {
 
-		// the linear case.
-		// set up and solve equations
-		LSYSLV(MSING, XI, XIOLD, DUMMY, DUMMY, Z, DMZ, G,
-			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 0,
-			fsub, dfsub, gsub, dgsub, guess, ISING);
+			// the linear case.
+			// set up and solve equations
+			LSYSLV(MSING, XI, XIOLD, DUMMY, DUMMY, Z, DMZ, G,
+				W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 0,
+				fsub, dfsub, gsub, dgsub, guess, ISING);
 
-		// check for a singular matrix
-		if (ISING != 0) {
-			if (IPRINT < 1) {// WRITE(IOUT, 497)
+			// check for a singular matrix
+			if (ISING != 0) {
+				if (IPRINT < 1) {// WRITE(IOUT, 497)
+				}
+				iflag = 0;
+				return;
 			}
-			IFLAG = 0;
+			if (MSING == 0)
+				goto n400;
+		n30:
+			if (MSING >= 0) {
+				if (IPRINT < 1) {
+					//WRITE(IOUT, 495)
+				}
+				goto n460;
+			}
+			if (IPRINT < 1) {
+				//WRITE(IOUT, 490)
+			}
+			iflag = 0;
 			return;
 		}
-		if (MSING == 0)
-			goto n400;
-	n30:
-		if (MSING >= 0) {
+
+		//       iteration loop for nonlinear case
+		//       define the initial relaxation parameter (= relax)
+		double RELAX = 1.0;
+
+		// check for previous convergence and problem sensitivity
+		if (ICARE == -1)
+			RELAX = RSTART;
+		if (ICARE == 1)
+			RELAX = 1.0;
+		if (ICONV == 0)
+			goto n160;
+
+		//       convergence on a previous mesh has been obtained.    thus
+		//       we have a very good initial approximation for the newton
+		//       process.    proceed with one full newton and then iterate
+		//       with a fixed jacobian.
+
+		int IFREEZ = 0;
+
+		//       evaluate right hand side and its norm  and
+		//       find the first newton correction
+
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+			W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
+
+		if (IPRINT < 0) {
+			//WRITE(IOUT, 530)
+		}
+		if (IPRINT < 0) {
+			//WRITE(IOUT, 510) ITER, RNOLD
+		}
+		goto n70;
+
+		// solve for the next iterate .
+		// the value of ifreez determines whether this is a full
+		// newton step (=0) or a fixed jacobian iteration (=1).
+
+	n60:
+		if (IPRINT < 0) {
+			//WRITE(IOUT, 510) ITER, RNORM;
+		}
+		RNOLD = RNORM;
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM,
+			3 + IFREEZ, fsub, dfsub, gsub, dgsub, guess, ISING);
+
+
+	n70:
+		// check for a singular matrix
+		if (MSING != 0)
+			goto n30;
+		if (ISING != 0) {
 			if (IPRINT < 1) {
-				//WRITE(IOUT, 495)
+				//WRITE(IOUT, 497)
 			}
-			goto n460;
+			iflag = 0;
+			return;
 		}
-		if (IPRINT < 1) {
-			//WRITE(IOUT, 490)
+		int IFRZ;
+		if (IFREEZ != 1) {
+			//       a full newton step
+			ITER = ITER + 1;
+			IFRZ = 0;
 		}
-		IFLAG = 0;
-		return;
-	}
 
-	//       iteration loop for nonlinear case
-	//       define the initial relaxation parameter (= relax)
-	double RELAX = 1.0;
-
-	// check for previous convergence and problem sensitivity
-	if (ICARE == -1) 
-		RELAX = RSTART;
-	if (ICARE == 1)  
-		RELAX = 1.0;
-	if (ICONV == 0)
-		goto n160;
-
-	//       convergence on a previous mesh has been obtained.    thus
-	//       we have a very good initial approximation for the newton
-	//       process.    proceed with one full newton and then iterate
-	//       with a fixed jacobian.
-
-	int IFREEZ = 0;
-
-	//       evaluate right hand side and its norm  and
-	//       find the first newton correction
-
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	if (IPRINT < 0) {
-		//WRITE(IOUT, 530)
-	}
-	if (IPRINT < 0) {
-		//WRITE(IOUT, 510) ITER, RNOLD
-	}
-	goto n70;
-
-	// solve for the next iterate .
-	// the value of ifreez determines whether this is a full
-	// newton step (=0) or a fixed jacobian iteration (=1).
-
-n60:
-	if (IPRINT < 0) {
-		//WRITE(IOUT, 510) ITER, RNORM;
-	}
-	RNOLD = RNORM;
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM,
-		3 + IFREEZ, fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	
-n70:
-	// check for a singular matrix
-	if (MSING != 0)
-		goto n30;
-	if (ISING != 0) {
-		if (IPRINT < 1) {
-			//WRITE(IOUT, 497)
-		}
-		IFLAG = 0;
-		return;
-	}
-	int IFRZ;
-	if (IFREEZ != 1) {
-		//       a full newton step
-		ITER = ITER + 1;
-		IFRZ = 0;
-	}
-
-	// update   z and dmz , compute new  rhs  and its norm
-	for (int i = 1; i <= NZ; ++i)
-		Z(i) = Z(i) + DELZ(i);
-	for (int i = 1; i <= NDMZ; ++i)
-		DMZ(i) = DMZ(i) + DELDMZ(i);
-
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	//       check monotonicity. if the norm of  rhs  gets smaller,
-	//       proceed with a fixed jacobian; else proceed cautiously,
-	//       as if convergence has not been obtained before (iconv=0).
-	if (RNORM < PRECIS)
-		goto n390;
-	if (RNORM > RNOLD)
-		goto n130;
-	if (IFREEZ == 1)
-		goto n110;
-	IFREEZ = 1;
-	goto n60;
-
-	//       verify that the linear convergence with fixed jacobian
-	//       is fast enough.
-
-n110:
-	IFRZ = IFRZ + 1;
-	if (IFRZ >= LMTFRZ)       IFREEZ = 0;
-	if (RNOLD < 4.0 * RNORM)  IFREEZ = 0;
-
-	// check convergence (iconv = 1).
-	for (int IT = 1; IT <= NTOL; ++IT) {
-		int INZ = LTOL(IT);
-		for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-			if (DABS(DELZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
-				goto n60;
-		}
-	}
-
-	// convergence obtained
-	if (IPRINT < 1) {// WRITE(IOUT, 560) ITER
-	}
-	goto n400;
-
-n130:
-	// convergence of fixed jacobian iteration failed.
-	/*if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
-	if (IPRINT < 0)  WRITE(IOUT, 540)*/
-	ICONV = 0;
-	if (ICARE != 1)   RELAX = RSTART;
-	for (int i = 1; i <= NZ; ++i)
-		Z(i) = Z(i) - DELZ(i);
-	for (int i = 1; i <= NDMZ; ++i)
-		DMZ(i) = DMZ(i) - DELDMZ(i);
-
-
-	// update old mesh
-	int NP1 = N + 1;
-	for (int i = 1; i <= NP1; ++i)
-		XIOLD(i) = XI(i);
-	NOLD = N;
-	ITER = 0;
-
-n160:
-	// no previous convergence has been obtained. proceed
-	// with the damped newton method.
-	// evaluate rhs and find the first newton correction.
-	//if (IPRINT < 0)  WRITE(IOUT, 500)
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-		W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	// check for a singular matrix
-	if (MSING != 0)
-		goto n30;
-	if (ISING != 0) {
-		//if (IPRINT < 1)  WRITE(IOUT, 497)
-		IFLAG = 0;
-		return;
-	}
-
-	// bookkeeping for first mesh
-	if (IGUESS == 1)
-		IGUESS = 0;
-
-	// find initial scaling
-	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
-	double RLXOLD = RELAX;
-	int IPRED = 1;
-	goto n220;
-
-n170:
-	// main iteration loop
-	RNOLD = RNORM;
-	if (ITER >= LIMIT)
-		goto n430;
-
-	// update scaling
-	SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
-
-	// compute norm of newton correction with new scaling
-	double ANSCL = 0.0;
-	for (int i = 1; i <= NZ; ++i)
-		ANSCL = ANSCL + pow(DELZ(i) * SCALE(i), 2);
-
-	for (int i = 1; i <= NDMZ; ++i)
-		ANSCL = ANSCL + pow(DELDMZ(i) * DSCALE(i), 2);
-
-	ANSCL = sqrt(ANSCL / float(NZ + NDMZ));
-
-	// find a newton direction
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
-		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 3,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	// check for a singular matrix
-	if (MSING != 0)
-		goto n30;
-
-	if (ISING != 0) {
-		//if (IPRINT < 1)  WRITE(IOUT, 497)
-		IFLAG = 0;
-		return;
-	}
-
-	// predict relaxation factor for newton step.
-	if (ICARE != 1) {
-		double ANDIF = 0.0;
+		// update   z and dmz , compute new  rhs  and its norm
 		for (int i = 1; i <= NZ; ++i)
-			ANDIF = ANDIF + pow((DQZ(i) - DELZ(i)) * SCALE(i), 2);
-
+			Z(i) = Z(i) + DELZ(i);
 		for (int i = 1; i <= NDMZ; ++i)
-			ANDIF = ANDIF + pow((DQDMZ(i) - DELDMZ(i)) * DSCALE(i), 2);
+			DMZ(i) = DMZ(i) + DELDMZ(i);
 
-		ANDIF = sqrt(ANDIF / float(NZ + NDMZ) + PRECIS);
-		RELAX = RELAX * ANSCL / ANDIF;
-		if (RELAX > 1.0)  RELAX = 1.0;
-		RLXOLD = RELAX;
-		IPRED = 1;
-	}
-n220:
-	ITER = ITER + 1;
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	// determine a new  z and dmz  and find new  rhs  and its norm
-	for (int i = 1; i <= NZ; ++i)
-		Z(i) = Z(i) + RELAX * DELZ(i);
+		//       check monotonicity. if the norm of  rhs  gets smaller,
+		//       proceed with a fixed jacobian; else proceed cautiously,
+		//       as if convergence has not been obtained before (iconv=0).
+		if (RNORM < PRECIS)
+			goto n390;
+		if (RNORM > RNOLD)
+			goto n130;
+		if (IFREEZ == 1)
+			goto n110;
+		IFREEZ = 1;
+		goto n60;
 
-	for (int i = 1; i <= NDMZ; ++i)
-		DMZ(i) = DMZ(i) + RELAX * DELDMZ(i);
+		//       verify that the linear convergence with fixed jacobian
+		//       is fast enough.
 
-n250:
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
-		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
+	n110:
+		IFRZ = IFRZ + 1;
+		if (IFRZ >= LMTFRZ)       IFREEZ = 0;
+		if (RNOLD < 4.0 * RNORM)  IFREEZ = 0;
 
-	// compute a fixed jacobian iterate (used to control relax)
-	LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
-		W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
-		fsub, dfsub, gsub, dgsub, guess, ISING);
-
-	// find scaled norms of various terms used to correct relax
-	double ANORM = 0.0;
-	double ANFIX = 0.0;
-	for (int i = 1; NZ; ++i) {
-		ANORM = ANORM + pow(DELZ(i) * SCALE(i), 2);
-		ANFIX = ANFIX + pow(DQZ(i) * SCALE(i), 2);
-	}
-	for (int i = 1; NDMZ; ++i) {
-		ANORM = ANORM + pow(DELDMZ(i) * DSCALE(i), 2);
-		ANFIX = ANFIX + pow(DQDMZ(i) * DSCALE(i), 2);
-	}
-	ANORM = sqrt(ANORM / float(NZ + NDMZ));
-	ANFIX = sqrt(ANFIX / float(NZ + NDMZ));
-	if (ICOR == 1) {
-		//if (IPRINT < 0) WRITE(IOUT, 550) RELAX, ANORM, ANFIX,  RNOLD, RNORM
-	}
-	else {
-		//if (IPRINT < 0)  WRITE(IOUT, 520) ITER, RELAX, ANORM, ANFIX, RNOLD, RNORM
-	}
-
-	ICOR = 0;
-
-	// check for monotonic decrease in  delz and deldmz.
-	if (ANFIX < PRECIS || RNORM < PRECIS)
-		goto n390;
-	if (ANFIX <= ANORM || ICARE == 1) {
-		//       we have a decrease.
-		//       if  dqz  and dqdmz  small, check for convergence
-		if (ANFIX <= CHECK)
-			goto n350;
-
-		//       correct the predicted  relax  unless the corrected
-		//       value is within 10 percent of the predicted one.
-		if (IPRED != 1)
-			goto n170;
-	}
-	if (ITER >= LIMIT)
-		goto n430;
-	if (ICARE == 1)
-		goto n170;
-
-	// correct the relaxation factor.
-	IPRED = 0;
-	double ARG = (ANFIX / ANORM - 1.0) / RELAX + 1.0;
-	if (ARG < 0.0)
-		goto n170;
-	if (ARG > .25 * RELAX + .125 * RELAX * RELAX) {
-		double FACTOR = -1.0 + sqrt(1.0 + 8.0 * ARG);
-		if (DABS(FACTOR - 1.0) < .10 * FACTOR)
-			goto n170;
-		if (FACTOR < 0.50)
-			FACTOR = 0.5;
-		RELAX = RELAX / FACTOR;
-	}
-	else {
-		if (RELAX >= .9)
-			goto n170;
-		RELAX = 1.0;
-	}
-	ICOR = 1;
-	if (RELAX >= RELMIN) {
-		double FACT = RELAX - RLXOLD;
-		for (int i = 1; NZ; ++i)
-			Z(i) = Z(i) + FACT * DELZ(i);
-
-		for (int i = 1; NDMZ; ++i) {
-			DMZ(i) = DMZ(i) + FACT * DELDMZ(i);
-		}
-		RLXOLD = RELAX;
-		goto n250;
-
-
-		//       check convergence (iconv = 0).
-	n350:
-
+		// check convergence (iconv = 1).
 		for (int IT = 1; IT <= NTOL; ++IT) {
 			int INZ = LTOL(IT);
 			for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-				if (DABS(DQZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
-					goto n170;
+				if (DABS(DELZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+					goto n60;
 			}
 		}
-		//       convergence obtained
 
-		//if (IPRINT < 1)  WRITE(IOUT, 560) ITER
+		// convergence obtained
+		if (IPRINT < 1) {// WRITE(IOUT, 560) ITER
+		}
+		goto n400;
 
-		//       since convergence obtained, update  z and dmz  with term
-		//       from the fixed jacobian iteration.
+	n130:
+		// convergence of fixed jacobian iteration failed.
+		/*if (IPRINT < 0)  WRITE(IOUT, 510) ITER, RNORM
+		if (IPRINT < 0)  WRITE(IOUT, 540)*/
+		ICONV = 0;
+		if (ICARE != 1)   RELAX = RSTART;
 		for (int i = 1; i <= NZ; ++i)
-			Z(i) = Z(i) + DQZ(i);
+			Z(i) = Z(i) - DELZ(i);
+		for (int i = 1; i <= NDMZ; ++i)
+			DMZ(i) = DMZ(i) - DELDMZ(i);
+
+
+		// update old mesh
+		int NP1 = N + 1;
+		for (int i = 1; i <= NP1; ++i)
+			XIOLD(i) = XI(i);
+		NOLD = N;
+		ITER = 0;
+
+	n160:
+		// no previous convergence has been obtained. proceed
+		// with the damped newton method.
+		// evaluate rhs and find the first newton correction.
+		//if (IPRINT < 0)  WRITE(IOUT, 500)
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+			W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
+
+		// check for a singular matrix
+		if (MSING != 0)
+			goto n30;
+		if (ISING != 0) {
+			//if (IPRINT < 1)  WRITE(IOUT, 497)
+			iflag = 0;
+			return;
+		}
+
+		// bookkeeping for first mesh
+		if (IGUESS == 1)
+			IGUESS = 0;
+
+		// find initial scaling
+		SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
+		double RLXOLD = RELAX;
+		int IPRED = 1;
+		goto n220;
+
+	n170:
+		// main iteration loop
+		RNOLD = RNORM;
+		if (ITER >= LIMIT)
+			goto n430;
+
+		// update scaling
+		SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
+
+		// compute norm of newton correction with new scaling
+		double ANSCL = 0.0;
+		for (int i = 1; i <= NZ; ++i)
+			ANSCL = ANSCL + pow(DELZ(i) * SCALE(i), 2);
 
 		for (int i = 1; i <= NDMZ; ++i)
-			DMZ(i) = DMZ(i) + DQDMZ(i);
+			ANSCL = ANSCL + pow(DELDMZ(i) * DSCALE(i), 2);
 
-	n390:
+		ANSCL = sqrt(ANSCL / float(NZ + NDMZ));
 
-		//if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1)  WRITE(IOUT, 560) ITER
-		ICONV = 1;
-		if (ICARE == (-1))  ICARE = 0;
+		// find a newton direction
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 3,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
 
-	n400:
+		// check for a singular matrix
+		if (MSING != 0)
+			goto n30;
 
-		//       if full output has been requested, print values of the
-		//       solution components   z  at the meshpoints and  y  at
-		//       collocation points.
-		if (IPRINT >= 0)
-			goto n420;
-		//for (j = 1, MSTAR) WRITE(IOUT, 610) j
-
-		//WRITE(IOUT, 620) (Z(LJ), LJ = j, NZ, MSTAR)
-		for (int j = 1; j <= NY; ++j) {
-			//WRITE(IOUT, 630) j
-			//WRITE(IOUT, 620) (DMZ(LJ), LJ = j + NCOMP, NDMZ, KDY)
+		if (ISING != 0) {
+			//if (IPRINT < 1)  WRITE(IOUT, 497)
+			iflag = 0;
+			return;
 		}
 
-	n420:
+		// predict relaxation factor for newton step.
+		if (ICARE != 1) {
+			double ANDIF = 0.0;
+			for (int i = 1; i <= NZ; ++i)
+				ANDIF = ANDIF + pow((DQZ(i) - DELZ(i)) * SCALE(i), 2);
 
-		//       check for error tolerance satisfaction
-		int IFIN = 1;
-		if (IMESH == 2)
-			ERRCHK(XI, Z, DMZ, VALSTR, IFIN);
-		if (IMESH == 1 || IFIN == 0 && ICARE != 2)
-			goto n460;
-		IFLAG = 1;
-		return;
+			for (int i = 1; i <= NDMZ; ++i)
+				ANDIF = ANDIF + pow((DQDMZ(i) - DELDMZ(i)) * DSCALE(i), 2);
 
-
-	n430:
-		// diagnostics for failure of nonlinear iteration.
-		//if (IPRINT < 1)  WRITE(IOUT, 570) ITER
-		;
-	}
-	else {
-		if (IPRINT < 1) {
-			/*	WRITE(IOUT, 580) RELAX
-					WRITE(IOUT, 581) RELMIN*/
+			ANDIF = sqrt(ANDIF / float(NZ + NDMZ) + PRECIS);
+			RELAX = RELAX * ANSCL / ANDIF;
+			if (RELAX > 1.0)  RELAX = 1.0;
+			RLXOLD = RELAX;
+			IPRED = 1;
 		}
+	n220:
+		ITER = ITER + 1;
+
+		// determine a new  z and dmz  and find new  rhs  and its norm
+		for (int i = 1; i <= NZ; ++i)
+			Z(i) = Z(i) + RELAX * DELZ(i);
+
+		for (int i = 1; i <= NDMZ; ++i)
+			DMZ(i) = DMZ(i) + RELAX * DELDMZ(i);
+
+	n250:
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
+
+		// compute a fixed jacobian iterate (used to control relax)
+		LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
+			W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
+			fsub, dfsub, gsub, dgsub, guess, ISING);
+
+		// find scaled norms of various terms used to correct relax
+		double ANORM = 0.0;
+		double ANFIX = 0.0;
+		for (int i = 1; NZ; ++i) {
+			ANORM = ANORM + pow(DELZ(i) * SCALE(i), 2);
+			ANFIX = ANFIX + pow(DQZ(i) * SCALE(i), 2);
+		}
+		for (int i = 1; NDMZ; ++i) {
+			ANORM = ANORM + pow(DELDMZ(i) * DSCALE(i), 2);
+			ANFIX = ANFIX + pow(DQDMZ(i) * DSCALE(i), 2);
+		}
+		ANORM = sqrt(ANORM / float(NZ + NDMZ));
+		ANFIX = sqrt(ANFIX / float(NZ + NDMZ));
+		if (ICOR == 1) {
+			//if (IPRINT < 0) WRITE(IOUT, 550) RELAX, ANORM, ANFIX,  RNOLD, RNORM
+		}
+		else {
+			//if (IPRINT < 0)  WRITE(IOUT, 520) ITER, RELAX, ANORM, ANFIX, RNOLD, RNORM
+		}
+
+		ICOR = 0;
+
+		// check for monotonic decrease in  delz and deldmz.
+		if (ANFIX < PRECIS || RNORM < PRECIS)
+			goto n390;
+		if (ANFIX <= ANORM || ICARE == 1) {
+			//       we have a decrease.
+			//       if  dqz  and dqdmz  small, check for convergence
+			if (ANFIX <= CHECK)
+				goto n350;
+
+			//       correct the predicted  relax  unless the corrected
+			//       value is within 10 percent of the predicted one.
+			if (IPRED != 1)
+				goto n170;
+		}
+		if (ITER >= LIMIT)
+			goto n430;
+		if (ICARE == 1)
+			goto n170;
+
+		// correct the relaxation factor.
+		IPRED = 0;
+		double ARG = (ANFIX / ANORM - 1.0) / RELAX + 1.0;
+		if (ARG < 0.0)
+			goto n170;
+		if (ARG > .25 * RELAX + .125 * RELAX * RELAX) {
+			double FACTOR = -1.0 + sqrt(1.0 + 8.0 * ARG);
+			if (DABS(FACTOR - 1.0) < .10 * FACTOR)
+				goto n170;
+			if (FACTOR < 0.50)
+				FACTOR = 0.5;
+			RELAX = RELAX / FACTOR;
+		}
+		else {
+			if (RELAX >= .9)
+				goto n170;
+			RELAX = 1.0;
+		}
+		ICOR = 1;
+		if (RELAX >= RELMIN) {
+			double FACT = RELAX - RLXOLD;
+			for (int i = 1; NZ; ++i)
+				Z(i) = Z(i) + FACT * DELZ(i);
+
+			for (int i = 1; NDMZ; ++i) {
+				DMZ(i) = DMZ(i) + FACT * DELDMZ(i);
+			}
+			RLXOLD = RELAX;
+			goto n250;
+
+
+			//       check convergence (iconv = 0).
+		n350:
+
+			for (int IT = 1; IT <= NTOL; ++IT) {
+				int INZ = LTOL(IT);
+				for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
+					if (DABS(DQZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+						goto n170;
+				}
+			}
+			//       convergence obtained
+
+			//if (IPRINT < 1)  WRITE(IOUT, 560) ITER
+
+			//       since convergence obtained, update  z and dmz  with term
+			//       from the fixed jacobian iteration.
+			for (int i = 1; i <= NZ; ++i)
+				Z(i) = Z(i) + DQZ(i);
+
+			for (int i = 1; i <= NDMZ; ++i)
+				DMZ(i) = DMZ(i) + DQDMZ(i);
+
+		n390:
+
+			//if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1)  WRITE(IOUT, 560) ITER
+			ICONV = 1;
+			if (ICARE == (-1))  ICARE = 0;
+
+		n400:
+
+			//       if full output has been requested, print values of the
+			//       solution components   z  at the meshpoints and  y  at
+			//       collocation points.
+			if (IPRINT >= 0)
+				goto n420;
+			//for (j = 1, MSTAR) WRITE(IOUT, 610) j
+
+			//WRITE(IOUT, 620) (Z(LJ), LJ = j, NZ, MSTAR)
+			for (int j = 1; j <= NY; ++j) {
+				//WRITE(IOUT, 630) j
+				//WRITE(IOUT, 620) (DMZ(LJ), LJ = j + NCOMP, NDMZ, KDY)
+			}
+
+		n420:
+
+			//       check for error tolerance satisfaction
+			int IFIN = 1;
+			if (IMESH == 2)
+				ERRCHK(XI, Z, DMZ, VALSTR, IFIN);
+			if (IMESH == 1 || IFIN == 0 && ICARE != 2)
+				goto n460;
+			iflag = 1;
+			return;
+
+
+		n430:
+			// diagnostics for failure of nonlinear iteration.
+			//if (IPRINT < 1)  WRITE(IOUT, 570) ITER
+			;
+		}
+		else {
+			if (IPRINT < 1) {
+				/*	WRITE(IOUT, 580) RELAX
+						WRITE(IOUT, 581) RELMIN*/
+			}
+		}
+
+		iflag = -2;
+		NOCONV = NOCONV + 1;
+		if (ICARE == 2 && NOCONV > 1)
+			return;
+		if (ICARE == 0)
+			ICARE = -1;
+
+	n460:
+
+		// update old mesh
+		NP1 = N + 1;
+		for (int i = 1; i <= NP1; ++i)
+			XIOLD(i) = XI(i);
+		NOLD = N;
+
+		//       pick a new mesh
+		//       check safeguards for mesh refinement
+		IMESH = 1;
+		if (ICONV == 0 || MSHNUM >= MSHLMT || MSHALT >= MSHLMT)
+			IMESH = 2;
+		if (MSHALT >= MSHLMT && MSHNUM < MSHLMT)
+			MSHALT = 1;
+		int NYCB;
+		if (NY == 0)
+			NYCB = 1;
+		else
+			NYCB = NY;
+
+
+		NEWMSH(IMESH, XI, XIOLD, Z, DMZ, DMV, VALSTR,
+			SLOPE, ACCUM, NFXPNT, FIXPNT, DF, dfsub,
+			FCSP, CBSP, NCOMP, NYCB);
+
+		// exit if expected n is too large (but may try n=nmax once)
+		if (N > NMAX)
+		{
+			N = N / 2;
+			iflag = -1;
+			// if (ICONV == 0 && IPRINT < 1)  WRITE(IOUT, 590)
+			// if (ICONV == 1 && IPRINT < 1)  WRITE(IOUT, 600)
+			return;
+		}
+		if (ICONV == 0)  IMESH = 1;
+		if (ICARE == 1)  ICONV = 0;
 	}
-
-	IFLAG = -2;
-	NOCONV = NOCONV + 1;
-	if (ICARE == 2 && NOCONV > 1)
-		return;
-	if (ICARE == 0)
-		ICARE = -1;
-
-n460:
-
-	// update old mesh
-	NP1 = N + 1;
-	for (int i = 1; i <= NP1; ++i)
-		XIOLD(i) = XI(i);
-	NOLD = N;
-
-	//       pick a new mesh
-	//       check safeguards for mesh refinement
-	IMESH = 1;
-	if (ICONV == 0 || MSHNUM >= MSHLMT || MSHALT >= MSHLMT)
-		IMESH = 2;
-	if (MSHALT >= MSHLMT && MSHNUM < MSHLMT)
-		MSHALT = 1;
-	int NYCB;
-	if (NY == 0)
-		NYCB = 1;
-	else
-		NYCB = NY;
-
-
-	NEWMSH(IMESH, XI, XIOLD, Z, DMZ, DMV, VALSTR,
-		SLOPE, ACCUM, NFXPNT, FIXPNT, DF, dfsub,
-		FCSP, CBSP, NCOMP, NYCB);
-
-	// exit if expected n is too large (but may try n=nmax once)
-	if (N > NMAX)
-	{
-		N = N / 2;
-		IFLAG = -1;
-		// if (ICONV == 0 && IPRINT < 1)  WRITE(IOUT, 590)
-		// if (ICONV == 1 && IPRINT < 1)  WRITE(IOUT, 600)
-		return;
-	}
-	if (ICONV == 0)  IMESH = 1;
-	if (ICARE == 1)  ICONV = 0;
-}
 	//-------------------------------------------------------------- -
 	//490 FORMAT(//35H THE GLOBAL BVP-MATRIX IS SINGULAR )
 	//    495 FORMAT(//40H A LOCAL ELIMINATION MATRIX IS SINGULAR )
@@ -1748,6 +1791,9 @@ n460:
 
 
 
+
+
+
 //**********************************************************************
 //
 //   purpose
@@ -1768,12 +1814,18 @@ n460:
 //**********************************************************************
 void SKALE(int N, int MSTAR, int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 {
-
 	Z.assertDim(MSTAR, 1);
 	SCALE.assertDim(MSTAR, 1);
 	DMZ.assertDim(KDY, N);
 	DSCALE.assertDim(KDY, N);
 	XI.assertDim(1);
+	
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+
+	//COLAPR::N = N;
+	//COLORD::MSTAR = MSTAR;
+	//COLORD::KDY = KDY;
+
 	dad1 BASM(5);
 
 	BASM(1) = 1.0;
@@ -1891,6 +1943,16 @@ void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALS
 	dar1 SLOPE, dar1, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
 	dar2 FC, dar2 CB, int NCOMP, int NYCB)
 {
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+
 	SLOPE.assertDim(1);
 	XI.assertDim(1);
 	XIOLD.assertDim(1);
@@ -1903,6 +1965,7 @@ void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALS
 	DF.assertDim(NCY, 1);
 	CB.assertDim(NYCB, NYCB);
 
+	
 	dad1 D1(40), D2(40), ACCUM(1), DUMMY(1), ZVAL(40), YVAL(40), A(28), BCOL(40), U(400), V(400);
 	iad1 IPVTCB(40);
 
@@ -1957,7 +2020,7 @@ void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALS
 				// determine where the j-th fixed point should fall in the
 				// new mesh - this is xi(iright) and the (j-1)st fixed
 				// point is in xi(ileft)
-				int NMIN = (XRIGHT - ALEFT) / (ARIGHT - ALEFT) * float(N) + 1.5;
+				int NMIN = int((XRIGHT - ALEFT) / (ARIGHT - ALEFT) * double(N) + 1.5);
 				if (NMIN > N - NFXPNT + j)
 					NMIN = N - NFXPNT + j;
 				IRIGHT = std::max(ILEFT + 1, NMIN);
@@ -2137,7 +2200,6 @@ n100:
 		//  other intervals (generally the solution on the (i-1)st and ith
 		//  intervals will be used to approximate the needed derivative, but
 		//  here the 1st and second intervals are used.)
-		int i = 1;
 		double HIOLD = XIOLD(2) - XIOLD(1);
 		HORDER(1, D1, HIOLD, DMV, NCOMP, NCY, K);
 		IDMZ = IDMZ + (NCOMP + NY) * K;
@@ -2186,7 +2248,7 @@ n100:
 		double DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS);
 
 		//  naccum=expected n to achieve .1x user requested tolerances
-		int NACCUM = ACCUM(NOLD + 1) + 1.0;
+		int NACCUM = int(ACCUM(NOLD + 1) + 1.0);
 		//if (IPRINT < 0)  WRITE(IOUT, 350) DEGEQU, NACCUM
 
 		//  decide if mesh selection is worthwhile (otherwise, halve)
@@ -2203,7 +2265,7 @@ n100:
 		int NMAX2 = NMAX / 2;
 
 		//  the mesh is at most halved
-		int N = MIN0(NMAX2, NOLD, NMX);
+		N = MIN0(NMAX2, NOLD, NMX);
 
 	n220:
 
@@ -2332,6 +2394,15 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 {
 	RHO.assertDim(7);
 	COEF.assertDim(K, 1);
+	
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+
+	/*COLORD::K = K;
+	COLLOC::RHO = RHO;
+	COLLOC::COEF = COEF;*/
+
 	dad1 CNSTS1(28), CNSTS2(28), DUMMY(1);
 
 	CNSTS1 = { .250, .625 - 1, 7.2169 - 2, 1.8342 - 2,
@@ -2348,7 +2419,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		 4.028 - 13, 5.646 - 12, 7.531 - 11, 1.129 - 9 };
 
 	// assign weights for error estimate
-	double KOFF = K * (K + 1) / 2;
+	int KOFF = K * (K + 1) / 2;
 	int IZ = 1;
 	for (int j = 1; j <= NCOMP; ++j) {
 		int MJ = M(j);
@@ -2426,7 +2497,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 	}
 
 	// map (-1,1) to (0,1) by  t = .5 * (1. + x)
-	for (int j = 1; K; ++j)
+	for (int j = 1; j<=K; ++j)
 		RHO(j) = .50 * (1.0 + RHO(j));
 
 
@@ -2480,13 +2551,22 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 	Z.assertDim(1);
 	DMZ.assertDim(1);
 	VALSTR.assertDim(1);
+	
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+
+	COLMSH::MSHFLG = 1;
+
 	dad1 ERR(40), ERREST(40), DUMMY(1);
 	
 
 	//  error estimates are to be generated and tested
 	//  to see if the tolerance requirements are satisfied.
 	IFIN = 1;
-	int MSHFLG = 1;
 	for (int j = 1; j <= MSTAR; ++j)
 		ERREST(j) = 0.0;
 	for (int IBACK = 1; IBACK <= N; ++IBACK) {
@@ -2643,6 +2723,14 @@ void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DE
 	IPVTG.assertDim(1);
 	IPVTW.assertDim(1);
 	FC.assertDim(1);
+
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	dad1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
 	dad1 DUMMY(1), Y(1), AT(28), CB(400);
@@ -2864,7 +2952,7 @@ void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DE
 			if (ISING != 0)
 				return;
 			if (i >= N) {
-				int IZSAVE = IZETA;
+				IZSAVE = IZETA;
 				while (true) {
 					if (IZETA > MSTAR)
 						break;
@@ -2887,6 +2975,7 @@ void LSYSLV(int MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DE
 							}
 						}
 					}
+
 					// find  rhs  boundary value.
 					double GVAL;
 					gsub(IZETA, ZVAL, GVAL);
@@ -3048,8 +3137,12 @@ void GDERIV(dar2 GI, int NROW, int IROW, dar1 ZVAL, dar1 DGZ, int MODE, dgsub_t 
 	GI.assertDim(NROW, 1);
 	ZVAL.assertDim(1);
 	DGZ.assertDim(1);
+	
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	
 	dad1 DG(40);
-
 
 	//  zero jacobian dg
 	for (int j = 1; j <= MSTAR; ++j)
@@ -3124,6 +3217,9 @@ void VWBLOK(double XCOL, double HRHO, int JJ, dar2 WI, dar2 VI, iar1 IPVTW, int 
 	ACOL.assertDim(7, 4);
 	YVAL.assertDim(1);
 
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	
 	dad1 BASM(5);
 	dad2 HA(7, 4);
 
@@ -3259,6 +3355,10 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	V.assertDim(NY, NY);
 	IPVTCB.assertDim(1);
 
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	
 	dad1 WORK(20), S(21), E(20);
 
 
@@ -3286,7 +3386,6 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	}
 
 	//  if d has full rank then no projection is needed
-
 	if (IRANK == NY) {
 		for (int i = 1; i <= NCOMP; ++i)
 			for (int j = 1; j <= MSTAR + NY; ++j)
@@ -3296,7 +3395,6 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	else
 	{
 		//  form projected cb
-
 		int IR = NY - IRANK;
 		for (int i = 1; i <= NY; ++i) {
 			for (int j = 1; j <= NY; ++j) {
@@ -3319,68 +3417,65 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 			for (int j = 1; j <= NCOMP; ++j) {
 				D(i, j) = WORK(j);
 			}
-			for (int i = 1; i <= IR; ++i) {
-				for (int j = 1; j <= IR; ++j) {
-					WORK(j) = 0;
-					for (int l = 1; l <= NY; ++l) {
-						WORK(j) = WORK(j) + U(l, i + IRANK) * D(l, j);
-					}
+		}
+		for (int i = 1; i <= IR; ++i) {
+			for (int j = 1; j <= IR; ++j) {
+				WORK(j) = 0;
+				for (int l = 1; l <= NY; ++l) {
+					WORK(j) = WORK(j) + U(l, i + IRANK) * D(l, j);
 				}
-				for (int j = 1; j <= IR; ++j) {
-					D(i, j) = WORK(j);
-				}
+			}
+			for (int j = 1; j <= IR; ++j) {
+				D(i, j) = WORK(j);
+			}
+		}
+		//  decompose projected cb
+		DGEFA(D, NY, IR, IPVTCB, ISING);
+		if (ISING != 0)
+			return;
 
-				//  decompose projected cb
-
-				DGEFA(D, NY, IR, IPVTCB, ISING);
-				if (ISING != 0)
-					return;
-
-				//  form columns of fc
-
-				for (int j = MSTAR + 1; j <= MSTAR + NY; ++j) {
-					for (int i = 1; i <= IR; ++i)
-						WORK(i) = U(j - MSTAR, i + IRANK);
-					DGESL(D, NY, IR, IPVTCB, WORK, 0);
-					for (int i = 1; i <= NY; ++i) {
-						U(j - MSTAR, i) = 0;
-						for (int l = 1; l <= IR; ++l)
-							U(j - MSTAR, i) = U(j - MSTAR, i) + V(i, l + IRANK) * WORK(l);
-					}
-					for (int i = 1; i <= NCOMP; ++i) {
-						double FACT = 0;
-						for (int l = 1; l <= NY; ++l)
-							FACT = FACT + DF(i, MSTAR + l) * U(j - MSTAR, l);
-						FC(i, j) = FACT;
-					}
-
-					if (MODE == 1) {
-						for (int i = 1; i <= NCOMP; ++i) {
-							for (int j = 1; j <= MSTAR; ++j) {
-								double FACT = 0;
-								for (int l = 1; l <= NY; ++l)
-									FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, j);
-								FC(i, j) = FACT;
-							}
-						}
-					}
-					else {
-						for (int i = 1; i <= NCOMP; ++i)
-						{
-							int MJ = 0;
-							for (int j = 1; j <= NCOMP; ++j) {
-								MJ = MJ + M(j);
-								double FACT = 0;
-								for (int l = 1; l <= NY; ++l)
-									FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, MJ);
-
-								FC(i, j) = FACT;
-							}
-						}
-					}
+		//  form columns of fc
+		for (int j = MSTAR + 1; j <= MSTAR + NY; ++j) {
+			for (int i = 1; i <= IR; ++i)
+				WORK(i) = U(j - MSTAR, i + IRANK);
+			DGESL(D, NY, IR, IPVTCB, WORK, 0);
+			for (int i = 1; i <= NY; ++i) {
+				U(j - MSTAR, i) = 0;
+				for (int l = 1; l <= IR; ++l)
+					U(j - MSTAR, i) = U(j - MSTAR, i) + V(i, l + IRANK) * WORK(l);
+			}
+			for (int i = 1; i <= NCOMP; ++i) {
+				double FACT = 0;
+				for (int l = 1; l <= NY; ++l)
+					FACT = FACT + DF(i, MSTAR + l) * U(j - MSTAR, l);
+				FC(i, j) = FACT;
+			}
+		}
+		if (MODE == 1) {
+			for (int i = 1; i <= NCOMP; ++i) {
+				for (int j = 1; j <= MSTAR; ++j) {
+					double FACT = 0;
+					for (int l = 1; l <= NY; ++l)
+						FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, j);
+					FC(i, j) = FACT;
 				}
 			}
 		}
+		else {
+			for (int i = 1; i <= NCOMP; ++i)
+			{
+				int MJ = 0;
+				for (int j = 1; j <= NCOMP; ++j) {
+					MJ = MJ + M(j);
+					double FACT = 0;
+					for (int l = 1; l <= NY; ++l)
+						FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, MJ);
+
+					FC(i, j) = FACT;
+				}
+			}
+		}
+
 	}
 }
 
@@ -3433,6 +3528,10 @@ void GBLOCK(double H, dar2 GI, int NROW, int IROW, dar1 WI, dar2 VI, int KDY, da
 	CB.assertDim(NYCB, NYCB);
 	IPVTCB.assertDim(1);
 	FC.assertDim(NCOMP, 1);
+
+	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	dad2 HB(7, 4);
 	dad1 BASM(5), BCOL(40), U(400), V(400);
@@ -3737,6 +3836,8 @@ void APPROX(int i, double X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
 	COEF.assertDim(1);
 	YVAL.assertDim(1);
 	
+	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT;
+
 	dad1 BM(4), DM(7);
 	int IZ, ILEFT, l, IRIGHT;
 
@@ -3897,7 +3998,7 @@ purpose
 * **********************************************************************/
 void VMONDE(dar1 RHO, dar1 COEF, int k)
 {
-	int i, IFAC, j, KM1, KMI;
+	int IFAC, KM1, KMI;
 	RHO.assertDim(k);
 	COEF.assertDim(k);
 
@@ -3912,9 +4013,9 @@ void VMONDE(dar1 RHO, dar1 COEF, int k)
 	}
 
 	IFAC = 1;
-	for (i = 1; i <= KM1; ++j) {
+	for (int i = 1; i <= KM1; ++i) {
 		KMI = k + 1 - i;
-		for (j = 2; j <= KMI; ++j)
+		for (int j = 2; j <= KMI; ++j)
 			COEF(j) = COEF(j) - RHO(j + i - 1) * COEF(j - 1);
 		COEF(KMI) = float(IFAC) * COEF(KMI);
 		IFAC = IFAC * i;
@@ -3946,11 +4047,11 @@ void HORDER(int i, dar1 UHIGH, double HI, dar1 DMZ, int NCOMP, int NCY, int k)
 	UHIGH.assertDim(1);
 	DMZ.assertDim(1);
 
-
+	using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	
 	double DN = 1.0 / pow(HI, (k - 1));
 
 	//  loop over the ncomp solution components
-
 	for (int ID = 1; ID <= NCOMP; ++ID)
 		UHIGH(ID) = 0.0;
 
@@ -4031,21 +4132,21 @@ void DMZSOL(int KDY, int MSTAR, int N, dar2 V, dar1 Z, dar2 DMZ)
 //
 // * *********************************************************************
 //
-void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, int NROW, int NCOL, int LAST, int INFO)
+void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, int NROW, int NCOL, int LAST, int& INFO)
 {
 	IPIVOT.assertDim(NROW);
-	int i, j, k, l, KP1;
+	int k, l, KP1;
 	W.assertDim(NROW, NCOL);
 	D.assertDim(NROW);
-	double COLMAX, T, S;// , DABS, DMAX1;
+	double COLMAX, T, S;
 
 
 	//  initialize  d
-	for (i = 1; i <= NROW; ++i)
+	for (int i = 1; i <= NROW; ++i)
 		D(i) = 0.0;
 
-	for (j = 1; j <= NCOL; ++j)
-		for (i = 1; i <= NROW; ++i)
+	for (int j = 1; j <= NCOL; ++j)
+		for (int i = 1; i <= NROW; ++i)
 			D(i) = DMAX1(D(i), DABS(W(i, j)));
 
 	//  gauss elimination with pivoting of scaled rows, loop over
@@ -4074,8 +4175,8 @@ n30:
 	l = k;
 	KP1 = k + 1;
 	COLMAX = DABS(W(k, k)) / D(k);
-	//       find the(relatively) largest pivot
-	for (i = KP1; i <= NROW; ++i) {
+	// find the(relatively) largest pivot
+	for (int i = KP1; i <= NROW; ++i) {
 		if (DABS(W(i, k)) <= COLMAX * D(i))
 			continue;
 		COLMAX = DABS(W(i, k)) / D(i);
@@ -4105,24 +4206,23 @@ n30:
 	////       to make k - th entry zero.save the multiplier in its place.
 	////       for high performance do this operations column oriented.
 	T = -1.00 / T;
-	for (i = KP1; i <= NROW; ++i)
+	for (int i = KP1; i <= NROW; ++i)
 		W(i, k) = W(i, k) * T;
 
-	for (j = KP1; j <= NCOL; ++j) {
+	for (int j = KP1; j <= NCOL; ++j) {
 		T = W(l, j);
-		if (l != k)
-		{
+		if (l != k){
 			W(l, j) = W(k, j);
 			W(k, j) = T;
 		}
 		if (T == 0.0)
 			continue;
-		for (i = KP1; i <= NROW; ++i)
+		for (int i = KP1; i <= NROW; ++i)
 			W(i, j) = W(i, j) + W(i, k) * T;
 	}
 	k = KP1;
 
-	////       check for having reached the next block.
+	// check for having reached the next block.
 	if (k <= LAST)
 		goto n30;
 }
@@ -4165,31 +4265,27 @@ n30:
 //
 void SHIFTB(dar2 AI, int NROWI, int NCOLI, int LAST, dar2 AI1, int NROWI1, int NCOLI1)
 {
-	int j, JMAX, JMAXP1, M, MMAX;
 	AI.assertDim(NROWI, NCOLI);
 	AI1.assertDim(NROWI1, NCOLI1);
 
-
-	MMAX = NROWI - LAST;
-	JMAX = NCOLI - LAST;
+	int MMAX = NROWI - LAST;
+	int JMAX = NCOLI - LAST;
 	if (MMAX < 1 || JMAX < 1)
 		return;
 
-	////  put the remainder of block i into ai1
-	for (j = 1; j <= JMAX; ++j)
-		for (M = 1; M <= MMAX; ++M)
-			AI1(M, j) = AI(LAST + M, LAST + j);
-
+	// put the remainder of block i into ai1
+	for (int j = 1; j <= JMAX; ++j)
+		for (int m = 1; m <= MMAX; ++m)
+			AI1(m, j) = AI(LAST + m, LAST + j);
 
 	if (JMAX == NCOLI1)
 		return;
 
-	////  zero out the upper right corner of ai1
-
-	JMAXP1 = JMAX + 1;
-	for (j = JMAXP1; j <= NCOLI1; ++j)
-		for (M = 1; MMAX; ++M)
-			AI1(M, j) = 0.0;
+	// zero out the upper right corner of ai1
+	int JMAXP1 = JMAX + 1;
+	for (int j = JMAXP1; j <= NCOLI1; ++j)
+		for (int m = 1; m<= MMAX; ++m)
+			AI1(m, j) = 0.0;
 }
 
 
@@ -4222,48 +4318,42 @@ void SHIFTB(dar2 AI, int NROWI, int NCOLI, int LAST, dar2 AI1, int NROWI1, int N
 // = n if the pivot element in the nth gauss step is zero.
 //
 //**********************************************************************
-void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int INFO)
+void FCBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int& INFO)
 {
 	INTEGS.assertDim(3, NBLOKS);
 	IPIVOT.assertDim(1);
-	int i, INDEX, INDEXN, LAST, NCOL, NROW;
 	BLOKS.assertDim(1);
 	SCRTCH.assertDim(1);
 
 	INFO = 0;
 	int INDEXX = 1;
-	INDEXN = 1;
-	i = 1;
-
+	int INDEXN = 1;
+	
 	//  loop over the blocks. i is loop index
+	int i = 1;
+	while (true) {
+		int INDEX = INDEXN;
+		int NROW = INTEGS(1, i);
+		int NCOL = INTEGS(2, i);
+		int LAST = INTEGS(3, i);
 
-n10:
-	INDEX = INDEXN;
-	NROW = INTEGS(1, i);
-	NCOL = INTEGS(2, i);
-	LAST = INTEGS(3, i);
+		// carry out elimination on the i - th block until next block
+		// enters, i.e., for columns 1, ..., last  of i - th block.
+		FACTRB(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
 
-	//       carry out elimination on the i - th block until next block
-	//       enters, i.e., for columns 1, ..., last  of i - th block.
+		// check for having reached a singular block or the last block
+		if (INFO != 0)
+			break;
+		if (i == NBLOKS)
+			return;
 
-	FACTRB(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
+		i = i + 1;
+		INDEXN = NROW * NCOL + INDEX;
+		INDEXX = INDEXX + LAST;
 
-	//       check for having reached a singular block or the last block
-
-	if (INFO != 0)                       goto n20;
-	if (i == NBLOKS)                     return;
-	i = i + 1;
-	INDEXN = NROW * NCOL + INDEX;
-	INDEXX = INDEXX + LAST;
-
-	//       put the rest of the i - th block onto the next block
-
-	SHIFTB(BLOKS.sub(INDEX), NROW, NCOL, LAST, BLOKS.sub(INDEXN), INTEGS(1, i), INTEGS(2, i));
-
-	goto n10;
-
-
-n20:
+		// put the rest of the i - th block onto the next block
+		SHIFTB(BLOKS.sub(INDEX), NROW, NCOL, LAST, BLOKS.sub(INDEXN), INTEGS(1, i), INTEGS(2, i));
+	}
 	INFO = INFO + INDEXX - 1;
 }
 
@@ -4293,37 +4383,31 @@ void SUBBAK(dar2 W, int NROW, int NCOL, int LAST, dar1 X)
 {
 	W.assertDim(NROW, NCOL);
 	X.assertDim(NCOL);
-	int i, j, k, KM1, LM1, LP1, KB;
-	double T;
-
-	LP1 = LAST + 1;
+	
+	int LP1 = LAST + 1;
 	if (LP1 <= NCOL)
-		for (j = LP1; j <= NCOL; ++j) {
-			T = -X(j);
+		for (int j = LP1; j <= NCOL; ++j) {
+			double T = -X(j);
 			if (T == 0.0)
 				continue;
-			for (i = 1; i <= LAST; ++i)
+			for (int i = 1; i <= LAST; ++i)
 				X(i) = X(i) + W(i, j) * T;
 		}
 
-	if (LAST == 1)
-		goto n60;
-	LM1 = LAST - 1;
-
-	for (KB = 1; KB <= LM1; ++KB) {
-		KM1 = LAST - KB;
-		k = KM1 + 1;
-		X(k) = X(k) / W(k, k);
-		T = -X(k);
-		if (T == 0.0)
-			continue;
-		for (i = 1; i <= KM1; ++i)
-			X(i) = X(i) + W(i, k) * T;
+	if (LAST != 1) {
+		int LM1 = LAST - 1;
+		for (int KB = 1; KB <= LM1; ++KB) {
+			int KM1 = LAST - KB;
+			int k = KM1 + 1;
+			X(k) = X(k) / W(k, k);
+			double T = -X(k);
+			if (T == 0.0)
+				continue;
+			for (int i = 1; i <= KM1; ++i)
+				X(i) = X(i) + W(i, k) * T;
+		}
 	}
-
-n60:
 	X(1) = X(1) / W(1, 1);
-
 }
 
 
@@ -4352,7 +4436,6 @@ void SUBFOR(dar2 W, iar1 IPIVOT, int NROW, int LAST, dar1 X)
 	W.assertDim(NROW, LAST);
 	X.assertDim(NROW);
 	int IP, k, KP1, LSTEP;
-	double T;
 
 	if (NROW == 1)
 		return;
@@ -4361,7 +4444,7 @@ void SUBFOR(dar2 W, iar1 IPIVOT, int NROW, int LAST, dar1 X)
 	{
 		KP1 = k + 1;
 		IP = IPIVOT(k);
-		T = X(IP);
+		double T = X(IP);
 		X(IP) = X(k);
 		X(k) = T;
 		if (T == 0.0)
@@ -4396,12 +4479,12 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X)
 	IPIVOT.assertDim(1);
 	BLOKS.assertDim(1);
 	X.assertDim(1);
-	int i, INDEX, INDEXX, j, LAST, NBP1, NCOL, NROW;
+	int NCOL, NROW, LAST;
 
-	////  forward substitution pass
-	INDEX = 1;
-	INDEXX = 1;
-	for (i = 1; i <= NBLOKS; ++i) {
+	//  forward substitution pass
+	int INDEX = 1;
+	int INDEXX = 1;
+	for (int i = 1; i <= NBLOKS; ++i) {
 		NROW = INTEGS(1, i);
 		LAST = INTEGS(3, i);
 		SUBFOR(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), NROW, LAST, X.sub(INDEXX));
@@ -4409,10 +4492,10 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X)
 		INDEXX = INDEXX + LAST;
 	}
 
-	////  back substitution pass
-	NBP1 = NBLOKS + 1;
-	for (j = 1; j <= NBLOKS; ++j) {
-		i = NBP1 - j;
+	//  back substitution pass
+	int NBP1 = NBLOKS + 1;
+	for (int j = 1; j <= NBLOKS; ++j) {
+		int i = NBP1 - j;
 		NROW = INTEGS(1, i);
 		NCOL = INTEGS(2, i);
 		LAST = INTEGS(3, i);
@@ -4421,3 +4504,7 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, int NBLOKS, iar1 IPIVOT, dar1 X)
 	}
 	SUBBAK(BLOKS.sub(INDEX), NROW, NCOL, LAST, X.sub(INDEXX));
 }
+
+
+};
+

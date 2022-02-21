@@ -547,6 +547,8 @@ C
      1                ROOT(40), JTOL(40), LTTOL(40), NTOL
 C
       EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
+
+
 C
 C*********************************************************************
 C
@@ -601,6 +603,7 @@ C
       NDIMI = IPAR(6)
       NFXPNT = IPAR(11)
       IPRINT = IPAR(7)
+      write(*,*) "--------- IPRINT = ",IPRINT
       INDEX = IPAR(12)
       IF (NY .EQ. 0) INDEX = 0
       MSTAR = 0
@@ -765,6 +768,7 @@ C
       ELSE
 	 NYCB = NY
       ENDIF
+
       CALL NEWMSH (3+IREAD, FSPACE(LXI), FSPACE(LXIOLD), DUMMY,
      1             DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
      2		   DUMMY2, DFSUB, DUMMY2, DUMMY2, NCOMP, NYCB)
@@ -787,6 +791,9 @@ C
   225 FSPACE( LDMZ-1+I ) = 0.D0
   230 CONTINUE
       IF (IGUESS .GE. 2)  IGUESS = 0
+
+      call dumpState()
+    
       CALL CONTRL (FSPACE(LXI),FSPACE(LXIOLD),FSPACE(LZ),FSPACE(LDMZ),
      +     FSPACE(LDMV),
      1     FSPACE(LRHS),FSPACE(LDELZ),FSPACE(LDELDZ),FSPACE(LDQZ),
@@ -841,6 +848,19 @@ C----------------------------------------------------------------------
      1       24H (ALLOWED FROM ISPACE) ))
   360 FORMAT(/53H INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE)
       END
+
+
+
+
+
+
+
+
+
+
+
+
+
       SUBROUTINE CONTRL (XI, XIOLD, Z, DMZ, DMV, RHS, DELZ, DELDMZ,
      1           DQZ, DQDMZ, G, W, V, FC, VALSTR, SLOPE, SCALE, DSCALE,
      2           ACCUM, IPVTG, INTEGS, IPVTW, NFXPNT, FIXPNT, IFLAG,
@@ -911,7 +931,15 @@ C
       COMMON /COLEST/ TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
      1                ROOT(40), JTOL(40), LTOL(40), NTOL
 C
+
+     
+
+
       EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
+
+
+     
+
 C
 C...  constants for control of nonlinear iteration
 C
@@ -1820,6 +1848,10 @@ C
 	   DO 200 J = 1, NTOL
 	     JJ = JTOL(J)
 	     JZ = LTOL(J)  +  (I-1) * MSTAR
+           write(*,*) "WGTMSH(J)=",WGTMSH(J)
+           write(*,*) "SLOPE(I)=",SLOPE(I), " base=",
+     .   (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*ONEOVH / (1.D0 + DABS(Z(JZ)))),
+     .   "  ROOT(J)=",ROOT(J)
 	     SLOPE(I) = DMAX1(SLOPE(I),(DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*
      1                  ONEOVH / (1.D0 + DABS(Z(JZ)))) **ROOT(J))
   200      CONTINUE
@@ -1831,12 +1863,18 @@ C
 	   SLPHMX = DMAX1(SLPHMX,TEMP)
 	   ACCUM(I+1) = ACCUM(I) + TEMP
 	   IFLIP = - IFLIP
+
+         write(*,*)"SLOPE = ",SLOPE
+
   210 CONTINUE
       AVRG = ACCUM(NOLD+1) / FLOAT(NOLD)
       DEGEQU = AVRG / DMAX1(SLPHMX,PRECIS)
 C
 C...  naccum=expected n to achieve .1x user requested tolerances
 C
+
+      write(*,*) "NOLD=",NOLD," ACCUM(NOLD+1)=",ACCUM(NOLD+1)
+
       NACCUM = ACCUM(NOLD+1) + 1.D0
       IF ( IPRINT .LT. 0 )  WRITE(IOUT,350) DEGEQU, NACCUM
 C
@@ -1932,6 +1970,75 @@ C----------------------------------------------------------------
      1	     100(/6F12.6))
   370 FORMAT (/23H  EXPECTED N TOO LARGE  )
       END
+
+
+
+
+
+
+
+
+
+      subroutine dumpState() 
+      
+            IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      
+            COMMON /COLOUT/ PRECIS, IOUT, IPRINT
+      COMMON /COLLOC/ RHO(7), COEF(49)
+      COMMON /COLORD/ K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX, MT(20)
+      COMMON /COLAPR/ N, NOLD, NMAX, NZ, NDMZ
+      COMMON /COLMSH/ MSHFLG, MSHNUM, MSHLMT, MSHALT
+      COMMON /COLSID/ TZETA(40), TLEFT, TRIGHT, IZETA, IDUM
+      COMMON /COLNLN/ NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
+      COMMON /COLEST/ TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
+     1                ROOT(40), JTOL(40), LTTOL(40), NTOL
+           integer i
+
+           open(100,file=trim("state_f77.txt"))
+          
+           write(*,*) "==========",PRECIS,IOUT,IPRINT
+
+           write(100,*) PRECIS,IOUT,IPRINT
+              
+           write(100,*) (RHO(i), i=1,7) 
+           write(100,*) (COEF(i), i=1,49) 
+          
+           ! COLORD
+           write(100,*) K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX,
+     .                  (MT(i), i=1,20) 
+           
+
+            ! COLAPR
+            write(100,*) N, NOLD, NMAX, NZ, NDMZ
+
+            !COLMSH
+            write(100,*) MSHFLG, MSHNUM, MSHLMT, MSHALT
+            
+            !COLSID
+            write(100,*) (TZETA(i),i=1,40)
+            write(100,*) TLEFT, TRIGHT, IZETA, IDUM
+
+            !COLNLN
+            write(100,*) NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
+            
+            !COLEST
+            write(100,*) NTOL
+            write(100,*) (TTL(i),i=1,40)
+            write(100,*) (WGTMSH(i),i=1,40)
+            write(100,*) (WGTERR(i),i=1,40)
+            write(100,*) (TOLIN(i),i=1,40)
+            write(100,*) (ROOT(i),i=1,40)
+            write(100,*) (JTOL(i),i=1,40)
+            write(100,*) (LTTOL(i),i=1,40)
+
+            close(100)
+      return
+      end 
+
+
+
+
+
 
       SUBROUTINE CONSTS (K, RHO, COEF)
 C
@@ -2252,7 +2359,7 @@ C      dmzo  - an array used to project the initial solution into
 C              the current pp-space, when mode=1.
 C              in the case mode=1 the current solution iterate may not
 C              be in the right space, being defined by an arbitrary
-C              user's guess or as a pp on a different mesh.
+C              users guess or as a pp on a different mesh.
 C              when forming collocation equations we are using values
 C              of z, y and dmval at collocation points and of z at
 C              boundary points. at the end of lsyslv (with mode=1)
@@ -2334,6 +2441,7 @@ C
 C...  zero the matrices to be computed
 C
       LW = KDY * KDY * N
+      write(*,*) "LW=",LW
       DO 84 L = 1, LW
    84   W(L) = 0.D0
 C
