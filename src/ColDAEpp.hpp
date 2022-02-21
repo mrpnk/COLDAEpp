@@ -12,44 +12,23 @@
 #define assertm(exp, msg) assert(((void)msg, exp))
 
 
-template<typename T>
-class arr2 {
-public:
-    int offx = 0, offy = 0;
-    std::vector<std::vector<T>> data;
-public:
-	arr2() {}
-	arr2(int sizex, int sizey) {
-		data.resize(sizex);
-		for (auto& a : data)
-			a.resize(sizey);
-	}
-    void assertDim(int dim0, int dim1) {
-        assertm(data.size() - offx == dim0, "Dimension 0 does not match!");
-        for (auto& a : data)
-            assertm(a.size() - offy == dim1, "Dimension 1 does not match!");
-    }
-    T& operator()(int x, int y) { return data[x - 1 + offx][y - 1 + offy]; }
-    arr2 sub(int ox, int oy) {
-        arr2 s = *this;
-        s.offx = offx + ox - 1;
-        s.offy = offy + oy - 1;
-        return s;
-    }
-	T* continuous() {
-		return nullptr; // TODO to be implemented
-	}
+template<typename T, int D>
+class arrRef {
+
 };
 
 template<typename T>
 class arr1 {
-public:
     int offx = 0;
     std::vector<T> data;
 public:
     arr1(int size = 0) {
         data.resize(size);
     }
+	arr1(std::initializer_list<T> l) {
+		data.clear();
+		data.insert(data.end(), l.begin(), l.end());
+	}
     void assertDim(int dim0) { assertm(data.size() - offx == dim0, "Dimension 0 does not match!"); }
     T& operator()(int idx) { return data[idx - 1 + offx]; }
     arr1 sub(int ox) {
@@ -65,29 +44,68 @@ public:
 	}
 };
 
-
 template<typename T>
-arr1<T> wrap(T elem) {
-    arr2<T> vec;
-    vec.data = { elem };
-    return vec;
-}
+class arr2 {
 
-template<typename T>
-arr2<T> wrap(arr1<T> vec) {
-    arr2<T> mat;
-    mat.data = { vec.data };
-    mat.offy = vec.offx;
-    return mat;
-}
+	int offx = 0, offy = 0;
+	std::vector<std::vector<T>> data;
+public:
+	arr2() {}
+	arr2(int sizex, int sizey) {
+		data.resize(sizex);
+		for (auto& a : data)
+			a.resize(sizey);
+	}
+	arr2(arr1<T> const& a1) {
+		// interpret the memory of the one-dimensional array as a two-dimensional one
+		// TODO implement this
+	}
 
-template<typename T>
-arr1<T> unwrap(arr2<T> mat) {
-    arr1<T> vec;
-    vec.data = mat.data[0];
-    vec.offx = mat.offy;
-    return vec;
-}
+	void assertDim(int dim0, int dim1) {
+		assertm(data.size() - offx == dim0, "Dimension 0 does not match!");
+		for (auto& a : data)
+			assertm(a.size() - offy == dim1, "Dimension 1 does not match!");
+	}
+	T& operator()(int x, int y) { return data[x - 1 + offx][y - 1 + offy]; }
+	arr2 sub(int ox, int oy) {
+		arr2 s = *this;
+		s.offx = offx + ox - 1;
+		s.offy = offy + oy - 1;
+		return s;
+	}
+	T* contiguous() {
+		return nullptr; // TODO to be implemented
+	}
+};
+
+
+
+
+
+//template<typename T>
+//arr1<T> wrap(T elem) {
+//    arr2<T> vec;
+//    vec.data = { elem };
+//    return vec;
+//}
+//
+//template<typename T>
+//arr2<T> wrap(arr1<T> vec) {
+//    arr2<T> mat;
+//    mat.data = { vec.data };
+//    mat.offy = vec.offx;
+//    return mat;
+//}
+//
+//template<typename T>
+//arr1<T> unwrap(arr2<T> mat) {
+//    arr1<T> vec;
+//    vec.data = mat.data[0];
+//    vec.offx = mat.offy;
+//    return vec;
+//}
+//
+
 
 using darr1 = arr1<double>;
 using darr2 = arr2<double>;
@@ -96,15 +114,15 @@ using iarr2 = arr2<int>;
 
 
 void DGEFA(darr2 a, int lda, int n, iarr1 ipvt, int info) {
-	info = dgefa(a.continuous(), lda, n, ipvt.continuous());
+	info = dgefa(a.contiguous(), lda, n, ipvt.continuous());
 }
 void DGESL(darr2 a, int lda, int n, iarr1 ipvt, darr1 b, int job) {
-	dgesl(a.continuous(), lda, n, ipvt.continuous(),b.continuous(), job);
+	dgesl(a.contiguous(), lda, n, ipvt.continuous(),b.continuous(), job);
 }
 void DSVDC(darr2 x, int lda, int n, int p, darr1 s, darr1 e,
 	darr2 u, int ldu, darr2 v, int ldv, darr1 work, int job, int info) {
-	info = dsvdc(x.continuous(), lda, n, p, s.continuous(), e.continuous(),u.continuous(),
-		ldu, v.continuous(), ldv, work.continuous(), job);
+	info = dsvdc(x.contiguous(), lda, n, p, s.continuous(), e.continuous(),u.contiguous(),
+		ldu, v.contiguous(), ldv, work.continuous(), job);
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -112,7 +130,7 @@ void DSVDC(darr2 x, int lda, int n, int p, darr1 s, darr1 e,
 double DABS(double x) { return abs(x); }
 double DMAX1(double x, double y) { return std::max(x, y); }
 int MIN0(int x, int y) { return std::min(x, y); }
-
+int MIN0(int x, int y, int z) { return std::min(x, std::min(z, y)); }
 
 
 namespace  COLOUT { double PRECIS; int IOUT, IPRINT; }
@@ -135,6 +153,7 @@ namespace  COLORD {
 	auto& NCOMP = NC;
 	auto& NDM = NCY;
 	auto& KDYM = KDY;
+	auto& NCDUM = NC;
 }
 namespace  COLAPR {
 	int N, NOLD, NMAX, NZ, NDMZ;
@@ -159,15 +178,17 @@ namespace  COLEST {
 	darr1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
 		ROOT(40);
 	iarr1 JTOL(40), LTTOL(40);
-
 	int NTOL;
 
 	// aliases
 	auto& LTOL = LTTOL;
+	auto& TOL = TTL;
 }
 namespace  COLBAS {
 	darr2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 }
+
+
 
 
 
@@ -217,6 +238,50 @@ void CONTRL(darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 RHS, dar
 	darr1 DQZ, darr1 DQDMZ, darr1 G, darr1 W, darr1 V, darr1 FC, darr1 VALSTR, darr1 SLOPE, darr1 SCALE, darr1 DSCALE,
 	darr1 ACCUM, iarr1 IPVTG, iarr1 INTEGS, iarr1 IPVTW, int NFXPNT, darr1 FIXPNT, int IFLAG,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess);
+
+void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE, darr2 DSCALE);
+
+void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 VALSTR,
+	darr1 SLOPE, darr1, int NFXPNT, darr1 FIXPNT, darr2 DF, dfsub_t dfsub,
+	darr2 FC, darr2 CB, int NCOMP, int NYCB);
+
+void CONSTS(int K, darr1 RHO, darr2 COEF);
+
+void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN);
+
+void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, darr1 DELDMZ,
+	darr1 G, darr1 W, darr1 V, darr1 FC, darr1 RHS, darr1 DMZO,
+	iarr2 INTEGS, iarr1 IPVTG, iarr1 IPVTW, double RNORM,
+	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
+	dgsub_t dgsub, guess_t guess, int ISING);
+
+void GDERIV(darr2 GI, int NROW, int IROW, darr1 ZVAL, darr1 DGZ, int MODE, dgsub_t dgsub);
+
+void VWBLOK(double XCOL, double HRHO, int JJ, darr2 WI, darr2 VI, iarr1 IPVTW, int KDY, darr1 ZVAL,
+	darr1 YVAL, darr2 DF, darr2 ACOL, darr1 DMZO, int NCY, dfsub_t dfsub, int MSING);
+
+void PRJSVD(darr2 FC, darr2 DF, darr2 D, darr2 U, darr2 V,
+	int NCOMP, int NCY, int NY, iarr1 IPVTCB, int ISING, int MODE);
+
+void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY, darr1 RHSZ, darr1 RHSDMZ,
+	iarr1 IPVTW, int MODE, int MODL, double XI1, darr1 ZVAL, darr1 YVAL, darr1 F, darr2 DF, darr2 CB, iarr1 IPVTCB,
+	darr2 FC, dfsub_t dfsub, int ISING, int NCOMP, int NYCB, int NCY);
+
+void RKBAS(double S, darr2 COEF, int k, int M, darr2 RKB, darr1 DM, int MODE);
+
+void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 XI,
+	int N, darr1 Z, darr1 DMZ, int k, int NCOMP, int NY, int MMAX, iarr1 M,
+	int MSTAR, int MODE, darr1 DMVAL, int MODM);
+
+
+
+void VMONDE(darr1 RHO, darr1 COEF, int k);
+void HORDER(int i, darr1 UHIGH, double HI, darr1 DMZ, int NCOMP, int NCY, int k);
+void DMZSOL(int KDY, int MSTAR, int N, darr2 V, darr1 Z, darr2 DMZ);
+
+
+void FCBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 SCRTCH, int INFO);
+void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X);
 
 //------------------------------------------------------------------------------------------------------
 
@@ -1684,9 +1749,6 @@ n460:
 
 
 
-
-
-
 //**********************************************************************
 //
 //   purpose
@@ -1751,659 +1813,651 @@ void SKALE(int N, int MSTAR, int KDY, darr2 Z, darr2 DMZ, darr1 XI, darr2 SCALE,
 
 
 
-//
-////----------------------------------------------------------------------
-////                            p a r t  2
-////          mesh selection, error estimation, (and related
-////          constant assignment) routines -- see [5], [6]
-////----------------------------------------------------------------------
-//
-//
-////**********************************************************************
-////
-////   purpose
-////            select a mesh on which a collocation solution is to be
-////            determined
-////
-////                           there are 5 possible modes of action:
-////            mode = 5,4,3 - deal mainly with definition of an initial
-////                           mesh for the current boundary value problem
-////                 = 2,1   - deal with definition of a new mesh, either
-////                           by simple mesh halving or by mesh selection
-////            more specifically, for
-////            mode = 5  an initial (generally nonuniform) mesh is
-////                      defined by the user and no mesh selection is to
-////                      be performed
-////                 = 4  an initial (generally nonuniform) mesh is
-////                      defined by the user
-////                 = 3  a simple uniform mesh (except possibly for some
-////                      fixed points) is defined; n= no. of subintervals
-////                 = 1  the automatic mesh selection procedure is used
-////                      (see [5] for details)
-////                 = 2  a simple mesh halving is performed
-////
-////**********************************************************************
-////
-////   variables
-////
-////            n      = number of mesh subintervals
-////            nold   = number of subintervals for former mesh
-////            xi     - mesh point array
-////            xiold  - former mesh point array
-////            mshlmt - maximum no. of mesh selections which are permitted
-////                     for a given n before mesh halving
-////            mshnum - no. of mesh selections which have actually been
-////                     performed for the given n
-////            mshalt - no. of consecutive times ( plus 1 ) the mesh
-////                     selection has alternately halved and doubled n.
-////                     if mshalt .ge. mshlmt then  contrl  requires
-////                     that the current mesh be halved.
-////            mshflg = 1  the mesh is a halving of its former mesh
-////                       (so an error estimate has been calculated)
-////                   = 0  otherwise
-////            iguess - ipar(9) in subroutine coldae.  it is used
-////                     here only for mode=5 and 4, where
-////                   = 2 the subroutine sets xi=xiold.  this is
-////                       used e.g. if continuation is being per-
-////                       formed, and a mesh for the old differen-
-////                       tial equation is being used
-////                   = 3 same as for =2, except xi uses every other
-////                       point of xiold (so mesh xiold is mesh xi
-////                       halved)
-////                   = 4 xi has been defined by the user, and an old
-////                       mesh xiold is also available
-////                       otherwise, xi has been defined by the user
-////                       and we set xiold=xi in this subroutine
-////            slope  - an approximate quantity to be equidistributed for
-////                     mesh selection (see [5]), viz,
-////                             .                        (k+mj)
-////                     slope(i)=     max   (weight(l) *u      (xi(i)))
-////                               1.le.l.le.ntol         j
-////
-////                     where j=jtol(l)
-////            slphmx - maximum of slope(i)*(xiold(i+1)-xiold(i)) for
-////                     i = 1 ,..., nold.
-////            accum  - accum(i) is the integral of  slope  from  aleft
-////                     to  xiold(i).
-////            valstr - is assigned values needed in  errchk  for the
-////                     error estimate.
-////            fc     - you know
-////**********************************************************************
-//
-//void NEWMSH(MODE, XI, XIOLD, Z, DMZ, DMV, VALSTR,
-//    1                   SLOPE, ACCUM, NFXPNT, FIXPNT, DF, DFSUB,
-//    2			 FC, CB, NCOMP, NYCB)
-//{
-//
-//
-//    IMPLICIT DOUBLE PRECISION(A - H, O - Z)
-//        DIMENSION D1(40), D2(40), SLOPE(1), ACCUM(1), VALSTR(1), DMV(1)
-//        DIMENSION XI(1), XIOLD(1), Z(1), DMZ(1), FIXPNT(1), DUMMY(1)
-//        DIMENSION FC(NCOMP, 60), ZVAL(40), YVAL(40), A(28), DF(NCY, 1)
-//        DIMENSION CB(NYCB, NYCB), IPVTCB(40), BCOL(40), U(400), V(400)
-//        EXTERNAL DFSUB
-//
-//        COMMON / COLLOC / RHO(7), COEF(49)
-//        COMMON / COLOUT / PRECIS, IOUT, IPRINT
-//        COMMON / COLORD / K, NCDUM, NY, NCY, MSTAR, KD, KDY, MMAX, M(20)
-//        COMMON / COLAPR / N, NOLD, NMAX, NZ, NDMZ
-//        COMMON / COLMSH / MSHFLG, MSHNUM, MSHLMT, MSHALT
-//        COMMON / COLNLN / NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-//        COMMON / COLSID / ZETA(40), ALEFT, ARIGHT, IZETA, IDUM
-//        COMMON / COLBAS / B(28), ACOL(28, 7), ASAVE(28, 4)
-//        COMMON / COLEST / TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-//        1                ROOT(40), JTOL(40), LTOL(40), NTOL
-//
-//        NFXP1 = NFXPNT + 1
-//        goto (180, 100, 50, 20, 10), MODE
-//
-//        //  mode=5   set mshlmt=1 so that no mesh selection is performed
-//
-//        10 MSHLMT = 1
-//
-//        //  mode=4   the user-specified initial mesh is already in place.
-//
-//        20 if (IGUESS < 2)                          goto 40
-//
-//        //  iguess=2, 3 or 4.
-//
-//        NOLDP1 = NOLD + 1
-//        if (IPRINT < 1)  WRITE(IOUT, 360) NOLD, (XIOLD(i), i = 1, NOLDP1)
-//            if (IGUESS != 3)                          goto 40
-//
-//                //  if iread ( ipar(8) ) .ge. 1 and iguess ( ipar(9) ) .eq. 3
-//                //  then the first mesh is every second point of the
-//                //  mesh in  xiold .
-//
-//                N = NOLD / 2
-//                i = 0
-//                for (30 j = 1, NOLD, 2
-//                    i = i + 1
-//                    30 XI(i) = XIOLD(j)
-//                    40 CONTINUE
-//                    NP1 = N + 1
-//                    XI(1) = ALEFT
-//                    XI(NP1) = ARIGHT
-//                    goto 320
-//
-//                    //  mode=3   generate a (piecewise) uniform mesh. if there are
-//                    //  fixed points then ensure that the n being used is large enough.
-//
-//                    50 if (N < NFXP1)  N = NFXP1
-//                    NP1 = N + 1
-//                    XI(1) = ALEFT
-//                    ILEFT = 1
-//                    XLEFT = ALEFT
-//
-//                    //  loop over the subregions between fixed points.
-//
-//                    for (90 j = 1, NFXP1
-//                        XRIGHT = ARIGHT
-//                        IRIGHT = NP1
-//                        if (j == NFXP1)                      goto 60
-//                            XRIGHT = FIXPNT(j)
-//
-//                            //       determine where the j-th fixed point should fall in the
-//                            //       new mesh - this is xi(iright) and the (j-1)st fixed
-//                            //       point is in xi(ileft)
-//
-//                            NMIN = (XRIGHT - ALEFT) / (ARIGHT - ALEFT) * float(N) + 1.5D0
-//                            if (NMIN > N - NFXPNT + j)  NMIN = N - NFXPNT + j
-//                                IRIGHT = MAX0(ILEFT + 1, NMIN)
-//                                60      XI(IRIGHT) = XRIGHT
-//
-//                                //       generate equally spaced points between the j-1st and the
-//                                //       j-th fixed points.
-//
-//                                NREGN = IRIGHT - ILEFT - 1
-//                                if (NREGN == 0)                      goto 80
-//                                    DX = (XRIGHT - XLEFT) / float(NREGN + 1)
-//                                    for (70 i = 1, NREGN
-//                                        70      XI(ILEFT + i) = XLEFT + float(i) * DX
-//                                        80      ILEFT = IRIGHT
-//                                        XLEFT = XRIGHT
-//                                        90 CONTINUE
-//                                        goto 320
-//
-//                                        //  mode=2  halve the current mesh (i.e. double its size)
-//
-//                                        100 N2 = 2 * N
-//
-//                                        //  check that n does not exceed storage limitations
-//
-//                                        if (N2 <= NMAX)                           goto 120
-//
-//                                            //  if possible, try with n=nmax. redistribute first.
-//
-//                                            if (MODE == 2)                            goto 110
-//                                                N = NMAX / 2
-//                                                goto 220
-//                                                110 if (IPRINT < 1)  WRITE(IOUT, 370)
-//                                                N = N2
-//                                                return;
-//
-//    //  calculate the old approximate solution values at
-//    //  points to be used in  errchk  for error estimates.
-//    //  if  mshflg  =1 an error estimate was obtained for
-//    //  for the old approximation so half the needed values
-//    //  will already be in  valstr .
-//
-//    120 if (MSHFLG == 0)                          goto 140
-//
-//        //  save in  valstr  the values of the old solution
-//        //  at the relative positions 1/6 and 5/6 in each subinterval.
-//
-//        KSTORE = 1
-//        for (130 i = 1, NOLD
-//            HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0
-//            X = XIOLD(i) + HD6
-//            CALL APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE(1, 1),
-//                +DUMMY, XIOLD, NOLD, Z, DMZ,
-//                1         K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
-//            X = X + 4.0 * HD6
-//            KSTORE = KSTORE + 3 * MSTAR
-//            CALL APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE(1, 4),
-//                +DUMMY, XIOLD, NOLD, Z, DMZ,
-//                1         K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
-//            KSTORE = KSTORE + MSTAR
-//            130 CONTINUE
-//            goto 160
-//
-//            //  save in  valstr  the values of the old solution
-//            //  at the relative positions 1/6, 2/6, 4/6 and 5/6 in
-//            //  each subinterval.
-//
-//            140 KSTORE = 1
-//            for (150 i = 1, N
-//                X = XI(i)
-//                HD6 = (XI(i + 1) - XI(i)) / 6.0
-//                for (150 j = 1, 4
-//                    X = X + HD6
-//                    if (j == 3)  X = X + HD6
-//                        CALL APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE(1, j),
-//                            +DUMMY, XIOLD, NOLD, Z, DMZ,
-//                            1          K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
-//                        KSTORE = KSTORE + MSTAR
-//                        150 CONTINUE
-//                        160 MSHFLG = 0
-//                        MSHNUM = 1
-//                        MODE = 2
-//
-//                        //  generate the halved mesh.
-//
-//                        j = 2
-//                        for (170 i = 1, N
-//                            XI(j) = (XIOLD(i) + XIOLD(i + 1)) / 2.0
-//                            XI(j + 1) = XIOLD(i + 1)
-//                            170 j = j + 2
-//                            N = N2
-//                            goto 320
-//
-//                            //  mode=1  we do mesh selection if it is deemed worthwhile
-//
-//                            180 if (NOLD == 1)                            goto 100
-//                            if (NOLD <= 2 * NFXPNT)                     goto 100
-//
-//                                //  we now project DMZ for mesh selection strategy, if required
-//                                //  but set DMV = DMZ in case it is not
-//
-//                                IDMZ = 1
-//                                for (183 i = 1, NOLD
-//                                    for (182 KK = 1, K
-//                                        for (181 j = 1, NCY
-//                                            DMV(IDMZ) = DMZ(IDMZ)
-//                                            IDMZ = IDMZ + 1
-//                                            181         CONTINUE
-//                                            182      CONTINUE
-//                                            183   CONTINUE
-//
-//                                            if (INDEX != 1 && NY > 0) THEN
-//                                                IDMZ = 1
-//                                                for (500 i = 1, NOLD
-//                                                    XI1 = XIOLD(i + 1)
-//                                                    CALL APPROX(i, XI1, ZVAL, YVAL, A,
-//                                                        1                     COEF, XIOLD, NOLD, Z, DMZ,
-//                                                        1                     K, NCOMP, NY, MMAX, M, MSTAR, 3, DUMMY, 1)
-//                                                    CALL DFSUB(XI1, ZVAL, YVAL, DF)
-//
-//                                                    //         if index=2, form projection matrices directly
-//                                                    //         otherwise use svd to define appropriate projection
-//
-//                                                    if (INDEX == 0) THEN
-//                                                        CALL PRJSVD(FC, DF, CB, U, V, NCOMP, NCY, NY, IPVTCB, ISING, 2)
-//                                                    else
-//
-//                                                        //        form cb
-//
-//                                                        for (212 j = 1, NY
-//                                                            for (212 J1 = 1, NY
-//                                                                FACT = 0.0D0
-//                                                                ML = 0
-//                                                                for (211 l = 1, NCOMP
-//                                                                    ML = ML + M(l)
-//                                                                    FACT = FACT + DF(j + NCOMP, ML) * DF(l, MSTAR + J1)
-//                                                                    211                  CONTINUE
-//                                                                    CB(j, J1) = FACT
-//                                                                    212            CONTINUE
-//
-//                                                                    //           decompose cb
-//
-//                                                                    CALL DGEFA(CB, NY, NY, IPVTCB, ISING)
-//                                                                    if (ISING != 0) return;
-//
-//                                                                    //           form columns of fc
-//
-//                                                                        ML = 0
-//                                                                        for (215 l = 1, NCOMP
-//                                                                            ML = ML + M(l)
-//                                                                            for (213 J1 = 1, NY
-//                                                                                BCOL(J1) = DF(J1 + NCOMP, ML)
-//                                                                                213               CONTINUE
-//
-//                                                                                CALL DGESL(CB, NY, NY, IPVTCB, BCOL, 0)
-//
-//                                                                                for (215 J1 = 1, NCOMP
-//                                                                                    FACT = 0.0D0
-//                                                                                    for (214 j = 1, NY
-//                                                                                        FACT = FACT + DF(J1, j + MSTAR) * BCOL(j)
-//                                                                                        214                  CONTINUE
-//                                                                                        FC(J1, l) = FACT
-//                                                                                        CONTINUE
-//                                                                                        215            CONTINUE
-//
-//                                                                                        ENDIF
-//
-//                                                                                        ..finally, replace fc with the true projection SR = i - fc
-//
-//                                                                                        for (217 j = 1, NCOMP
-//                                                                                            for (216 l = 1, NCOMP
-//                                                                                                FC(j, l) = -FC(j, l)
-//                                                                                                if (j == l) FC(j, l) = FC(j, l) + 1.0D0
-//                                                                                                    216               CONTINUE
-//                                                                                                    217            CONTINUE
-//
-//                                                                                                    //        project DMZ for the k collocation points, store in DMV
-//
-//                                                                                                    for (221 KK = 1, K
-//
-//                                                                                                        for (219 j = 1, NCOMP
-//                                                                                                            FACT = 0.0D0
-//                                                                                                            for (218 l = 1, NCOMP
-//                                                                                                                FACT = FACT + FC(j, l) * DMZ(IDMZ + l - 1)
-//                                                                                                                218               CONTINUE
-//                                                                                                                DMV(IDMZ + j - 1) = FACT
-//                                                                                                                219            CONTINUE
-//
-//                                                                                                                IDMZ = IDMZ + NCY
-//                                                                                                                221         CONTINUE
-//
-//                                                                                                                500      CONTINUE
-//
-//                                                                                                                ENDIF
-//
-//                                                                                                                //  the first interval has to be treated separately from the
-//                                                                                                                //  other intervals (generally the solution on the (i-1)st and ith
-//                                                                                                                //  intervals will be used to approximate the needed derivative, but
-//                                                                                                                //  here the 1st and second intervals are used.)
-//
-//                                                                                                                i = 1
-//                                                                                                                HIOLD = XIOLD(2) - XIOLD(1)
-//                                                                                                                CALL HORDER(1, D1, HIOLD, DMV, NCOMP, NCY, K)
-//                                                                                                                IDMZ = IDMZ + (NCOMP + NY) * K
-//                                                                                                                HIOLD = XIOLD(3) - XIOLD(2)
-//                                                                                                                CALL HORDER(2, D2, HIOLD, DMV, NCOMP, NCY, K)
-//                                                                                                                ACCUM(1) = 0.0
-//                                                                                                                SLOPE(1) = 0.0
-//                                                                                                                ONEOVH = 2.0 / (XIOLD(3) - XIOLD(1))
-//                                                                                                                for (190 j = 1, NTOL
-//                                                                                                                    JJ = JTOL(j)
-//                                                                                                                    JZ = LTOL(j)
-//                                                                                                                    190 SLOPE(1) = DMAX1(SLOPE(1), (DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) *
-//                                                                                                                        1           ONEOVH / (1.0 + DABS(Z(JZ)))) * *ROOT(j))
-//                                                                                                                    SLPHMX = SLOPE(1) * (XIOLD(2) - XIOLD(1))
-//                                                                                                                    ACCUM(2) = SLPHMX
-//                                                                                                                    IFLIP = 1
-//
-//                                                                                                                    //  go through the remaining intervals generating  slope
-//                                                                                                                    //  and  accum .
-//
-//                                                                                                                    for (210 i = 2, NOLD
-//                                                                                                                        HIOLD = XIOLD(i + 1) - XIOLD(i)
-//                                                                                                                        if (IFLIP == -1)
-//                                                                                                                            1        CALL HORDER(i, D1, HIOLD, DMV, NCOMP, NCY, K)
-//                                                                                                                            if (IFLIP == 1)
-//                                                                                                                                1        CALL HORDER(i, D2, HIOLD, DMV, NCOMP, NCY, K)
-//                                                                                                                                ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1))
-//                                                                                                                                SLOPE(i) = 0.0
-//
-//                                                                                                                                //       evaluate function to be equidistributed
-//
-//                                                                                                                                for (200 j = 1, NTOL
-//                                                                                                                                    JJ = JTOL(j)
-//                                                                                                                                    JZ = LTOL(j) + (i - 1) * MSTAR
-//                                                                                                                                    SLOPE(i) = DMAX1(SLOPE(i), (DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) *
-//                                                                                                                                        1                  ONEOVH / (1.0 + DABS(Z(JZ)))) * *ROOT(j))
-//                                                                                                                                    200      CONTINUE
-//
-//                                                                                                                                    //       accumulate approximate integral of function to be
-//                                                                                                                                    //       equidistributed
-//
-//                                                                                                                                    TEMP = SLOPE(i) * (XIOLD(i + 1) - XIOLD(i))
-//                                                                                                                                    SLPHMX = DMAX1(SLPHMX, TEMP)
-//                                                                                                                                    ACCUM(i + 1) = ACCUM(i) + TEMP
-//                                                                                                                                    IFLIP = -IFLIP
-//                                                                                                                                    210 CONTINUE
-//                                                                                                                                    AVRG = ACCUM(NOLD + 1) / float(NOLD)
-//                                                                                                                                    DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS)
-//
-//                                                                                                                                    //  naccum=expected n to achieve .1x user requested tolerances
-//
-//                                                                                                                                    NACCUM = ACCUM(NOLD + 1) + 1.0
-//                                                                                                                                    if (IPRINT < 0)  WRITE(IOUT, 350) DEGEQU, NACCUM
-//
-//                                                                                                                                        //  decide if mesh selection is worthwhile (otherwise, halve)
-//
-//                                                                                                                                        if (AVRG < PRECIS)                       goto 100
-//                                                                                                                                            if (DEGEQU >= .5D0)                       goto 100
-//
-//                                                                                                                                                //  nmx assures mesh has at least half as many subintervals as the
-//                                                                                                                                                //  previous mesh
-//
-//                                                                                                                                                NMX = MAX0(NOLD + 1, NACCUM) / 2
-//
-//                                                                                                                                                //  this assures that halving will be possible later (for error est)
-//
-//                                                                                                                                                NMAX2 = NMAX / 2
-//
-//                                                                                                                                                //  the mesh is at most halved
-//
-//                                                                                                                                                N = MIN0(NMAX2, NOLD, NMX)
-//                                                                                                                                                220 NOLDP1 = NOLD + 1
-//                                                                                                                                                if (N < NFXP1)  N = NFXP1
-//                                                                                                                                                    MSHNUM = MSHNUM + 1
-//
-//                                                                                                                                                    //  if the new mesh is smaller than the old mesh set mshnum
-//                                                                                                                                                    //  so that the next call to  newmsh  will produce a halved
-//                                                                                                                                                    //  mesh. if n .eq. nold / 2 increment mshalt so there can not
-//                                                                                                                                                    //  be an infinite loop alternating between n and n/2 points.
-//
-//                                                                                                                                                    if (N < NOLD)  MSHNUM = MSHLMT
-//                                                                                                                                                        if (N > NOLD / 2)  MSHALT = 1
-//                                                                                                                                                            if (N == NOLD / 2)  MSHALT = MSHALT + 1
-//                                                                                                                                                                MSHFLG = 0
-//
-//                                                                                                                                                                //  having decided to generate a new mesh with n subintervals we now
-//                                                                                                                                                                //  do so, taking into account that the nfxpnt points in the array
-//                                                                                                                                                                //  fixpnt must be included in the new mesh.
-//
-//                                                                                                                                                                IN = 1
-//                                                                                                                                                                ACCL = 0.0
-//                                                                                                                                                                LOLD = 2
-//                                                                                                                                                                XI(1) = ALEFT
-//                                                                                                                                                                XI(N + 1) = ARIGHT
-//                                                                                                                                                                for (310 i = 1, NFXP1
-//                                                                                                                                                                    if (i == NFXP1)                      goto 250
-//                                                                                                                                                                        for (230 j = LOLD, NOLDP1
-//                                                                                                                                                                            LNEW = j
-//                                                                                                                                                                            if (FIXPNT(i) <= XIOLD(j))         goto 240
-//                                                                                                                                                                                230      CONTINUE
-//                                                                                                                                                                                240      CONTINUE
-//                                                                                                                                                                                ACCR = ACCUM(LNEW) + (FIXPNT(i) - XIOLD(LNEW)) * SLOPE(LNEW - 1)
-//                                                                                                                                                                                NREGN = (ACCR - ACCL) / ACCUM(NOLDP1) * float(N) - .5D0
-//                                                                                                                                                                                NREGN = MIN0(NREGN, N - IN - NFXP1 + i)
-//                                                                                                                                                                                XI(IN + NREGN + 1) = FIXPNT(i)
-//                                                                                                                                                                                goto 260
-//                                                                                                                                                                                250      ACCR = ACCUM(NOLDP1)
-//                                                                                                                                                                                LNEW = NOLDP1
-//                                                                                                                                                                                NREGN = N - IN
-//                                                                                                                                                                                260      if (NREGN == 0)                      goto 300
-//                                                                                                                                                                                TEMP = ACCL
-//                                                                                                                                                                                TSUM = (ACCR - ACCL) / float(NREGN + 1)
-//                                                                                                                                                                                for (290 j = 1, NREGN
-//                                                                                                                                                                                    IN = IN + 1
-//                                                                                                                                                                                    TEMP = TEMP + TSUM
-//                                                                                                                                                                                    for (270 l = LOLD, LNEW
-//                                                                                                                                                                                        LCARRY = l
-//                                                                                                                                                                                        if (TEMP <= ACCUM(l))            goto 280
-//                                                                                                                                                                                            270        CONTINUE
-//                                                                                                                                                                                            280        CONTINUE
-//                                                                                                                                                                                            LOLD = LCARRY
-//                                                                                                                                                                                            290      XI(IN) = XIOLD(LOLD - 1) + (TEMP - ACCUM(LOLD - 1)) /
-//                                                                                                                                                                                            1     SLOPE(LOLD - 1)
-//                                                                                                                                                                                            300      IN = IN + 1
-//                                                                                                                                                                                            ACCL = ACCR
-//                                                                                                                                                                                            LOLD = LNEW
-//                                                                                                                                                                                            310 CONTINUE
-//                                                                                                                                                                                            MODE = 1
-//                                                                                                                                                                                            320 CONTINUE
-//                                                                                                                                                                                            NP1 = N + 1
-//                                                                                                                                                                                            if (IPRINT < 1)  THEN
-//                                                                                                                                                                                                WRITE(IOUT, 340) N
-//                                                                                                                                                                                                WRITE(IOUT, 341) (XI(i), i = 1, NP1)
-//                                                                                                                                                                                                ENDIF
-//                                                                                                                                                                                                NZ = MSTAR * (N + 1)
-//                                                                                                                                                                                                NDMZ = KDY * N
-//                                                                                                                                                                                                return;
-//    //----------------------------------------------------------------
-//    340 FORMAT(/ 17H THE NEW MESH(OF, I5, 14H SUBINTERVALS))
-//        341 FORMAT(100(/ 6F12.6))
-//        350 FORMAT(/ 21H MESH SELECTION INFO, / 30H DEGREE OF EQUIDISTRIBUTION =
-//            1, F8.5, 28H PREDICTION FOR REQUIRED N =, I8)
-//        360 FORMAT(/ 20H THE FORMER MESH(OF, I5, 15H SUBINTERVALS), ,
-//            1	     100(/ 6F12.6))
-//        370 FORMAT(/ 23H  EXPECTED N TOO LARGE)
-//}
-//
+//----------------------------------------------------------------------
+//                            p a r t  2
+//          mesh selection, error estimation, (and related
+//          constant assignment) routines -- see [5], [6]
+//----------------------------------------------------------------------
 
 
+//**********************************************************************
 //
-////**********************************************************************
-////
-////   purpose
-////            assign (once) values to various array constants.
-////
-////   arrays assigned during compilation:
-////     cnsts1 - weights for extrapolation error estimate
-////     cnsts2 - weights for mesh selection
-////              (the above weights come from the theoretical form for
-////              the collocation error -- see [5])
-////
-////   arrays assigned during execution:
-////     wgterr - the particular values of cnsts1 used for current run
-////              (depending on k, m)
-////     wgtmsh - gotten from the values of cnsts2 which in turn are
-////              the constants in the theoretical expression for the
-////              errors. the quantities in wgtmsh are 10x the values
-////              in cnsts2 so that the mesh selection algorithm
-////              is aiming for errors .1x as large as the user
-////              requested tolerances.
-////     jtol   - components of differential system to which tolerances
-////              refer (viz, if ltol(i) refers to a derivative of u(j),
-////              then jtol(i)=j)
-////     root   - reciprocals of expected rates of convergence of compo-
-////              nents of z(j) for which tolerances are specified
-////     rho    - the k collocation points on (0,1)
-////     coef   -
-////     acol  -  the runge-kutta coefficients values at collocation
-////              points
-////
-////**********************************************************************
-//void CONSTS(K, RHO, COEF)
-//{
-//    IMPLICIT DOUBLE PRECISION(A - H, O - Z)
-//        DIMENSION RHO(7), COEF(K, 1), CNSTS1(28), CNSTS2(28), DUMMY(1)
+//   purpose
+//            select a mesh on which a collocation solution is to be
+//            determined
 //
-//        COMMON / COLORD / KDUM, NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX, M(20)
-//        COMMON / COLBAS / B(28), ACOL(28, 7), ASAVE(28, 4)
-//        COMMON / COLEST / TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-//        1                ROOT(40), JTOL(40), LTOL(40), NTOL
+//                           there are 5 possible modes of action:
+//            mode = 5,4,3 - deal mainly with definition of an initial
+//                           mesh for the current boundary value problem
+//                 = 2,1   - deal with definition of a new mesh, either
+//                           by simple mesh halving or by mesh selection
+//            more specifically, for
+//            mode = 5  an initial (generally nonuniform) mesh is
+//                      defined by the user and no mesh selection is to
+//                      be performed
+//                 = 4  an initial (generally nonuniform) mesh is
+//                      defined by the user
+//                 = 3  a simple uniform mesh (except possibly for some
+//                      fixed points) is defined; n= no. of subintervals
+//                 = 1  the automatic mesh selection procedure is used
+//                      (see [5] for details)
+//                 = 2  a simple mesh halving is performed
 //
-//        DATA CNSTS1 / .25D0, .625D - 1, 7.2169D - 2, 1.8342D - 2,
-//        1     1.9065D - 2, 5.8190D - 2, 5.4658D - 3, 5.3370D - 3, 1.8890D - 2,
-//        2     2.7792D - 2, 1.6095D - 3, 1.4964D - 3, 7.5938D - 3, 5.7573D - 3,
-//        3     1.8342D - 2, 4.673D - 3, 4.150D - 4, 1.919D - 3, 1.468D - 3,
-//        4     6.371D - 3, 4.610D - 3, 1.342D - 4, 1.138D - 4, 4.889D - 4,
-//        5     4.177D - 4, 1.374D - 3, 1.654D - 3, 2.863D - 3 /
-//        DATA CNSTS2 / 1.25D - 1, 2.604D - 3, 8.019D - 3, 2.170D - 5,
-//        1     7.453D - 5, 5.208D - 4, 9.689D - 8, 3.689D - 7, 3.100D - 6,
-//        2     2.451D - 5, 2.691D - 10, 1.120D - 9, 1.076D - 8, 9.405D - 8,
-//        3     1.033D - 6, 5.097D - 13, 2.290D - 12, 2.446D - 11, 2.331D - 10,
-//        4     2.936D - 9, 3.593D - 8, 7.001D - 16, 3.363D - 15, 3.921D - 14,
-//        5     4.028D - 13, 5.646D - 12, 7.531D - 11, 1.129D - 9 /
+//**********************************************************************
 //
-//        //  assign weights for error estimate
+//   variables
 //
-//        KOFF = K * (K + 1) / 2
-//        IZ = 1
-//        for (10 j = 1, NCOMP
-//            MJ = M(j)
-//            for (10 l = 1, MJ
-//                WGTERR(IZ) = CNSTS1(KOFF - MJ + l)
-//                IZ = IZ + 1
-//                10 CONTINUE
+//            n      = number of mesh subintervals
+//            nold   = number of subintervals for former mesh
+//            xi     - mesh point array
+//            xiold  - former mesh point array
+//            mshlmt - maximum no. of mesh selections which are permitted
+//                     for a given n before mesh halving
+//            mshnum - no. of mesh selections which have actually been
+//                     performed for the given n
+//            mshalt - no. of consecutive times ( plus 1 ) the mesh
+//                     selection has alternately halved and doubled n.
+//                     if mshalt .ge. mshlmt then  contrl  requires
+//                     that the current mesh be halved.
+//            mshflg = 1  the mesh is a halving of its former mesh
+//                       (so an error estimate has been calculated)
+//                   = 0  otherwise
+//            iguess - ipar(9) in subroutine coldae.  it is used
+//                     here only for mode=5 and 4, where
+//                   = 2 the subroutine sets xi=xiold.  this is
+//                       used e.g. if continuation is being per-
+//                       formed, and a mesh for the old differen-
+//                       tial equation is being used
+//                   = 3 same as for =2, except xi uses every other
+//                       point of xiold (so mesh xiold is mesh xi
+//                       halved)
+//                   = 4 xi has been defined by the user, and an old
+//                       mesh xiold is also available
+//                       otherwise, xi has been defined by the user
+//                       and we set xiold=xi in this subroutine
+//            slope  - an approximate quantity to be equidistributed for
+//                     mesh selection (see [5]), viz,
+//                             .                        (k+mj)
+//                     slope(i)=     max   (weight(l) *u      (xi(i)))
+//                               1.le.l.le.ntol         j
 //
-//                //  assign array values for mesh selection: wgtmsh, jtol, and root
+//                     where j=jtol(l)
+//            slphmx - maximum of slope(i)*(xiold(i+1)-xiold(i)) for
+//                     i = 1 ,..., nold.
+//            accum  - accum(i) is the integral of  slope  from  aleft
+//                     to  xiold(i).
+//            valstr - is assigned values needed in  errchk  for the
+//                     error estimate.
+//            fc     - you know
+//**********************************************************************
+void NEWMSH(int MODE, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DMV, darr1 VALSTR,
+	darr1 SLOPE, darr1, int NFXPNT, darr1 FIXPNT, darr2 DF, dfsub_t dfsub,
+	darr2 FC, darr2 CB, int NCOMP, int NYCB)
+{
+	SLOPE.assertDim(1);
+	XI.assertDim(1);
+	XIOLD.assertDim(1);
+	Z.assertDim(1);
+	DMZ.assertDim(1);
+	DMV.assertDim(1);
+	FIXPNT.assertDim(1);
+	VALSTR.assertDim(1);
+	FC.assertDim(NCOMP, 60);
+	DF.assertDim(NCY, 1);
+	CB.assertDim(NYCB, NYCB);
+
+	darr1 D1(40), D2(40), ACCUM(1);
+	darr1 DUMMY(1);
+	darr1 ZVAL(40);
+	darr1 YVAL(40);
+	darr1 A(28);
+	iarr1 IPVTCB(40);
+	darr1 BCOL(40);
+	darr1 U(400);
+	darr1 V(400);
+
+	int ISING = 0;
+
+	int NFXP1 = NFXPNT + 1;
+	switch (MODE) {
+	case 5:
+		//  mode=5   set mshlmt=1 so that no mesh selection is performed
+		MSHLMT = 1;
+
+		[[fallthrough]]
+	case 4: {
+		//  mode=4   the user-specified initial mesh is already in place.
+		if (IGUESS >= 2) {
+			//  iguess=2, 3 or 4.
+			int NOLDP1 = NOLD + 1;
+			// if (IPRINT < 1)  WRITE(IOUT, 360) NOLD, (XIOLD(i), i = 1, NOLDP1)
+			if (IGUESS == 3) {
+				//  if iread ( ipar(8) ) .ge. 1 and iguess ( ipar(9) ) .eq. 3
+				//  then the first mesh is every second point of the
+				//  mesh in  xiold .
+				N = NOLD / 2;
+				for (int j = 1, i = 0; j <= NOLD; j += 2) {
+					i = i + 1;
+					XI(i) = XIOLD(j);
+				}
+			}
+		}
+		int NP1 = N + 1;
+		XI(1) = ALEFT;
+		XI(NP1) = ARIGHT;
+		break;
+	}
+	case 3: {
+		//  mode=3   generate a (piecewise) uniform mesh. if there are
+		//  fixed points then ensure that the n being used is large enough
+		if (N < NFXP1)
+			N = NFXP1;
+		int NP1 = N + 1;
+		XI(1) = ALEFT;
+		int ILEFT = 1;
+		double XLEFT = ALEFT;
+
+		//  loop over the subregions between fixed points.
+		for (int j = 1; j <= NFXP1; ++j) {
+			double XRIGHT = ARIGHT;
+			int IRIGHT = NP1;
+			if (j != NFXP1) {
+				XRIGHT = FIXPNT(j);
+
+				// determine where the j-th fixed point should fall in the
+				// new mesh - this is xi(iright) and the (j-1)st fixed
+				// point is in xi(ileft)
+				int NMIN = (XRIGHT - ALEFT) / (ARIGHT - ALEFT) * float(N) + 1.5;
+				if (NMIN > N - NFXPNT + j)
+					NMIN = N - NFXPNT + j;
+				IRIGHT = std::max(ILEFT + 1, NMIN);
+			}
+			XI(IRIGHT) = XRIGHT;
+
+			// generate equally spaced points between the j-1st and the
+			// j-th fixed points.
+			int NREGN = IRIGHT - ILEFT - 1;
+			if (NREGN != 0) {
+				double DX = (XRIGHT - XLEFT) / float(NREGN + 1);
+				for (int i = 1; i <= NREGN; ++i)
+					XI(ILEFT + i) = XLEFT + float(i) * DX;
+				ILEFT = IRIGHT;
+			}
+			XLEFT = XRIGHT;
+		}
+		break;
+	}
+n100:
+	case 2: {
+		//  mode=2  halve the current mesh (i.e. double its size)
+		int N2 = 2 * N;
+
+		//  check that n does not exceed storage limitations
+		if (N2 > NMAX) {
+			//  if possible, try with n=nmax. redistribute first.
+			if (MODE != 2) {
+				N = NMAX / 2;
+				goto n220;
+			}
+			//if (IPRINT < 1)  WRITE(IOUT, 370)
+			N = N2;
+			return;
+		}
+		//  calculate the old approximate solution values at
+		//  points to be used in  errchk  for error estimates.
+		//  if  mshflg  =1 an error estimate was obtained for
+		//  for the old approximation so half the needed values
+		//  will already be in  valstr .
+		if (MSHFLG != 0) {
+			//  save in  valstr  the values of the old solution
+			//  at the relative positions 1/6 and 5/6 in each subinterval.
+			int KSTORE = 1;
+			for (int i = 1; i <= NOLD; ++i) {
+				double HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0;
+				double X = XIOLD(i) + HD6;
+				APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, 1), DUMMY, XIOLD,
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+				X = X + 4.0 * HD6;
+				KSTORE = KSTORE + 3 * MSTAR;
+				APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, 4), DUMMY, XIOLD,
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+				KSTORE = KSTORE + MSTAR;
+			}
+		}
+		//  save in  valstr  the values of the old solution
+		//  at the relative positions 1/6, 2/6, 4/6 and 5/6 in
+		//  each subinterval.
+		else {
+			int KSTORE = 1;
+			for (int i = 1; i <= N; ++i) {
+				double X = XI(i);
+				double HD6 = (XI(i + 1) - XI(i)) / 6.0;
+				for (int j = 1; j <= 4; ++j) {
+					X = X + HD6;
+					if (j == 3)
+						X = X + HD6;
+					APPROX(i, X, VALSTR(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					KSTORE = KSTORE + MSTAR;
+				}
+			}
+		}
+		MSHFLG = 0;
+		MSHNUM = 1;
+		MODE = 2;
+
+		//  generate the halved mesh.
+		for (int i = 1, j = 2; i <= N; ++i) {
+			XI(j) = (XIOLD(i) + XIOLD(i + 1)) / 2.0;
+			XI(j + 1) = XIOLD(i + 1);
+			j = j + 2;
+		}
+		N = N2;
+		break;
+	}
+	case 1: {
+		//  mode=1  we do mesh selection if it is deemed worthwhile
+
+		if (NOLD == 1)
+			goto n100;
+		if (NOLD <= 2 * NFXPNT)
+			goto n100;
+
+		//  we now project DMZ for mesh selection strategy, if required
+		//  but set DMV = DMZ in case it is not
+		int IDMZ = 1;
+		for (int i = 1; i <= NOLD; ++i) {
+			for (int KK = 1; KK <= K; ++KK) {
+				for (int j = 1; j <= NCY; ++j) {
+					DMV(IDMZ) = DMZ(IDMZ);
+					IDMZ = IDMZ + 1;
+				}
+			}
+		}
+		if (INDEX != 1 && NY > 0) {
+			IDMZ = 1;
+			for (int i = 1; i <= NOLD; ++i) {
+				double XI1 = XIOLD(i + 1);
+				APPROX(i, XI1, ZVAL, YVAL, A, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 3, DUMMY, 1);
+				dfsub(XI1, ZVAL, YVAL, DF);
+
+				// if index=2, form projection matrices directly
+				// otherwise use svd to define appropriate projection
+				if (INDEX == 0) {
+					PRJSVD(FC, DF, CB, U, V, NCOMP, NCY, NY, IPVTCB, ISING, 2);
+				}
+				else {
+					// form cb
+					for (int j = 1; j <= NY; ++j) {
+						for (int J1 = 1; J1 <= NY; ++J1) {
+							double FACT = 0.0;
+							for (int l = 1, ML = 0; l <= NCOMP; ++l) {
+								ML = ML + M(l);
+								FACT = FACT + DF(j + NCOMP, ML) * DF(l, MSTAR + J1);
+							}
+							CB(j, J1) = FACT;
+						}
+					}
+
+					// decompose cb
+					DGEFA(CB, NY, NY, IPVTCB, ISING);
+					if (ISING != 0)
+						return;
+
+					// form columns of fc
+					int ML = 0;
+					for (int l = 1; l <= NCOMP; ++l) {
+						ML += M(l);
+						for (int J1 = 1; J1 <= NY; ++J1)
+							BCOL(J1) = DF(J1 + NCOMP, ML);
+
+						DGESL(CB, NY, NY, IPVTCB, BCOL, 0);
+
+						for (int J1 = 1; J1 <= NCOMP; ++J1) {
+							double FACT = 0.0;
+							for (int j = 1; j <= NY; ++j)
+								FACT += DF(J1, j + MSTAR) * BCOL(j);
+							FC(J1, l) = FACT;
+						}
+					}
+				}
+
+				// finally, replace fc with the true projection SR = i - fc
+				for (int j = 1; j <= NCOMP; ++j) {
+					for (int l = 1; l <= NCOMP; ++l) {
+						FC(j, l) = -FC(j, l);
+						if (j == l)
+							FC(j, l) = FC(j, l) + 1.0;
+					}
+				}
+
+				// project DMZ for the k collocation points, store in DMV
+				for (int KK = 1; KK <= K; ++KK) {
+					for (int j = 1; j <= NCOMP; ++j) {
+						double FACT = 0.0;
+						for (int l = 1; l <= NCOMP; ++l)
+							FACT = FACT + FC(j, l) * DMZ(IDMZ + l - 1);
+						DMV(IDMZ + j - 1) = FACT;
+					}
+					IDMZ = IDMZ + NCY;
+				}
+			}
+		}
+
+		//  the first interval has to be treated separately from the
+		//  other intervals (generally the solution on the (i-1)st and ith
+		//  intervals will be used to approximate the needed derivative, but
+		//  here the 1st and second intervals are used.)
+		int i = 1;
+		double HIOLD = XIOLD(2) - XIOLD(1);
+		HORDER(1, D1, HIOLD, DMV, NCOMP, NCY, K);
+		IDMZ = IDMZ + (NCOMP + NY) * K;
+		HIOLD = XIOLD(3) - XIOLD(2);
+		HORDER(2, D2, HIOLD, DMV, NCOMP, NCY, K);
+		ACCUM(1) = 0.0;
+		SLOPE(1) = 0.0;
+		double ONEOVH = 2.0 / (XIOLD(3) - XIOLD(1));
+		for (int j = 1; j <= NTOL; ++j) {
+			int JJ = JTOL(j);
+			int JZ = LTOL(j);
+			SLOPE(1) = DMAX1(SLOPE(1),
+				pow(DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + DABS(Z(JZ))),
+					ROOT(j)));
+		}
+		double SLPHMX = SLOPE(1) * (XIOLD(2) - XIOLD(1));
+		ACCUM(2) = SLPHMX;
+		int IFLIP = 1;
+
+		//  go through the remaining intervals generating  slope
+		//  and  accum .
+		for (int i = 2; i <= NOLD; ++i) {
+			HIOLD = XIOLD(i + 1) - XIOLD(i);
+			if (IFLIP == -1)
+				HORDER(i, D1, HIOLD, DMV, NCOMP, NCY, K);
+			if (IFLIP == 1)
+				HORDER(i, D2, HIOLD, DMV, NCOMP, NCY, K);
+			ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1));
+			SLOPE(i) = 0.0;
+
+			// evaluate function to be equidistributed
+			for (int j = 1; j <= NTOL; ++j) {
+				int JJ = JTOL(j);
+				int JZ = LTOL(j) + (i - 1) * MSTAR;
+				SLOPE(i) = DMAX1(SLOPE(i),
+					pow(DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + DABS(Z(JZ))), ROOT(j)));
+			}
+
+			// accumulate approximate integral of function to be equidistributed
+			double TEMP = SLOPE(i) * (XIOLD(i + 1) - XIOLD(i));
+			SLPHMX = DMAX1(SLPHMX, TEMP);
+			ACCUM(i + 1) = ACCUM(i) + TEMP;
+			IFLIP = -IFLIP;
+		}
+		double AVRG = ACCUM(NOLD + 1) / float(NOLD);
+		double DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS);
+
+		//  naccum=expected n to achieve .1x user requested tolerances
+		int NACCUM = ACCUM(NOLD + 1) + 1.0;
+		//if (IPRINT < 0)  WRITE(IOUT, 350) DEGEQU, NACCUM
+
+		//  decide if mesh selection is worthwhile (otherwise, halve)
+		if (AVRG < PRECIS)
+			goto n100;
+		if (DEGEQU >= .5)
+			goto n100;
+
+		//  nmx assures mesh has at least half as many subintervals as the
+		//  previous mesh
+		int NMX = std::max(NOLD + 1, NACCUM) / 2;
+
+		//  this assures that halving will be possible later (for error est)
+		int NMAX2 = NMAX / 2;
+
+		//  the mesh is at most halved
+		int N = MIN0(NMAX2, NOLD, NMX);
+
+	n220:
+
+		int NOLDP1 = NOLD + 1;
+		if (N < NFXP1)
+			N = NFXP1;
+		MSHNUM = MSHNUM + 1;
+
+		//  if the new mesh is smaller than the old mesh set mshnum
+		//  so that the next call to  newmsh  will produce a halved
+		//  mesh. if n .eq. nold / 2 increment mshalt so there can not
+		//  be an infinite loop alternating between n and n/2 points.
+		if (N < NOLD)
+			MSHNUM = MSHLMT;
+		if (N > NOLD / 2)
+			MSHALT = 1;
+		if (N == NOLD / 2)
+			MSHALT = MSHALT + 1;
+		MSHFLG = 0;
+
+		//  having decided to generate a new mesh with n subintervals we now
+		//  do so, taking into account that the nfxpnt points in the array
+		//  fixpnt must be included in the new mesh.
+		int IN = 1;
+		double ACCL = 0.0;
+		int LOLD = 2;
+		XI(1) = ALEFT;
+		XI(N + 1) = ARIGHT;
+		for (int i = 1; i <= NFXP1; ++i) {
+			double ACCR; int LNEW, NREGN;
+			if (i != NFXP1) {
+				for (int j = LOLD; j <= NOLDP1; ++j) {
+					LNEW = j;
+					if (FIXPNT(i) <= XIOLD(j))
+						break;
+				}
+				ACCR = ACCUM(LNEW) + (FIXPNT(i) - XIOLD(LNEW)) * SLOPE(LNEW - 1);
+				NREGN = (ACCR - ACCL) / ACCUM(NOLDP1) * float(N) - .5;
+				NREGN = std::min(NREGN, N - IN - NFXP1 + i);
+				XI(IN + NREGN + 1) = FIXPNT(i);
+			}
+			else {
+				ACCR = ACCUM(NOLDP1);
+				LNEW = NOLDP1;
+				NREGN = N - IN;
+			}
+			if (NREGN != 0) {
+				double TEMP = ACCL;
+				double TSUM = (ACCR - ACCL) / float(NREGN + 1);
+				for (int j = 1; j <= NREGN; ++j) {
+					IN = IN + 1;
+					TEMP = TEMP + TSUM;
+					int LCARRY;
+					for (int l = LOLD; l <= LNEW; ++l) {
+						LCARRY = l;
+						if (TEMP <= ACCUM(l))
+							break;
+					}
+					LOLD = LCARRY;
+					XI(IN) = XIOLD(LOLD - 1) + (TEMP - ACCUM(LOLD - 1)) / SLOPE(LOLD - 1);
+				}
+			}
+			IN = IN + 1;;
+			ACCL = ACCR;
+			LOLD = LNEW;
+		}
+		MODE = 1;
+		break;
+	}
+	} // end of switch
+
+
+	if (IPRINT < 1) {
+		int NP1 = N + 1;
+		/*WRITE(IOUT, 340) N
+		WRITE(IOUT, 341) (XI(i), i = 1, NP1)*/
+	}
+	NZ = MSTAR * (N + 1);
+	NDMZ = KDY * N;
+
+	//----------------------------------------------------------------
+	/*340 FORMAT(/ 17H THE NEW MESH(OF, I5, 14H SUBINTERVALS))
+		341 FORMAT(100(/ 6F12.6))
+		350 FORMAT(/ 21H MESH SELECTION INFO, / 30H DEGREE OF EQUIDISTRIBUTION =
+			1, F8.5, 28H PREDICTION FOR REQUIRED N =, I8)
+		360 FORMAT(/ 20H THE FORMER MESH(OF, I5, 15H SUBINTERVALS), ,
+			1	     100(/ 6F12.6))
+		370 FORMAT(/ 23H  EXPECTED N TOO LARGE)*/
+}
+
+
+
+
+//**********************************************************************
 //
-//                JCOMP = 1
-//                MTOT = M(1)
-//                for (40 i = 1, NTOL
-//                    LTOLI = LTOL(i)
-//                    20      CONTINUE
-//                    if (LTOLI <= MTOT)                   goto 30
-//                        JCOMP = JCOMP + 1
-//                        MTOT = MTOT + M(JCOMP)
-//                        goto 20
-//                        30      CONTINUE
-//                        JTOL(i) = JCOMP
-//                        WGTMSH(i) = 1.D1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i)
-//                        ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1)
-//                        40 CONTINUE
+//   purpose
+//            assign (once) values to various array constants.
 //
-//                        //  specify collocation points
+//   arrays assigned during compilation:
+//     cnsts1 - weights for extrapolation error estimate
+//     cnsts2 - weights for mesh selection
+//              (the above weights come from the theoretical form for
+//              the collocation error -- see [5])
 //
-//                        goto (50, 60, 70, 80, 90, 100, 110), K
-//                        50 RHO(1) = 0.0
-//                        goto 120
-//                        60 RHO(2) = .57735026918962576451D0
-//                        RHO(1) = -RHO(2)
-//                        goto 120
-//                        70 RHO(3) = .77459666924148337704D0
-//                        RHO(2) = .0D0
-//                        RHO(1) = -RHO(3)
-//                        goto 120
-//                        80 RHO(4) = .86113631159405257523D0
-//                        RHO(3) = .33998104358485626480D0
-//                        RHO(2) = -RHO(3)
-//                        RHO(1) = -RHO(4)
-//                        goto 120
-//                        90 RHO(5) = .90617984593866399280D0
-//                        RHO(4) = .53846931010568309104D0
-//                        RHO(3) = .0D0
-//                        RHO(2) = -RHO(4)
-//                        RHO(1) = -RHO(5)
-//                        goto 120
-//                        100 RHO(6) = .93246951420315202781D0
-//                        RHO(5) = .66120938646626451366D0
-//                        RHO(4) = .23861918608319690863D0
-//                        RHO(3) = -RHO(4)
-//                        RHO(2) = -RHO(5)
-//                        RHO(1) = -RHO(6)
-//                        goto 120
-//                        110 RHO(7) = .949107991234275852452D0
-//                        RHO(6) = .74153118559939443986D0
-//                        RHO(5) = .40584515137739716690D0
-//                        RHO(4) = 0.0
-//                        RHO(3) = -RHO(5)
-//                        RHO(2) = -RHO(6)
-//                        RHO(1) = -RHO(7)
-//                        120 CONTINUE
+//   arrays assigned during execution:
+//     wgterr - the particular values of cnsts1 used for current run
+//              (depending on k, m)
+//     wgtmsh - gotten from the values of cnsts2 which in turn are
+//              the constants in the theoretical expression for the
+//              errors. the quantities in wgtmsh are 10x the values
+//              in cnsts2 so that the mesh selection algorithm
+//              is aiming for errors .1x as large as the user
+//              requested tolerances.
+//     jtol   - components of differential system to which tolerances
+//              refer (viz, if ltol(i) refers to a derivative of u(j),
+//              then jtol(i)=j)
+//     root   - reciprocals of expected rates of convergence of compo-
+//              nents of z(j) for which tolerances are specified
+//     rho    - the k collocation points on (0,1)
+//     coef   -
+//     acol  -  the runge-kutta coefficients values at collocation
+//              points
 //
-//                        //  map (-1,1) to (0,1) by  t = .5 * (1. + x)
-//
-//                        for (130 j = 1, K
-//                            RHO(j) = .5D0 * (1.0 + RHO(j))
-//                            130 CONTINUE
-//
-//                            //  now find runge-kutta coeffitients b, acol and asave
-//                            //  the values of asave are to be used in  newmsh  and errchk .
-//
-//                            for (140 j = 1, K
-//                                for (135 i = 1, K
-//                                    135      COEF(i, j) = 0.0
-//                                    COEF(j, j) = 1.0
-//                                    CALL VMONDE(RHO, COEF(1, j), K)
-//                                    140 CONTINUE
-//                                    CALL RKBAS(1.0, COEF, K, MMAX, B, DUMMY, 0)
-//                                    for (150 i = 1, K
-//                                        CALL RKBAS(RHO(i), COEF, K, MMAX, ACOL(1, i), DUMMY, 0)
-//                                        150 CONTINUE
-//                                        CALL RKBAS(1.0 / 6.0, COEF, K, MMAX, ASAVE(1, 1), DUMMY, 0)
-//                                        CALL RKBAS(1.0 / 3.0, COEF, K, MMAX, ASAVE(1, 2), DUMMY, 0)
-//                                        CALL RKBAS(2.0 / 3.0, COEF, K, MMAX, ASAVE(1, 3), DUMMY, 0)
-//                                        CALL RKBAS(5.0 / 6.0, COEF, K, MMAX, ASAVE(1, 4), DUMMY, 0)
-//                                        return;
-//}
-//
+//**********************************************************************
+void CONSTS(int K, darr1 RHO, darr2 COEF)
+{
+	RHO.assertDim(7);
+	COEF.assertDim(K, 1);
+	darr1 CNSTS1(28), CNSTS2(28), DUMMY(1);
+
+	CNSTS1 = { .250, .625 - 1, 7.2169 - 2, 1.8342 - 2,
+		 1.9065 - 2, 5.8190 - 2, 5.4658 - 3, 5.3370 - 3, 1.8890 - 2,
+		 2.7792 - 2, 1.6095 - 3, 1.4964 - 3, 7.5938 - 3, 5.7573 - 3,
+		 1.8342 - 2, 4.673 - 3, 4.150 - 4, 1.919 - 3, 1.468 - 3,
+		 6.371 - 3, 4.610 - 3, 1.342 - 4, 1.138 - 4, 4.889 - 4,
+		 4.177 - 4, 1.374 - 3, 1.654 - 3, 2.863 - 3 };
+	CNSTS2 = { 1.25 - 1, 2.604 - 3, 8.019 - 3, 2.170 - 5,
+		 7.453 - 5, 5.208 - 4, 9.689 - 8, 3.689 - 7, 3.100 - 6,
+		 2.451 - 5, 2.691 - 10, 1.120 - 9, 1.076 - 8, 9.405 - 8,
+		 1.033 - 6, 5.097 - 13, 2.290 - 12, 2.446 - 11, 2.331 - 10,
+		 2.936 - 9, 3.593 - 8, 7.001 - 16, 3.363 - 15, 3.921 - 14,
+		 4.028 - 13, 5.646 - 12, 7.531 - 11, 1.129 - 9 };
+
+	//  assign weights for error estimate
+	double KOFF = K * (K + 1) / 2;
+	int IZ = 1;
+	for (int j = 1; j <= NCOMP; ++j) {
+		int MJ = M(j);
+		for (int l = 1; l <= MJ; ++l) {
+			WGTERR(IZ) = CNSTS1(KOFF - MJ + l);
+			IZ = IZ + 1;
+		}
+	}
+
+	//  assign array values for mesh selection: wgtmsh, jtol, and root
+	int JCOMP = 1;
+	int MTOT = M(1);
+	for (int i = 1; i <= NTOL; ++i) {
+		int LTOLI = LTOL(i);
+		while (true) {
+			if (LTOLI <= MTOT)
+				break;
+			JCOMP = JCOMP + 1;
+			MTOT = MTOT + M(JCOMP);
+		}
+		JTOL(i) = JCOMP;
+		WGTMSH(i) = 1.1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i);
+		ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1);
+	}
+
+	//  specify collocation points
+	switch (K) {
+	case 1: RHO(1) = 0.0;
+		break;
+
+	case 2:
+		RHO(2) = .577350269189625764510;
+		RHO(1) = -RHO(2);
+		break;
+
+	case 3:
+		RHO(3) = .774596669241483377040;
+		RHO(2) = .00;
+		RHO(1) = -RHO(3);
+		break;
+
+	case 4:
+		RHO(4) = .861136311594052575230;
+		RHO(3) = .339981043584856264800;
+		RHO(2) = -RHO(3);
+		RHO(1) = -RHO(4);
+		break;
+
+	case 5:
+		RHO(5) = .906179845938663992800;
+		RHO(4) = .538469310105683091040;
+		RHO(3) = .00;
+		RHO(2) = -RHO(4);
+		RHO(1) = -RHO(5);
+		break;
+
+	case 6:
+		RHO(6) = .932469514203152027810;
+		RHO(5) = .661209386466264513660;
+		RHO(4) = .238619186083196908630;
+		RHO(3) = -RHO(4);
+		RHO(2) = -RHO(5);
+		RHO(1) = -RHO(6);
+		break;
+
+	case 7:
+		RHO(7) = .9491079912342758524520;
+		RHO(6) = .741531185599394439860;
+		RHO(5) = .405845151377397166900;
+		RHO(4) = 0.0;
+		RHO(3) = -RHO(5);
+		RHO(2) = -RHO(6);
+		RHO(1) = -RHO(7);
+		break;
+	}
+
+	//  map (-1,1) to (0,1) by  t = .5 * (1. + x)
+	for (int j = 1; K; ++j)
+		RHO(j) = .50 * (1.0 + RHO(j));
+
+
+	//  now find runge-kutta coeffitients b, acol and asave
+	//  the values of asave are to be used in  newmsh  and errchk .
+	for (int j = 1; j <= K; ++j) {
+		for (int i = 1; i <= K; ++i)
+			COEF(i, j) = 0.0;
+		COEF(j, j) = 1.0;
+		VMONDE(RHO, COEF(1, j), K);
+	}
+	RKBAS(1.0, COEF, K, MMAX, B, DUMMY, 0);
+	for (int i = 1; i <= K; ++i)
+		RKBAS(RHO(i), COEF, K, MMAX, ACOL.sub(1, i), DUMMY, 0);
+
+	RKBAS(1.0 / 6.0, COEF, K, MMAX, ASAVE.sub(1, 1), DUMMY, 0);
+	RKBAS(1.0 / 3.0, COEF, K, MMAX, ASAVE.sub(1, 2), DUMMY, 0);
+	RKBAS(2.0 / 3.0, COEF, K, MMAX, ASAVE.sub(1, 3), DUMMY, 0);
+	RKBAS(5.0 / 6.0, COEF, K, MMAX, ASAVE.sub(1, 4), DUMMY, 0);
+}
+
 
 
 
@@ -2474,7 +2528,7 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
 		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
 		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
-		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 		for (int l = 1; l<= MSTAR;++l) {
 			ERR(l) = WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2483,7 +2537,7 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
 		KSTORE = 2 * (i - 1) * MSTAR + 1;
 		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
-		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
 		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = ERR(l) + WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2520,8 +2574,6 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 	   120 FORMAT(3H U(, I2, 3H) - , 4D12.4)
 	   130 FORMAT(/ 26H THE ESTIMATED ERRORS ARE, )*/
 }
-
-
 
 
 
@@ -2593,392 +2645,405 @@ void ERRCHK(darr1 XI, darr1 Z, darr1 DMZ, darr1 VALSTR, int IFIN)
 //
 //
 //*********************************************************************
-//void LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ,
-//    1           G, W, V, FC, RHS, DMZO, INTEGS, IPVTG, IPVTW, RNORM,
-//    2           MODE, FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING)
-//{
-//    IMPLICIT DOUBLE PRECISION(A - H, O - Z)
-//        DIMENSION  Z(1), DMZ(1), DELZ(1), DELDMZ(1), XI(1), XIOLD(1)
-//        DIMENSION  G(1), W(1), V(1), RHS(1), DMZO(1), DUMMY(1), Y(1)
-//        DIMENSION  INTEGS(3, 1), IPVTG(1), IPVTW(1), YVAL(20)
-//        DIMENSION  ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800), AT(28)
-//        DIMENSION  FC(1), CB(400), IPVTCB(20)
-//
-//        COMMON / COLOUT / PRECIS, IOUT, IPRINT
-//        COMMON / COLLOC / RHO(7), COEF(49)
-//        COMMON / COLORD / K, NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX, M(20)
-//        COMMON / COLSID / ZETA(40), ALEFT, ARIGHT, IZETA, IZSAVE
-//        COMMON / COLAPR / N, NOLD, NMAX, NZ, NDMZ
-//        COMMON / COLNLN / NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-//        COMMON / COLBAS / B(28), ACOL(28, 7), ASAVE(28, 4)
-//
-//        EXTERNAL DFSUB, DGSUB
-//
-//        if (NY == 0) THEN
-//            NYCB = 1
-//        else
-//            NYCB = NY
-//            ENDIF
-//            INFC = (MSTAR + NY) * NCOMP
-//            M1 = MODE + 1
-//            goto (10, 30, 30, 30, 310), M1
-//
-//            //  linear problem initialization
-//
-//            10 for (20 i = 1, MSTAR
-//                20   ZVAL(i) = 0.0
-//                for (25 i = 1, NY
-//                    25   YVAL(i) = 0.0
-//
-//                    //  initialization
-//
-//                    30 IDMZ = 1
-//                    IDMZO = 1
-//                    IRHS = 1
-//                    IG = 1
-//                    IW = 1
-//                    IV = 1
-//                    IFC = 1
-//                    IZETA = 1
-//                    LSIDE = 0
-//                    IOLD = 1
-//                    NCOL = 2 * MSTAR
-//                    RNORM = 0.0
-//                    if (MODE > 1)                            goto 80
-//
-//                        //  build integs (describing block structure of matrix)
-//
-//                        for (70 i = 1, N
-//                            INTEGS(2, i) = NCOL
-//                            if (i < N)                            goto 40
-//                                INTEGS(3, N) = NCOL
-//                                LSIDE = MSTAR
-//                                goto 60
-//                                40      INTEGS(3, i) = MSTAR
-//                                50      if (LSIDE == MSTAR)                   goto 60
-//                                if (ZETA(LSIDE + 1) >= XI(i) + PRECIS)   goto 60
-//                                    LSIDE = LSIDE + 1
-//                                    goto 50
-//                                    60      NROW = MSTAR + LSIDE
-//                                    70      INTEGS(1, i) = NROW
-//                                    80 CONTINUE
-//                                    if (MODE == 2)                            goto 90
-//
-//                                        //  zero the matrices to be computed
-//
-//                                        LW = KDY * KDY * N
-//                                        for (84 l = 1, LW
-//                                            84   W(l) = 0.0
-//
-//                                            //  the do loop 290 sets up the linear system of equations.
-//
-//                                            90  CONTINUE
-//                                            for (290 i = 1, N
-//
-//                                                //       construct a block of  a  and a corresponding piece of  rhs.
-//
-//                                                XII = XI(i)
-//                                                H = XI(i + 1) - XI(i)
-//                                                NROW = INTEGS(1, i)
-//
-//                                                //       go thru the ncomp collocation equations and side conditions
-//                                                //       in the i-th subinterval
-//
-//                                                100      if (IZETA > MSTAR)                   goto 140
-//                                                if (ZETA(IZETA) > XII + PRECIS)      goto 140
-//
-//                                                    //       build equation for a side condition.
-//
-//                                                    if (MODE == 0)                       goto 110
-//                                                        if (IGUESS != 1)                     goto 102
-//
-//                                                            //       case where user provided current approximation
-//
-//                                                            CALL GUESS(XII, ZVAL, YVAL, DMVAL)
-//                                                            goto 110
-//
-//                                                            //       other nonlinear case
-//
-//                                                            102      if (MODE != 1)                       goto 106
-//                                                            CALL APPROX(IOLD, XII, ZVAL, Y, AT, COEF, XIOLD, NOLD,
-//                                                                1          Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2, DUMMY, 0)
-//                                                            goto 110
-//                                                            106      CALL APPROX(i, XII, ZVAL, Y, AT, DUMMY, XI, N, Z, DMZ,
-//                                                                1                  K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0)
-//                                                            108      if (MODE == 3)                       goto 120
-//
-//                                                            //       find  rhs  boundary value.
-//
-//                                                            110      CALL GSUB(IZETA, ZVAL, GVAL)
-//                                                            RHS(NDMZ + IZETA) = -GVAL
-//                                                            RNORM = RNORM + GVAL * *2
-//                                                            if (MODE == 2)                       goto 130
-//
-//                                                                //       build a row of  a  corresponding to a boundary point
-//
-//                                                                120      CALL GDERIV(G(IG), NROW, IZETA, ZVAL, DGZ, 1, DGSUB)
-//                                                                130      IZETA = IZETA + 1
-//                                                                goto 100
-//
-//                                                                //       assemble collocation equations
-//
-//                                                                140      for (220 j = 1, K
-//                                                                    HRHO = H * RHO(j)
-//                                                                    XCOL = XII + HRHO
-//
-//                                                                    //         this value corresponds to a collocation (interior)
-//                                                                    //         point. build the corresponding  ncy  equations.
-//
-//                                                                    if (MODE == 0)                     goto 200
-//                                                                        if (IGUESS != 1)                   goto 160
-//
-//                                                                            //         use initial approximation provided by the user.
-//
-//                                                                            CALL GUESS(XCOL, ZVAL, YVAL, DMZO(IRHS))
-//                                                                            goto 170
-//
-//                                                                            //         find  rhs  values
-//
-//                                                                            160        if (MODE != 1)                     goto 190
-//                                                                            CALL APPROX(IOLD, XCOL, ZVAL, YVAL, AT, COEF,
-//                                                                                +XIOLD, NOLD, Z, DMZ,
-//                                                                                1            K, NCOMP, NY, MMAX, M, MSTAR, 2, DMZO(IRHS), 2)
-//
-//                                                                            170        CALL FSUB(XCOL, ZVAL, YVAL, F)
-//                                                                            for (175 JJ = NCOMP + 1, NCY
-//                                                                                175          DMZO(IRHS + JJ - 1) = 0.0
-//                                                                                for (180 JJ = 1, NCY
-//                                                                                    VALUE = DMZO(IRHS) - F(JJ)
-//                                                                                    RHS(IRHS) = -VALUE
-//                                                                                    RNORM = RNORM + VALUE * *2
-//                                                                                    IRHS = IRHS + 1
-//                                                                                    180        CONTINUE
-//                                                                                    goto 210
-//
-//                                                                                    //         evaluate former collocation solution
-//
-//                                                                                    190        CALL APPROX(i, XCOL, ZVAL, Y, ACOL(1, j), COEF, XI, N,
-//                                                                                        1            Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0)
-//                                                                                    if (MODE == 3)                     goto 210
-//
-//                                                                                        //         fill in  rhs  values (and accumulate its norm).
-//
-//                                                                                        CALL FSUB(XCOL, ZVAL, DMZ(IRHS + NCOMP), F)
-//                                                                                        for (195 JJ = 1, NCY
-//                                                                                            VALUE = F(JJ)
-//                                                                                            if (JJ <= NCOMP) VALUE = VALUE - DMZ(IRHS)
-//                                                                                                RHS(IRHS) = VALUE
-//                                                                                                RNORM = RNORM + VALUE * *2
-//                                                                                                IRHS = IRHS + 1
-//                                                                                                195        CONTINUE
-//                                                                                                goto 220
-//
-//                                                                                                //         the linear case
-//
-//                                                                                                200        CALL FSUB(XCOL, ZVAL, YVAL, RHS(IRHS))
-//                                                                                                IRHS = IRHS + NCY
-//
-//                                                                                                //         fill in ncy rows of  w and v
-//
-//                                                                                                210        CALL VWBLOK(XCOL, HRHO, j, W(IW), V(IV), IPVTW(IDMZ),
-//                                                                                                    1            KDY, ZVAL, YVAL, DF, ACOL(1, j), DMZO(IDMZO),
-//                                                                                                    2            NCY, DFSUB, MSING)
-//                                                                                                if (MSING != 0)                    return;
-//    220      CONTINUE
-//
-//        //       build global bvp matrix  g
-//
-//        if (INDEX != 1 && NY > 0) THEN
-//
-//            //          projected collocation: find solution at xi(i+1)
-//
-//            XI1 = XI(i + 1)
-//            if (MODE != 0) THEN
-//                if (IGUESS == 1) THEN
-//                    CALL GUESS(XI1, ZVAL, YVAL, DMVAL)
-//                else
-//                    if (MODE == 1) THEN
-//                        CALL APPROX(IOLD, XI1, ZVAL, YVAL, AT, COEF,
-//                            +XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-//                            +M, MSTAR, 2, DUMMY, 1)
-//                        if (i == N)
-//                            + CALL APPROX(NOLD + 1, XI1, ZVAL, YVAL, AT, COEF,
-//                                +XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-//                                +M, MSTAR, 1, DUMMY, 0)
-//                        else
-//                            CALL APPROX(i, XI1, ZVAL, YVAL, AT, COEF,
-//                                +XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-//                                +M, MSTAR, 3, DUMMY, 1)
-//                            CALL APPROX(i + 1, XI1, ZVAL, YVAL, AT, COEF,
-//                                +XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-//                                +M, MSTAR, 1, DUMMY, 0)
-//                            END if
-//                            END if
-//                            END if
-//
-//                            //          find rhs at next mesh point (also for linear case)
-//
-//                            CALL FSUB(XI1, ZVAL, YVAL, F)
-//                            END if
-//
-//                            CALL GBLOCK(H, G(IG), NROW, IZETA, W(IW), V(IV), KDY,
-//                                2                  DUMMY, DELDMZ(IDMZ), IPVTW(IDMZ), 1, MODE,
-//                                +XI1, ZVAL, YVAL, F, DF, CB, IPVTCB,
-//                                +FC(IFC), DFSUB, ISING, NCOMP, NYCB, NCY)
-//                            if (ISING != 0)                       return;
-//    if (i < N)                          goto 280
-//        IZSAVE = IZETA
-//        240      if (IZETA > MSTAR)                  goto 290
-//
-//        //       build equation for a side condition.
-//
-//        if (MODE == 0)                       goto 250
-//            if (IGUESS != 1)                     goto 245
-//
-//                //       case where user provided current approximation
-//
-//                CALL GUESS(ARIGHT, ZVAL, YVAL, DMVAL)
-//                goto 250
-//
-//                //       other nonlinear case
-//
-//                245      if (MODE != 1)                       goto 246
-//                CALL APPROX(NOLD + 1, ARIGHT, ZVAL, Y, AT, COEF,
-//                    +XIOLD, NOLD, Z, DMZ,
-//                    1          K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0)
-//                goto 250
-//                246      CALL APPROX(N + 1, ARIGHT, ZVAL, Y, AT, COEF, XI, N,
-//                    1       Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0)
-//                248      if (MODE == 3)                       goto 260
-//
-//                //       find  rhs  boundary value.
-//
-//                250      CALL GSUB(IZETA, ZVAL, GVAL)
-//                RHS(NDMZ + IZETA) = -GVAL
-//                RNORM = RNORM + GVAL * *2
-//                if (MODE == 2)                       goto 270
-//
-//                    //       build a row of  a  corresponding to a boundary point
-//
-//                    260      CALL GDERIV(G(IG), NROW, IZETA + MSTAR, ZVAL, DGZ, 2, DGSUB)
-//                    270      IZETA = IZETA + 1
-//                    goto 240
-//
-//                    //       update counters -- i-th block completed
-//
-//                    280      IG = IG + NROW * NCOL
-//                    IV = IV + KDY * MSTAR
-//                    IW = IW + KDY * KDY
-//                    IDMZ = IDMZ + KDY
-//                    if (MODE == 1)  IDMZO = IDMZO + KDY
-//                        IFC = IFC + INFC + 2 * NCOMP
-//                        290 CONTINUE
-//
-//                        //       assembly process completed
-//
-//                        if (MODE == 0 || MODE == 3)           goto 300
-//                            RNORM = sqrt(RNORM / float(NZ + NDMZ))
-//                            if (MODE == 2)                            return;
-//
-//    //  solve the linear system.
-//
-//    //  matrix decomposition
-//
-//    300 CALL FCBLOK(G, INTEGS, N, IPVTG, DF, MSING)
-//
-//        //  check for singular matrix
-//
-//        MSING = -MSING
-//        if (MSING != 0)                            return;
-//
-//    //  perform forward and backward substitution .
-//
-//    310 CONTINUE
-//        for (311 l = 1, NDMZ
-//            DELDMZ(l) = RHS(l)
-//            311 CONTINUE
-//            IZ = 1
-//            IDMZ = 1
-//            IW = 1
-//            IFC = 1
-//            IZET = 1
-//            for (320 i = 1, N
-//                NROW = INTEGS(1, i)
-//                IZETA = NROW + 1 - MSTAR
-//                if (i == N) IZETA = IZSAVE
-//                    322    if (IZET == IZETA)                     goto 324
-//                    DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET)
-//                    IZET = IZET + 1
-//                    goto 322
-//                    324    H = XI(i + 1) - XI(i)
-//                    CALL GBLOCK(H, G(1), NROW, IZETA, W(IW), V(1), KDY,
-//                        1                DELZ(IZ), DELDMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
-//                        +XI1, ZVAL, YVAL, FC(IFC + INFC), DF, CB,
-//                        +IPVTCB, FC(IFC), DFSUB, ISING, NCOMP, NYCB, NCY)
-//                    IZ = IZ + MSTAR
-//                    IDMZ = IDMZ + KDY
-//                    IW = IW + KDY * KDY
-//                    IFC = IFC + INFC + 2 * NCOMP
-//                    if (i < N)                            goto 320
-//                        326    if (IZET > MSTAR)                     goto 320
-//                        DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET)
-//                        IZET = IZET + 1
-//                        goto 326
-//                        320 CONTINUE
-//
-//                        //  perform forward and backward substitution for mode=0,2, or 3.
-//
-//                        CALL SBBLOK(G, INTEGS, N, IPVTG, DELZ)
-//
-//                        //  finally find deldmz
-//
-//                        CALL DMZSOL(KDY, MSTAR, N, V, DELZ, DELDMZ)
-//
-//                        if (MODE != 1)                            return;
-//
-//    //  project current iterate into current pp-space
-//
-//    for (321 l = 1, NDMZ
-//        DMZ(l) = DMZO(l)
-//        321 CONTINUE
-//        IZ = 1
-//        IDMZ = 1
-//        IW = 1
-//        IFC = 1
-//        IZET = 1
-//        for (350 i = 1, N
-//            NROW = INTEGS(1, i)
-//            IZETA = NROW + 1 - MSTAR
-//            if (i == N) IZETA = IZSAVE
-//                330    if (IZET == IZETA)                     goto 340
-//                Z(IZ - 1 + IZET) = DGZ(IZET)
-//                IZET = IZET + 1
-//                goto 330
-//                340    H = XI(i + 1) - XI(i)
-//                CALL GBLOCK(H, G(1), NROW, IZETA, W(IW), DF, KDY,
-//                    1                Z(IZ), DMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
-//                    +XI1, ZVAL, YVAL, FC(IFC + INFC + NCOMP),
-//                    +DF, CB, IPVTCB, FC(IFC), DFSUB, ISING,
-//                    +NCOMP, NYCB, NCY)
-//                IZ = IZ + MSTAR
-//                IDMZ = IDMZ + KDY
-//                IW = IW + KDY * KDY
-//                IFC = IFC + INFC + 2 * NCOMP
-//                if (i < N)                            goto 350
-//                    342    if (IZET > MSTAR)                     goto 350
-//                    Z(IZ - 1 + IZET) = DGZ(IZET)
-//                    IZET = IZET + 1
-//                    goto 342
-//                    350 CONTINUE
-//                    CALL SBBLOK(G, INTEGS, N, IPVTG, Z)
-//
-//                    //  finally find dmz
-//
-//                    CALL DMZSOL(KDY, MSTAR, N, V, Z, DMZ)
-//
-//}
-//
-//
+void LSYSLV(int MSING, darr1 XI, darr1 XIOLD, darr1 Z, darr1 DMZ, darr1 DELZ, darr1 DELDMZ,
+	darr1 G, darr1 W, darr1 V, darr1 FC, darr1 RHS, darr1 DMZO,
+	iarr2 INTEGS, iarr1 IPVTG, iarr1 IPVTW, double RNORM,
+	int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
+	dgsub_t dgsub, guess_t guess, int ISING)
+{
+	Z.assertDim(1);
+	DMZ.assertDim(1);
+	DELZ.assertDim(1);
+	DELDMZ.assertDim(1);
+	XI.assertDim(1);
+	XIOLD.assertDim(1);
+	G.assertDim(1);
+	W.assertDim(1);
+	V.assertDim(1);
+	RHS.assertDim(1);
+	DMZO.assertDim(1);
+	INTEGS.assertDim(3, 1);
+	IPVTG.assertDim(1);
+	IPVTW.assertDim(1);
+	FC.assertDim(1);
+
+	darr1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
+	darr1 DUMMY(1), Y(1), AT(28), CB(400);
+	iarr1 IPVTCB(20);
+
+	int NYCB;
+	if (NY == 0)
+		NYCB = 1;
+	else
+		NYCB = NY;
+
+	int INFC = (MSTAR + NY) * NCOMP;
+	int M1 = MODE + 1;
+	double XI1;
+
+	int IZSAVE = 0;
+
+	switch (M1) {
+	case 1: {
+		//  linear problem initialization
+		for (int i = 1; i <= MSTAR; ++i)
+			ZVAL(i) = 0.0;
+		for (int i = 1; i <= NY; ++i)
+			YVAL(i) = 0.0;
+
+		[[fallthrough]];
+	}
+	case 2:
+	case 3:
+	case 4: {
+		//  initialization
+		int IDMZ = 1;
+		int IDMZO = 1;
+		int IRHS = 1;
+		int IG = 1;
+		int IW = 1;
+		int IV = 1;
+		int IFC = 1;
+		IZETA = 1;
+		int LSIDE = 0;
+		int IOLD = 1;
+		int NCOL = 2 * MSTAR;
+		RNORM = 0.0;
+		if (MODE <= 1) {
+			//  build integs (describing block structure of matrix)
+			for (int i = 1; i <= N; ++i) {
+				INTEGS(2, i) = NCOL;
+				if (i >= N) {
+					INTEGS(3, N) = NCOL;
+					LSIDE = MSTAR;
+				}
+				else {
+					INTEGS(3, i) = MSTAR;
+					while (true) {
+						if (LSIDE == MSTAR)
+							break;
+						if (ZETA(LSIDE + 1) >= XI(i) + PRECIS)
+							break;
+						LSIDE = LSIDE + 1;
+					}
+				}
+				int NROW = MSTAR + LSIDE;
+				INTEGS(1, i) = NROW;
+			}
+		}
+		if (MODE != 2) {
+			//  zero the matrices to be computed
+			int LW = KDY * KDY * N;
+			for (int l = 1; l <= LW; ++l)
+				W(l) = 0.0;
+		}
+		// set up the linear system of equations
+		for (int i = 1; i <= N; ++i) {
+			// construct a block of  a  and a corresponding piece of  rhs.
+			double XII = XI(i);
+			double H = XI(i + 1) - XI(i);
+			int NROW = INTEGS(1, i);
+
+			// go thru the ncomp collocation equations and side conditions
+			// in the i-th subinterval
+			while (true) {
+				if (IZETA > MSTAR)
+					break;
+				if (ZETA(IZETA) > XII + PRECIS)
+					break;
+
+				// build equation for a side condition.
+				if (MODE == 0) {
+					if (IGUESS == 1) {
+						// case where user provided current approximation
+						guess(XII, ZVAL, YVAL, DMVAL);
+					}
+					else {
+						// other nonlinear case
+						if (MODE == 1) {
+							APPROX(IOLD, XII, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2, DUMMY, 0);
+						}
+						else {
+							APPROX(i, XII, ZVAL, Y, AT, DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+							if (MODE == 3)
+								goto n120;
+						}
+					}
+				}
+				// find  rhs  boundary value.
+				double GVAL;
+				gsub(IZETA, ZVAL, GVAL);
+				RHS(NDMZ + IZETA) = -GVAL;
+				RNORM = RNORM + GVAL * GVAL;
+				if (MODE != 2) {
+				n120:
+					// build a row of  a  corresponding to a boundary point
+					GDERIV(G.sub(IG), NROW, IZETA, ZVAL, DGZ, 1, dgsub);
+				}
+				IZETA = IZETA + 1;
+			}
+
+			// assemble collocation equations
+			for (int j = 1; j <= K; ++j) {
+				double HRHO = H * RHO(j);
+				double XCOL = XII + HRHO;
+
+				// this value corresponds to a collocation (interior)
+				// point. build the corresponding  ncy  equations.
+				if (MODE == 0)
+					goto n200;
+				if (IGUESS != 1)
+					goto n160;
+
+				// use initial approximation provided by the user.
+				guess(XCOL, ZVAL, YVAL, DMZO(IRHS));
+				goto n170;
+
+
+			n160:
+				if (MODE == 1) {
+					// find  rhs  values
+					APPROX(IOLD, XCOL, ZVAL, YVAL, AT, COEF, XIOLD,
+						NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2,
+						DMZO(IRHS), 2);
+
+				n170:
+					fsub(XCOL, ZVAL, YVAL, F);
+					for (int JJ = NCOMP + 1; JJ <= NCY; ++JJ)
+						DMZO(IRHS + JJ - 1) = 0.0;
+
+					for (int JJ = 1; JJ <= NCY; ++JJ) {
+						double VALUE = DMZO(IRHS) - F(JJ);
+						RHS(IRHS) = -VALUE;
+						RNORM = RNORM + VALUE * VALUE;
+						IRHS = IRHS + 1;
+					}
+				}
+				else {
+					// evaluate former collocation solution
+					APPROX(i, XCOL, ZVAL, Y, ACOL.sub(1, j), COEF, XI, N, Z,
+						DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					if (MODE == 3)
+						break;
+
+					// fill in  rhs  values (and accumulate its norm).
+					fsub(XCOL, ZVAL, DMZ(IRHS + NCOMP), F);
+					for (int JJ = 1; JJ <= NCY; ++JJ) {
+						double VALUE = F(JJ);
+						if (JJ <= NCOMP)
+							VALUE = VALUE - DMZ(IRHS);
+						RHS(IRHS) = VALUE;
+						RNORM = RNORM + VALUE * VALUE;
+						IRHS = IRHS + 1;
+					}
+					continue;
+
+					// the linear case
+				n200:
+					fsub(XCOL, ZVAL, YVAL, RHS(IRHS));
+					IRHS = IRHS + NCY;
+				}
+				// fill in ncy rows of  w and v
+				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW(IDMZ), KDY,
+					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO(IDMZO), NCY, dfsub, MSING);
+				if (MSING != 0)
+					return;
+			}
+
+			// build global bvp matrix  g
+			if (INDEX != 1 && NY > 0) {
+				// projected collocation: find solution at xi(i+1)
+				XI1 = XI(i + 1);
+				if (MODE != 0) {
+					if (IGUESS == 1)
+						guess(XI1, ZVAL, YVAL, DMVAL);
+					else {
+						if (MODE == 1) {
+							APPROX(IOLD, XI1, ZVAL, YVAL, AT, COEF,
+								XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
+								M, MSTAR, 2, DUMMY, 1);
+							if (i == N)
+								APPROX(NOLD + 1, XI1, ZVAL, YVAL, AT, COEF,
+									XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
+									M, MSTAR, 1, DUMMY, 0);
+							else
+								APPROX(i, XI1, ZVAL, YVAL, AT, COEF,
+									XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
+									M, MSTAR, 3, DUMMY, 1);
+							APPROX(i + 1, XI1, ZVAL, YVAL, AT, COEF,
+								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
+								M, MSTAR, 1, DUMMY, 0);
+						}
+					}
+				}
+
+				// find rhs at next mesh point (also for linear case)
+				fsub(XI1, ZVAL, YVAL, F);
+			}
+
+			GBLOCK(H, G.sub(IG), NROW, IZETA, W(IW), V.sub(IV), KDY, DUMMY,
+				DELDMZ(IDMZ), IPVTW(IDMZ), 1, MODE, XI1, ZVAL, YVAL, F,
+				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NCOMP, NYCB, NCY);
+			if (ISING != 0)
+				return;
+			if (i >= N) {
+				int IZSAVE = IZETA;
+				while (true) {
+					if (IZETA > MSTAR)
+						break;
+
+					// build equation for a side condition.
+					if (MODE != 0) {
+						if (IGUESS == 1) {
+							// case where user provided current approximation
+							guess(ARIGHT, ZVAL, YVAL, DMVAL);
+						}
+						else {
+							// other nonlinear case
+							if (MODE == 1) {
+								APPROX(NOLD + 1, ARIGHT, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+							}
+							else {
+								APPROX(N + 1, ARIGHT, ZVAL, Y, AT, COEF, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+								if (MODE == 3)
+									goto n260;
+							}
+						}
+					}
+					// find  rhs  boundary value.
+					double GVAL;
+					gsub(IZETA, ZVAL, GVAL);
+					RHS(NDMZ + IZETA) = -GVAL;
+					RNORM = RNORM + GVAL * GVAL;
+					if (MODE != 2) {
+						// build a row of  a  corresponding to a boundary point
+					n260:
+						GDERIV(G.sub(IG), NROW, IZETA + MSTAR, ZVAL, DGZ, 2, dgsub);
+					}
+					IZETA = IZETA + 1;
+				}
+			}
+			else {
+				// update counters -- i-th block completed
+				IG = IG + NROW * NCOL;
+				IV = IV + KDY * MSTAR;
+				IW = IW + KDY * KDY;
+				IDMZ = IDMZ + KDY;
+				if (MODE == 1)
+					IDMZO = IDMZO + KDY;
+				IFC = IFC + INFC + 2 * NCOMP;
+			}
+		}
+
+		// assembly process completed
+		if (MODE != 0 && MODE != 3) {
+			RNORM = sqrt(RNORM / float(NZ + NDMZ));
+			if (MODE == 2)
+				return;
+		}
+		//  solve the linear system.
+		//  matrix decomposition
+		FCBLOK(G, INTEGS, N, IPVTG, DF, MSING);
+
+		//  check for singular matrix
+		MSING = -MSING;
+		if (MSING != 0)
+			return;
+	} [[fallthrough]];
+	case 5: {
+		//  perform forward and backward substitution .
+		for (int l = 1; l <= NDMZ; ++l)
+			DELDMZ(l) = RHS(l);
+
+		int IZ = 1;
+		int IDMZ = 1;
+		int IW = 1;
+		int IFC = 1;
+		int IZET = 1;
+		for (int i = 1; i <= N; ++i) {
+			int NROW = INTEGS(1, i);
+			IZETA = NROW + 1 - MSTAR;
+			if (i == N)
+				IZETA = IZSAVE;
+			while (true) {
+				if (IZET == IZETA)
+					break;
+				DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET);
+				IZET = IZET + 1;
+			}
+			double H = XI(i + 1) - XI(i);
+			GBLOCK(H, G.sub(1), NROW, IZETA, W(IW), V.sub(1), KDY, DELZ(IZ), DELDMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
+				XI1, ZVAL, YVAL, FC(IFC + INFC), DF, CB,
+				IPVTCB, FC.sub(IFC), dfsub, ISING, NCOMP, NYCB, NCY);
+			IZ = IZ + MSTAR;
+			IDMZ = IDMZ + KDY;
+			IW = IW + KDY * KDY;
+			IFC = IFC + INFC + 2 * NCOMP;
+			if (i < N)
+				continue;
+			while (true) {
+				if (IZET > MSTAR)
+					break;
+				DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET);
+				IZET = IZET + 1;
+			}
+		}
+
+		//  perform forward and backward substitution for mode=0,2, or 3.
+		SBBLOK(G, INTEGS, N, IPVTG, DELZ);
+
+		//  finally find deldmz
+		DMZSOL(KDY, MSTAR, N, V, DELZ, DELDMZ);
+
+		if (MODE != 1)
+			return;
+
+		//  project current iterate into current pp-space
+		for (int l = 1; l <= NDMZ; ++l)
+			DMZ(l) = DMZO(l);
+		IZ = 1;
+		IDMZ = 1;
+		IW = 1;
+		IFC = 1;
+		IZET = 1;
+		for (int i = 1; i <= N; ++i) {
+			int NROW = INTEGS(1, i);
+			IZETA = NROW + 1 - MSTAR;
+			if (i == N)
+				IZETA = IZSAVE;
+			while (true) {
+				if (IZET == IZETA)
+					break;
+				Z(IZ - 1 + IZET) = DGZ(IZET);
+				IZET = IZET + 1;
+			}
+			double H = XI(i + 1) - XI(i);
+			GBLOCK(H, G.sub(1), NROW, IZETA, W(IW), DF, KDY,
+				Z(IZ), DMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
+				XI1, ZVAL, YVAL, FC(IFC + INFC + NCOMP),
+				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING,
+				NCOMP, NYCB, NCY);
+			IZ = IZ + MSTAR;
+			IDMZ = IDMZ + KDY;
+			IW = IW + KDY * KDY;
+			IFC = IFC + INFC + 2 * NCOMP;
+			if (i < N)
+				continue;
+
+			while (true) {
+				if (IZET > MSTAR)
+					break;
+				Z(IZ - 1 + IZET) = DGZ(IZET);
+				IZET = IZET + 1;
+			}
+		}
+		SBBLOK(G, INTEGS, N, IPVTG, Z);
+
+		//  finally find dmz
+		DMZSOL(KDY, MSTAR, N, V, Z, DMZ);
+	}
+	}
+}
 
 
 
@@ -3014,7 +3079,7 @@ void GDERIV(darr2 GI, int NROW, int IROW, darr1 ZVAL, darr1 DGZ, int MODE, dgsub
 		DG(j) = 0.0;
 
 	//  evaluate jacobian dg
-	dgsub(IZETA, ZVAL, wrap(DG));
+	dgsub(IZETA, ZVAL, DG);
 
 	//  evaluate  dgz = dg * zval  once for a new mesh
 	if (NONLIN != 0 && ITER <= 0) {
@@ -3467,7 +3532,7 @@ void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY,
 			//  otherwise use svd to define appropriate projection
 
 			if (INDEX == 0) {
-				PRJSVD(FC, DF, CB, wrap(U), wrap(V), NCOMP, NCY, NY, IPVTCB, ISING, 1);
+				PRJSVD(FC, DF, CB, U, V, NCOMP, NCY, NY, IPVTCB, ISING, 1);
 				if (ISING != 0)
 					return;
 			}
@@ -3558,7 +3623,7 @@ void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY,
 
 	case 2:
 		//  compute the appropriate piece of  rhsz
-		DGESL(wrap(WI), KDY, KDY, IPVTW, RHSDMZ, 0);
+		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
 			int MJ = M(JCOMP);
@@ -3591,10 +3656,6 @@ void GBLOCK(double H, darr2 GI, int NROW, int IROW, darr1 WI, darr2 VI, int KDY,
 		}
 	}
 }
-
-
-
-
 
 
 
@@ -3760,7 +3821,7 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 	case 3:	 {
 		//  mode = 2 or 3, compute mesh independent rk - basis.
 		double S = (X - XI(i)) / (XI(i + 1) - XI(i));
-		RKBAS(S, wrap(COEF), k, MMAX, A, DM, MODM);
+		RKBAS(S, COEF, k, MMAX, A, DM, MODM);
 		}
 		[[fallthrough]]
 	case 4:
@@ -3782,7 +3843,7 @@ void APPROX(int i, double X, darr1 ZVAL, darr1 YVAL, darr2 A, darr1 COEF, darr1 
 			for (l = 1; l <= MJ; ++l) {
 				int IND = IDMZ + JCOMP;
 				double ZSUM = 0.0;
-				for (int j = 1; j < k; ++j) {
+				for (int j = 1; j <= k; ++j) {
 					ZSUM = ZSUM + A(j, l) * DMZ(IND);
 					IND = IND + NCY;
 				}
@@ -3857,7 +3918,7 @@ void APPSLN(double X, darr1 Z, darr1 Y, darr1 FSPACE, iarr1 ISPACE) {
 	int IS5 = ISPACE(1) + 2;
 	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
 	int i = 1;
-	APPROX(i, X, Z, Y, wrap(A), FSPACE(IS6), FSPACE(1), ISPACE(1),
+	APPROX(i, X, Z, Y, A, FSPACE(IS6), FSPACE(1), ISPACE(1),
 		FSPACE(IS5), FSPACE(IS4), ISPACE(2), ISPACE(3),
 		ISPACE(4), ISPACE(6), ISPACE(9), ISPACE(5), 2,
 		DUMMY, 1);
@@ -3969,8 +4030,6 @@ void DMZSOL(int KDY, int MSTAR, int N, darr2 V, darr1 Z, darr2 DMZ)
 		}
 	}
 }
-
-
 
 
 
@@ -4225,7 +4284,7 @@ n10:
 	//       carry out elimination on the i - th block until next block
 	//       enters, i.e., for columns 1, ..., last  of i - th block.
 
-	FACTRB(wrap(BLOKS.sub(INDEX)), IPIVOT(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
+	FACTRB(BLOKS.sub(INDEX), IPIVOT(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
 
 	//       check for having reached a singular block or the last block
 
@@ -4237,7 +4296,7 @@ n10:
 
 	//       put the rest of the i - th block onto the next block
 
-	SHIFTB(wrap(BLOKS.sub(INDEX)), NROW, NCOL, LAST, wrap(BLOKS.sub(INDEXN)), INTEGS(1, i), INTEGS(2, i));
+	SHIFTB(BLOKS.sub(INDEX), NROW, NCOL, LAST, BLOKS.sub(INDEXN), INTEGS(1, i), INTEGS(2, i));
 
 	goto n10;
 
@@ -4383,7 +4442,7 @@ void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X)
 	for (i = 1; i <= NBLOKS; ++i) {
 		NROW = INTEGS(1, i);
 		LAST = INTEGS(3, i);
-		SUBFOR(wrap(BLOKS.sub(INDEX)), IPIVOT.sub(INDEXX), NROW, LAST, X.sub(INDEXX));
+		SUBFOR(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), NROW, LAST, X.sub(INDEXX));
 		INDEX = NROW * INTEGS(2, i) + INDEX;
 		INDEXX = INDEXX + LAST;
 	}
@@ -4398,7 +4457,5 @@ void SBBLOK(darr1 BLOKS, iarr2 INTEGS, int NBLOKS, iarr1 IPIVOT, darr1 X)
 		INDEX = INDEX - NROW * NCOL;
 		INDEXX = INDEXX - LAST;
 	}
-	SUBBAK(wrap(BLOKS.sub(INDEX)), NROW, NCOL, LAST, X.sub(INDEXX));
+	SUBBAK(BLOKS.sub(INDEX), NROW, NCOL, LAST, X.sub(INDEXX));
 }
-
-
