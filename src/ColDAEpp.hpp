@@ -1,9 +1,9 @@
 ﻿#pragma once
 
 #define FMT_HEADER_ONLY 
-#include "../fmt-8.1.1/include/fmt/format.h"
-#include "../fmt-8.1.1/include/fmt/ranges.h"
-#include "../fmt-8.1.1/include/fmt/color.h"
+#include "../fmt/include/fmt/format.h"
+#include "../fmt/include/fmt/ranges.h"
+#include "../fmt/include/fmt/color.h"
 
 #include "linpack/linpack_d.hpp"
 
