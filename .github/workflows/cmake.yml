@@ -28,8 +28,11 @@ jobs:
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
           }
     steps:
+    - name: Checkout repository
     - uses: actions/checkout@v2
-
+      with:
+          submodules: 'true'
+          oken: ${{ secrets.PAT_TOKEN }}
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type

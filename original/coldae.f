@@ -572,6 +572,7 @@ C
       PRECIS = 1.D0
    10 PRECIS = PRECIS / 2.D0
       PRECP1 = PRECIS + 1.D0
+      write(*,*) "PRECIS = ",PRECIS
       IF ( PRECP1 .GT. 1.D0 )                       GO TO 10
       PRECIS = PRECIS * 100.D0
 C
@@ -1320,6 +1321,8 @@ C
 C...       check for error tolerance satisfaction
 C
   420      IFIN = 1
+
+            write(*,*)"check for error tolerance satisfaction: ",IMESH
 	   IF (IMESH .EQ. 2) CALL ERRCHK (XI, Z, DMZ, VALSTR, IFIN)
 	   IF ( IMESH .EQ. 1 .OR.
      1          IFIN .EQ. 0 .AND. ICARE .NE. 2)     GO TO 460
@@ -1352,6 +1355,9 @@ C
 	   IMESH = 1
 	   IF ( ICONV .EQ. 0 .OR. MSHNUM .GE. MSHLMT
      1                       .OR. MSHALT .GE. MSHLMT )  IMESH = 2
+
+            write(*,*)"control: IMESH=",IMESH
+
 	   IF ( MSHALT .GE. MSHLMT .AND.
      1		MSHNUM .LT. MSHLMT )  MSHALT = 1
 	   IF (NY.EQ.0) THEN
@@ -1638,6 +1644,7 @@ C
 C
 C...  check that n does not exceed storage limitations
 C
+      write(*,*) " ! Hello 100 - half the mesh"
       IF ( N2 .LE. NMAX )                           GO TO 120
 C
 C...  if possible, try with n=nmax. redistribute first.
@@ -1848,12 +1855,21 @@ C
 	   DO 200 J = 1, NTOL
 	     JJ = JTOL(J)
 	     JZ = LTOL(J)  +  (I-1) * MSTAR
-           write(*,*) "WGTMSH(J)=",WGTMSH(J)
-           write(*,*) "SLOPE(I)=",SLOPE(I), " base=",
-     .   (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*ONEOVH / (1.D0 + DABS(Z(JZ)))),
-     .   "  ROOT(J)=",ROOT(J)
+          ! write(*,*) "WGTMSH(J)=",WGTMSH(J)
+          ! write(*,*) "SLOPE(I)=",SLOPE(I), " base=",
+    ! .   (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*ONEOVH / (1.D0 + DABS(Z(JZ)))),
+    ! .   "  ROOT(J)=",ROOT(J)
+
 	     SLOPE(I) = DMAX1(SLOPE(I),(DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*
      1                  ONEOVH / (1.D0 + DABS(Z(JZ)))) **ROOT(J))
+          
+             simtemp = (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*
+     1                  ONEOVH / (1.D0 + DABS(Z(JZ))));
+
+            write(*,*)"temp = ",simtemp
+            write(*,*)"ROOT(J) = ",ROOT(J)
+            write(*,*)"iteration SLOPE = ",SLOPE(I)
+
   200      CONTINUE
 C
 C...       accumulate approximate integral of function to be
@@ -1864,7 +1880,9 @@ C
 	   ACCUM(I+1) = ACCUM(I) + TEMP
 	   IFLIP = - IFLIP
 
-         write(*,*)"SLOPE = ",SLOPE
+         write(*,*)"SLOPE = ",SLOPE(I)
+         write(*,*)"diff  = ",(XIOLD(I+1)-XIOLD(I))
+         write(*,*)"TEMP  = ",TEMP
 
   210 CONTINUE
       AVRG = ACCUM(NOLD+1) / FLOAT(NOLD)
@@ -1872,14 +1890,16 @@ C
 C
 C...  naccum=expected n to achieve .1x user requested tolerances
 C
-
-      write(*,*) "NOLD=",NOLD," ACCUM(NOLD+1)=",ACCUM(NOLD+1)
+      write(*,*) "-------------------"
+      write(*,*) "AVRG=",AVRG," SLPHMX=",SLPHMX," PRECIS=",PRECIS
 
       NACCUM = ACCUM(NOLD+1) + 1.D0
       IF ( IPRINT .LT. 0 )  WRITE(IOUT,350) DEGEQU, NACCUM
 C
 C...  decide if mesh selection is worthwhile (otherwise, halve)
-C
+
+
+            write(*,*)"Check: ",AVRG,PRECIS,DEGEQU
       IF ( AVRG .LT. PRECIS )                       GO TO 100
       IF ( DEGEQU .GE. .5D0 )                       GO TO 100
 C

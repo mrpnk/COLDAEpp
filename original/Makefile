@@ -1,5 +1,5 @@
 FORT = gfortran
-FORTFLAGS = -Wfatal-errors -w -std=legacy -O2 -Wall
+FORTFLAGS = -Wfatal-errors -w -std=legacy -O1 -Wall
 
 
 SRC := ./

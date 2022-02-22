@@ -729,7 +729,6 @@ void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
 
 //------------------------------------------------------------------------------------------------------
 
-double DABS(double x) { return abs(x); }
 double DMAX1(double x, double y) { return std::max(x, y); }
 int MIN0(int x, int y) { return std::min(x, y); }
 int MIN0(int x, int y, int z) { return std::min(x, std::min(z, y)); }
@@ -953,6 +952,7 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	do {
 		PRECIS = PRECIS / 2.0;
 		PRECP1 = PRECIS + 1.0;
+		fmt::print(fg(fmt::color::cornflower_blue), "PRECIS = {}\n", PRECIS);
 	} while (PRECP1 > 1.0);
 
 	PRECIS = PRECIS * 100.0;
@@ -1058,7 +1058,7 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 
 	int IP = 1;
 	for (int i = 1; i <= MSTAR; ++i) {
-		if (DABS(ZETA(i) - ALEFT) < PRECIS || DABS(ZETA(i) - ARIGHT) < PRECIS)
+		if (abs(ZETA(i) - ALEFT) < PRECIS || abs(ZETA(i) - ARIGHT) < PRECIS)
 			continue;
 
 		while (true) {
@@ -1169,7 +1169,8 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	else
 		NYCB = NY;
 
-	NEWMSH(3 + IREAD, FSPACE.sub(LXI), FSPACE.sub(LXIOLD), DUMMY,
+	int meshmode = 3 + IREAD;
+	NEWMSH(meshmode, FSPACE.sub(LXI), FSPACE.sub(LXIOLD), DUMMY,
 		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
 		DUMMY2, dfsub, DUMMY2, DUMMY2, NCOMP, NYCB);
 
@@ -1477,7 +1478,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			for (int IT = 1; IT <= NTOL; ++IT) {
 				int INZ = LTOL(IT);
 				for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-					if (DABS(DELZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+					if (abs(DELZ(IZ)) > TOLIN(IT) * (abs(Z(IZ)) + 1.0))
 						goto n60;
 				}
 			}
@@ -1670,7 +1671,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					goto n170;
 				if (ARG > .25 * RELAX + .125 * RELAX * RELAX) {
 					double FACTOR = -1.0 + sqrt(1.0 + 8.0 * ARG);
-					if (DABS(FACTOR - 1.0) < .10 * FACTOR)
+					if (abs(FACTOR - 1.0) < .10 * FACTOR)
 						goto n170;
 					if (FACTOR < 0.50)
 						FACTOR = 0.5;
@@ -1701,7 +1702,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					for (int IT = 1; IT <= NTOL; ++IT) {
 						int INZ = LTOL(IT);
 						for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-							if (DABS(DQZ(IZ)) > TOLIN(IT) * (DABS(Z(IZ)) + 1.0))
+							if (abs(DQZ(IZ)) > TOLIN(IT) * (abs(Z(IZ)) + 1.0))
 								goto n170;
 						}
 					}
@@ -1811,7 +1812,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					fmt::print("PROBABLY TOLERANCES TOO STRINGENT OR NMAX TOO SMALL\n");
 				return;
 			}
-			if (ICONV == 0)  IMESH = 1;
+			if (ICONV == 0) 
+				IMESH = 1;
 			if (ICARE == 1)  ICONV = 0;
 		}
 	}
@@ -1860,7 +1862,7 @@ void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 X
 			BASM(l + 1) = BASM(l) * H / float(l);
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-			double SCAL = (DABS(Z(IZ, j)) + DABS(Z(IZ, j + 1))) * .5 + 1.0;
+			double SCAL = (abs(Z(IZ, j)) + abs(Z(IZ, j + 1))) * .5 + 1.0;
 			int MJ = M(ICOMP);
 			for (int l = 1; l <= MJ; ++l) {
 				SCALE(IZ, j) = BASM(l) / SCAL;
@@ -1872,7 +1874,7 @@ void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 X
 
 		}
 		for (int ICOMP = 1 + NCOMP; ICOMP <= NCY; ++ICOMP) {
-			double SCAL = 1.0 / (DABS(DMZ(ICOMP, j)) + 1.0);
+			double SCAL = 1.0 / (abs(DMZ(ICOMP, j)) + 1.0);
 			for (int IDMZ = ICOMP; IDMZ <= KDY; IDMZ += NCY) {
 				DSCALE(IDMZ, j) = SCAL;
 			}
@@ -1965,9 +1967,9 @@ void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 X
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
-	dar1 SLOPE, dar1 ACCUM, int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
-	dar2 FC, dar2 CB, int NCOMP, int NYCB)
+void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
+	dar1 SLOPE, dar1 ACCUM, const int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
+	dar2 FC, dar2 CB, const int NCOMP, const int NYCB)
 {
 	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
 	using namespace COLLOC; // dad1 RHO(7), COEF(49);
@@ -2240,7 +2242,7 @@ n100:
 				int JJ = JTOL(j);
 				int JZ = LTOL(j);
 				SLOPE(1) = DMAX1(SLOPE(1),
-					pow(DABS(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + DABS(Z(JZ))),
+					pow(abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ))),
 						ROOT(j)));
 			}
 			double SLPHMX = SLOPE(1) * (XIOLD(2) - XIOLD(1));
@@ -2258,15 +2260,23 @@ n100:
 				ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1));
 				SLOPE(i) = 0.0;
 
+
 				// evaluate function to be equidistributed
 				for (int j = 1; j <= COLEST::NTOL; ++j) {
 					int JJ = COLEST::JTOL(j);
 					int JZ = COLEST::LTOL(j) + (i - 1) * COLORD::MSTAR;
-					auto temp = DABS(D2(JJ) - D1(JJ)) * COLEST::WGTMSH(j) * ONEOVH / (1.0 + DABS(Z(JZ)));
+					auto temp = abs(D2(JJ) - D1(JJ)) * COLEST::WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ)));
 					SLOPE(i) = DMAX1(SLOPE(i),
 						pow(temp,
 							COLEST::ROOT(j))
 					);
+					fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
+					fmt::print(fg(fmt::color::orange), "COLEST::WGTMSH(j)  = {}\n", COLEST::WGTMSH(j));
+					fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
+					fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
+					fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
+					fmt::print(fg(fmt::color::orange), "COLEST::ROOT(j)  = {}\n", COLEST::ROOT(j));
+					fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));
 				}
 
 				// accumulate approximate integral of function to be equidistributed
@@ -2274,14 +2284,21 @@ n100:
 				SLPHMX = DMAX1(SLPHMX, TEMP);
 				ACCUM(i + 1) = ACCUM(i) + TEMP;
 				IFLIP = -IFLIP;
-				fmt::print(fg(fmt::color::green), "SLOPE({}) = {}\n", i, SLOPE(i)); 
-				fmt::print(fg(fmt::color::green), "ACCUM({} + 1) = {}\n", i, ACCUM(i + 1));
+				/*fmt::print(fg(fmt::color::green), "SLOPE({}) = {}\n", i, SLOPE(i)); 
+				fmt::print(fg(fmt::color::green), "ACCUM({} + 1) = {}\n", i, ACCUM(i + 1));*/
+
+				fmt::print(fg(fmt::color::green), "SLOPE = {}\n", SLOPE(i));
+				fmt::print(fg(fmt::color::green), "diff  = {}\n", (XIOLD(i + 1) - XIOLD(i)));
+				fmt::print(fg(fmt::color::green), "TEMP  = {}\n", TEMP);
 			}
-			double AVRG = ACCUM(NOLD + 1) / float(NOLD);
-			double DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS);
+
+			
+			auto test = ACCUM(COLAPR::NOLD + 1);
+			double AVRG = ACCUM(COLAPR::NOLD + 1) / double(COLAPR::NOLD);
+			double DEGEQU = AVRG / DMAX1(SLPHMX, COLOUT::PRECIS);
 
 			//  naccum=expected n to achieve .1x user requested tolerances
-			int NACCUM = int(ACCUM(NOLD + 1) + 1.0);
+			int NACCUM = int(ACCUM(COLAPR::NOLD + 1) + 1.0);
 			if (IPRINT < 0)  
 				fmt::print("MESH SELECTION INFO: DEGREE OF EQUIDISTRIBUTION = {}, "
 							"PREDICTION FOR REQUIRED N = {}\n", DEGEQU, NACCUM);
@@ -2576,7 +2593,7 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 	Z.assertDim(1);
 	DMZ.assertDim(1);
 	VALSTR.assertDim(1);
-	
+
 	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
 	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
 	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
@@ -2587,12 +2604,12 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 	COLMSH::MSHFLG = 1;
 
 	dad1 ERR(40), ERREST(40), DUMMY(1);
-	
+
 
 	//  error estimates are to be generated and tested
 	//  to see if the tolerance requirements are satisfied.
 	IFIN = 1;
-	for (int j = 1; j <= MSTAR; ++j)
+	for (int j = 1; j <= COLORD::MSTAR; ++j)
 		ERREST(j) = 0.0;
 	for (int IBACK = 1; IBACK <= N; ++IBACK) {
 		int i = N + 1 - IBACK;
@@ -2607,49 +2624,49 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 		//       for an error estimate. the routine  newmsh
 		//       filled in the needed values of the old solution
 		//       in valstr.
-		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
-		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
+		int KNEW = (4 * (i - 1) + 2) * COLORD::MSTAR + 1;
+		int KSTORE = (2 * (i - 1) + 1) * COLORD::MSTAR + 1;
 		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
 		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
-		for (int l = 1; l<= MSTAR;++l) {
-			ERR(l) = WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
+		for (int l = 1; l <= COLORD::MSTAR; ++l) {
+			ERR(l) = WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
 			KSTORE = KSTORE + 1;
 		}
-		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
-		KSTORE = 2 * (i - 1) * MSTAR + 1;
+		KNEW = (4 * (i - 1) + 1) * COLORD::MSTAR + 1;
+		KSTORE = 2 * (i - 1) * COLORD::MSTAR + 1;
 		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
 		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
-		for (int l = 1; l <= MSTAR; ++l) {
-			ERR(l) = ERR(l) + WGTERR(l) * DABS(VALSTR(KNEW) - VALSTR(KSTORE));
+		for (int l = 1; l <= COLORD::MSTAR; ++l) {
+			ERR(l) = ERR(l) + WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
 			KSTORE = KSTORE + 1;
 		}
 
-		//       find component-wise maximum error estimate
-		for (int l = 1; l <= MSTAR; ++l)
+		// find component-wise maximum error estimate
+		for (int l = 1; l <= COLORD::MSTAR; ++l)
 			ERREST(l) = DMAX1(ERREST(l), ERR(l));
 
-		//       test whether the tolerance requirements are satisfied
-		//       in the i-th interval.
+		// test whether the tolerance requirements are satisfied
+		// in the i-th interval.
 		if (IFIN == 0)
 			continue;
-		for (int j = 1; j <= NTOL; ++j) {
-			int LTOLJ = LTOL(j);
-			int LTJZ = LTOLJ + (i - 1) * MSTAR;
-			if (ERR(LTOLJ) > TOLIN(j) * (DABS(Z(LTJZ)) + 1.0))
+		for (int j = 1; j <= COLEST::NTOL; ++j) {
+			int LTOLJ = COLEST::LTOL(j);
+			int LTJZ = LTOLJ + (i - 1) * COLORD::MSTAR;
+			if (ERR(LTOLJ) > COLEST::TOLIN(j) * (abs(Z(LTJZ)) + 1.0))
 				IFIN = 0;
 		}
 	}
 
-	if (IPRINT >= 0)
+	if (COLOUT::IPRINT >= 0)
 		return;
 	fmt::print("THE ESTIMATED ERRORS ARE\n");
 	int LJ = 1;
-	for (int j = 1; j<=NCOMP; ++j) {
+	for (int j = 1; j <= COLORD::NCOMP; ++j) {
 		int MJ = LJ - 1 + M(j);
-		fmt::print("{}:  ",j);
-		for(int l=LJ;l<=MJ;++l)
+		fmt::print("{}:  ", j);
+		for (int l = LJ; l <= MJ; ++l)
 			fmt::print("{}, ", ERREST(l));
 		LJ = MJ + 1;
 	}
@@ -4191,7 +4208,7 @@ void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, const int NROW, const int NCOL, const i
 
 	for (int j = 1; j <= NCOL; ++j)
 		for (int i = 1; i <= NROW; ++i)
-			D(i) = DMAX1(D(i), DABS(W(i, j)));
+			D(i) = DMAX1(D(i), abs(W(i, j)));
 
 	//  gauss elimination with pivoting of scaled rows, loop over
 	//  k = 1, ., last
@@ -4212,18 +4229,18 @@ n30:
 	if (k == NROW) {
 		////  if  last.eq.nrow, check now that pivot element in last row
 		////  is nonzero.
-		if (DABS(W(NROW, NROW)) + D(NROW) <= D(NROW))
+		if (abs(W(NROW, NROW)) + D(NROW) <= D(NROW))
 			INFO = k;
 	}
 
 	l = k;
 	KP1 = k + 1;
-	COLMAX = DABS(W(k, k)) / D(k);
+	COLMAX = abs(W(k, k)) / D(k);
 	// find the(relatively) largest pivot
 	for (int i = KP1; i <= NROW; ++i) {
-		if (DABS(W(i, k)) <= COLMAX * D(i))
+		if (abs(W(i, k)) <= COLMAX * D(i))
 			continue;
-		COLMAX = DABS(W(i, k)) / D(i);
+		COLMAX = abs(W(i, k)) / D(i);
 		l = i;
 	}
 
@@ -4239,7 +4256,7 @@ n30:
 
 	//       if pivot element is too small in absolute value, declare
 	//       matrix to be noninvertible and quit.
-	if (DABS(T) + D(k) <= D(k))
+	if (abs(T) + D(k) <= D(k))
 	{
 		INFO = k; //  singularity flag set
 		return;
