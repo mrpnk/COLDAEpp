@@ -11,7 +11,7 @@ add_executable (ColDAEpp ${SOURCES})
 
 # set some options for the project
 target_compile_options(ColDAEpp PRIVATE /W4)
-target_compile_features(ColDAEpp PRIVATE cxx_std_17)
+target_compile_features(ColDAEpp PRIVATE cxx_std_20)
 
 
 # TODO: Fügen Sie bei Bedarf Tests hinzu, und installieren Sie Ziele.
