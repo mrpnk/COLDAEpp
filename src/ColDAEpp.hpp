@@ -1386,6 +1386,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 	while (true) {
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "while:\n");
+
 			// initialization for a new mesh
 			ITER = 0;
 			if (NONLIN <= 0) {
@@ -1407,6 +1409,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				if (MSING == 0)
 					goto n400;
 			n30:
+				fmt::print(fg(fmt::color::cornflower_blue), "30:\n");
+
 				if (MSING >= 0) {
 					if (IPRINT < 1) {
 						fmt::print(fg(fmt::color::red), "A LOCAL ELIMINATION MATRIX IS SINGULAR\n"); 
@@ -1454,6 +1458,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n60:
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "60:\n");
 			// solve for the next iterate .
 			// the value of ifreez determines whether this is a full
 			// newton step (=0) or a fixed jacobian iteration (=1).
@@ -1467,6 +1472,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n70:
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "70:\n");
+
 			// check for a singular matrix
 			if (MSING != 0)
 				goto n30;
@@ -1507,6 +1514,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n110:
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "110:\n");
+
 			// verify that the linear convergence with fixed jacobian
 			// is fast enough.
 			IFRZ = IFRZ + 1;
@@ -1529,6 +1538,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n130:
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "130:\n");
+
 			// convergence of fixed jacobian iteration failed.
 			if (IPRINT < 0) 
 				fmt::print("ITERATION = {}, NORM(RHS) = {}\nSWITCH TO DAMPED NEWTON ITERATION\n", ITER, RNORM);
@@ -1757,6 +1768,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}			
 			n350: 
 				{
+					fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
 					// check convergence (iconv = 0).
 					for (int IT = 1; IT <= NTOL; ++IT) {
 						int INZ = LTOL(IT);
@@ -1780,6 +1792,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n390:
 				{
+					fmt::print(fg(fmt::color::cornflower_blue), "390:\n");
 					if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1) 
 						fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 					ICONV = 1;
@@ -1787,6 +1800,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n400:
 				{
+					fmt::print(fg(fmt::color::cornflower_blue), "400:\n");
 					// if full output has been requested, print values of the
 					// solution components   z  at the meshpoints and  y  at
 					// collocation points.
@@ -1807,6 +1821,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n420:
 				{
+					fmt::print(fg(fmt::color::cornflower_blue), "420:\n");
 					// check for error tolerance satisfaction
 					int IFIN = 1;
 					if (IMESH == 2)
@@ -1817,6 +1832,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					return;
 				}
 			n430: ;
+				fmt::print(fg(fmt::color::cornflower_blue), "430:\n");
+
 				// diagnostics for failure of nonlinear iteration.
 				if (IPRINT < 1)  
 					fmt::print("NO CONVERGENCE AFTER {} ITERATIONS\n", ITER);
@@ -1837,6 +1854,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n460:
 		{
+			fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
 			// update old mesh
 			for (int i = 1; i <= N + 1; ++i)
 				XIOLD(i) = XI(i);
@@ -2805,6 +2823,9 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 //
 //
 //*********************************************************************
+
+double* observer = nullptr;
+
 void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 DELDMZ,
 	dar1 G, dar1 W, dar1 V, dar1 FC, dar1 RHS, dar1 DMZO,
 	iar2 INTEGS, iar1 IPVTG, iar1 IPVTW, double& RNORM,
@@ -2836,6 +2857,14 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
+	fmt::print(fg(fmt::color::orange_red),"Enter LSYSLV and RHS(41) = {}\n", RHS(41));
+	fmt::print(fg(fmt::color::orange_red), "Address is {}\n", 
+		(void*)(RHS.contiguous() + 40));
+	observer = RHS.contiguous() + 40;
+
+
+	fmt::print(fg(fmt::color::medium_purple), "observer = {}\n", *observer);
+	
 	dad1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
 	dad1 DUMMY(1), Y(1), AT(28), CB(400);
 	iad1 IPVTCB(20);
@@ -2921,7 +2950,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					break;
 
 				// build equation for a side condition.
-				if (MODE == 0) {
+				if (MODE != 0) {
 					if (IGUESS == 1) {
 						// case where user provided current approximation
 						guess(XII, ZVAL, YVAL, DMVAL);
@@ -2942,7 +2971,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				}
 				// find  rhs  boundary value.
 				double GVAL;
-				gsub(IZETA, ZVAL, GVAL);
+				gsub(IZETA, ZVAL, GVAL); // TODO problem: ZVAL ist immer 0,0
 				RHS(NDMZ + IZETA) = -GVAL;
 				RNORM = RNORM + GVAL * GVAL;
 				if (MODE != 2) {
@@ -3141,8 +3170,10 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		// assembly process completed
 		if (MODE != 0 && MODE != 3) {
 			RNORM = sqrt(RNORM / float(NZ + NDMZ));
-			if (MODE == 2)
+			if (MODE == 2) {
+				fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 				return;
+			}
 		}
 		//  solve the linear system.
 		//  matrix decomposition
@@ -3171,6 +3202,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			while (true) {
 				if (IZET == IZETA)
 					break;
+				fmt::print("---------------------------------------\n");
 				fmt::print("Set DELZ({}) = {}\n", IZ - 1 + IZET, RHS(NDMZ + IZET));
 				DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET);
 				IZET = IZET + 1;
@@ -3223,8 +3255,10 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		//  finally find deldmz
 		DMZSOL(V, DELZ, DELDMZ);
 
-		if (MODE != 1)
+		if (MODE != 1) {
+			fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 			return;
+		}
 
 		//  project current iterate into current pp-space
 		for (int l = 1; l <= NDMZ; ++l)
@@ -3280,6 +3314,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		DMZSOL(V, Z, DMZ);
 	}
 	}
+	fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 }
 
 
@@ -3888,9 +3923,13 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			
 		}
 		auto check = RHSDMZ(1);
+
+		static int niters = 0;
+		niters++;
+
 		//  compute the appropriate piece of  rhsz
-		if (logall) {
-			std::ofstream file("dgesl_in.txt");
+		if (logall||true) {
+			std::ofstream file("dgesl_in"+std::to_string(niters)+".txt");
 			for (int i = 0; i < KDY * KDY; ++i)
 				file << WI.contiguous()[i] << std::endl;
 			for (int i = 0; i < KDY; ++i)
@@ -3900,7 +3939,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			file.close();
 		}
 		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
-		if (logall) {
+		if (logall || true) {
 			std::ofstream file("dgesl_out.txt");
 			for (int i = 0; i < KDY * KDY; ++i)
 				file << WI.contiguous()[i] << std::endl;

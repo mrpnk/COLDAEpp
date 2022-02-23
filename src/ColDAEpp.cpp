@@ -1,7 +1,7 @@
 ﻿#pragma warning( disable : 5045 )
 
 #include <float.h>
-//unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
+unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 
 #include "ColDAEpp.hpp"
