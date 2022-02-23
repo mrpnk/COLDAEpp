@@ -206,7 +206,7 @@ C             = 0 causes coldae to generate a uniform initial mesh.
 C             = 1 if the initial mesh is provided by the user.  it
 C                 is defined in fspace as follows:  the mesh
 C                 aleft=x(1).lt.x(2).lt. ... .lt.x(n).lt.x(n+1)=aright
-C                 will occupy  fspace(1), ..., fspace(n+1). the
+C                 will occupy  fspace(1), ..., fspacen+1). the
 C                 user needs to supply only the interior mesh
 C                 points  fspace(j) = x(j), j = 2, ..., n.
 C             = 2 if the initial mesh is supplied by the user
@@ -444,8 +444,8 @@ C
 C     for ipar(9) = 4 the user specifies a new mesh of n subintervals
 C     as follows.
 C     the values in  fspace(1),...,fspace(ispace(8))  have to be
-C     shifted by n+1 locations to  fspace(n+2),..,fspace(ispace(8)+n+1)
-C     and the new mesh is then specified in fspace(1),..., fspace(n+1).
+C     shifted by n+1 locations to  fspacen+2),..,fspace(ispace(8)+n+1)
+C     and the new mesh is then specified in fspace(1),..., fspacen+1).
 C     also set ipar(3) = n.
 C
 C
@@ -547,8 +547,6 @@ C
      1                ROOT(40), JTOL(40), LTTOL(40), NTOL
 C
       EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
-
-
 C
 C*********************************************************************
 C
@@ -572,7 +570,6 @@ C
       PRECIS = 1.D0
    10 PRECIS = PRECIS / 2.D0
       PRECP1 = PRECIS + 1.D0
-      write(*,*) "PRECIS = ",PRECIS
       IF ( PRECP1 .GT. 1.D0 )                       GO TO 10
       PRECIS = PRECIS * 100.D0
 C
@@ -604,7 +601,6 @@ C
       NDIMI = IPAR(6)
       NFXPNT = IPAR(11)
       IPRINT = IPAR(7)
-      write(*,*) "--------- IPRINT = ",IPRINT
       INDEX = IPAR(12)
       IF (NY .EQ. 0) INDEX = 0
       MSTAR = 0
@@ -763,16 +759,12 @@ C
 C
 C...  initialize collocation points, constants, mesh.
 C
-      call dumpState()
-    
-
       CALL CONSTS ( K, RHO, COEF )
       IF (NY.EQ.0) THEN
 	 NYCB = 1
       ELSE
 	 NYCB = NY
       ENDIF
-
       CALL NEWMSH (3+IREAD, FSPACE(LXI), FSPACE(LXIOLD), DUMMY,
      1             DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
      2		   DUMMY2, DFSUB, DUMMY2, DUMMY2, NCOMP, NYCB)
@@ -795,8 +787,6 @@ C
   225 FSPACE( LDMZ-1+I ) = 0.D0
   230 CONTINUE
       IF (IGUESS .GE. 2)  IGUESS = 0
-
-     
       CALL CONTRL (FSPACE(LXI),FSPACE(LXIOLD),FSPACE(LZ),FSPACE(LDMZ),
      +     FSPACE(LDMV),
      1     FSPACE(LRHS),FSPACE(LDELZ),FSPACE(LDELDZ),FSPACE(LDQZ),
@@ -851,19 +841,6 @@ C----------------------------------------------------------------------
      1       24H (ALLOWED FROM ISPACE) ))
   360 FORMAT(/53H INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE)
       END
-
-
-
-
-
-
-
-
-
-
-
-
-
       SUBROUTINE CONTRL (XI, XIOLD, Z, DMZ, DMV, RHS, DELZ, DELDMZ,
      1           DQZ, DQDMZ, G, W, V, FC, VALSTR, SLOPE, SCALE, DSCALE,
      2           ACCUM, IPVTG, INTEGS, IPVTW, NFXPNT, FIXPNT, IFLAG,
@@ -934,18 +911,17 @@ C
       COMMON /COLEST/ TOL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
      1                ROOT(40), JTOL(40), LTOL(40), NTOL
 C
-
-     
-
-
       EXTERNAL FSUB, DFSUB, GSUB, DGSUB, GUESS
-
-
-     
-
 C
 C...  constants for control of nonlinear iteration
 C
+
+      DO 2600 I = 1, NZ
+            ! write(*,*) "+ DQZ(I)=",DQZ(I)
+
+ 2600      CONTINUE
+
+
       RELMIN = 1.D-3
       RSTART = 1.D-2
       LMTFRZ = 4
@@ -1218,13 +1194,18 @@ C
 C
 C...       find scaled norms of various terms used to correct relax
 C
+
+             write(*,*) "-------- NZ=",NZ
 	   ANORM = 0.D0
 	   ANFIX = 0.D0
 	   DO 260 I = 1, NZ
+             write(*,*) "----- DQZ(I)=",DQZ(I),", SCALE(I)=",SCALE(I)
 	     ANORM = ANORM  +  (DELZ(I) * SCALE(I))**2
 	     ANFIX = ANFIX  +  (DQZ(I) * SCALE(I))**2
   260      CONTINUE
+              write(*,*) "-------- NDMZ=",NDMZ
 	   DO 270 I = 1, NDMZ
+       write(*,*) "---- DQDMZ(I)=",DQDMZ(I),", DSCALE(I)=",DSCALE(I)
 	     ANORM = ANORM  +  (DELDMZ(I) * DSCALE(I))**2
 	     ANFIX = ANFIX  +  (DQDMZ(I) * DSCALE(I))**2
   270      CONTINUE
@@ -1237,6 +1218,8 @@ C
   280      IF (IPRINT .LT. 0) WRITE (IOUT,550) RELAX, ANORM, ANFIX,
      1           RNOLD, RNORM
   290      ICOR = 0
+             
+            !stop
 C
 C...       check for monotonic decrease in  delz and deldmz.
 C
@@ -1323,8 +1306,6 @@ C
 C...       check for error tolerance satisfaction
 C
   420      IFIN = 1
-
-            write(*,*)"check for error tolerance satisfaction: ",IMESH
 	   IF (IMESH .EQ. 2) CALL ERRCHK (XI, Z, DMZ, VALSTR, IFIN)
 	   IF ( IMESH .EQ. 1 .OR.
      1          IFIN .EQ. 0 .AND. ICARE .NE. 2)     GO TO 460
@@ -1357,9 +1338,6 @@ C
 	   IMESH = 1
 	   IF ( ICONV .EQ. 0 .OR. MSHNUM .GE. MSHLMT
      1                       .OR. MSHALT .GE. MSHLMT )  IMESH = 2
-
-            write(*,*)"control: IMESH=",IMESH
-
 	   IF ( MSHALT .GE. MSHLMT .AND.
      1		MSHNUM .LT. MSHLMT )  MSHALT = 1
 	   IF (NY.EQ.0) THEN
@@ -1646,7 +1624,6 @@ C
 C
 C...  check that n does not exceed storage limitations
 C
-      write(*,*) " ! Hello 100 - half the mesh"
       IF ( N2 .LE. NMAX )                           GO TO 120
 C
 C...  if possible, try with n=nmax. redistribute first.
@@ -1857,21 +1834,8 @@ C
 	   DO 200 J = 1, NTOL
 	     JJ = JTOL(J)
 	     JZ = LTOL(J)  +  (I-1) * MSTAR
-          ! write(*,*) "WGTMSH(J)=",WGTMSH(J)
-          ! write(*,*) "SLOPE(I)=",SLOPE(I), " base=",
-    ! .   (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*ONEOVH / (1.D0 + DABS(Z(JZ)))),
-    ! .   "  ROOT(J)=",ROOT(J)
-
 	     SLOPE(I) = DMAX1(SLOPE(I),(DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*
      1                  ONEOVH / (1.D0 + DABS(Z(JZ)))) **ROOT(J))
-          
-             simtemp = (DABS(D2(JJ)-D1(JJ))*WGTMSH(J)*
-     1                  ONEOVH / (1.D0 + DABS(Z(JZ))));
-
-            write(*,*)"temp = ",simtemp
-            write(*,*)"ROOT(J) = ",ROOT(J)
-            write(*,*)"iteration SLOPE = ",SLOPE(I)
-
   200      CONTINUE
 C
 C...       accumulate approximate integral of function to be
@@ -1881,27 +1845,17 @@ C
 	   SLPHMX = DMAX1(SLPHMX,TEMP)
 	   ACCUM(I+1) = ACCUM(I) + TEMP
 	   IFLIP = - IFLIP
-
-         write(*,*)"SLOPE = ",SLOPE(I)
-         write(*,*)"diff  = ",(XIOLD(I+1)-XIOLD(I))
-         write(*,*)"TEMP  = ",TEMP
-
   210 CONTINUE
       AVRG = ACCUM(NOLD+1) / FLOAT(NOLD)
       DEGEQU = AVRG / DMAX1(SLPHMX,PRECIS)
 C
 C...  naccum=expected n to achieve .1x user requested tolerances
 C
-      write(*,*) "-------------------"
-      write(*,*) "AVRG=",AVRG," SLPHMX=",SLPHMX," PRECIS=",PRECIS
-
       NACCUM = ACCUM(NOLD+1) + 1.D0
       IF ( IPRINT .LT. 0 )  WRITE(IOUT,350) DEGEQU, NACCUM
 C
 C...  decide if mesh selection is worthwhile (otherwise, halve)
-
-
-            write(*,*)"Check: ",AVRG,PRECIS,DEGEQU
+C
       IF ( AVRG .LT. PRECIS )                       GO TO 100
       IF ( DEGEQU .GE. .5D0 )                       GO TO 100
 C
@@ -1992,75 +1946,6 @@ C----------------------------------------------------------------
      1	     100(/6F12.6))
   370 FORMAT (/23H  EXPECTED N TOO LARGE  )
       END
-
-
-
-
-
-
-
-
-
-      subroutine dumpState() 
-      
-            IMPLICIT DOUBLE PRECISION (A-H,O-Z)
-      
-            COMMON /COLOUT/ PRECIS, IOUT, IPRINT
-      COMMON /COLLOC/ RHO(7), COEF(49)
-      COMMON /COLORD/ K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX, MT(20)
-      COMMON /COLAPR/ N, NOLD, NMAX, NZ, NDMZ
-      COMMON /COLMSH/ MSHFLG, MSHNUM, MSHLMT, MSHALT
-      COMMON /COLSID/ TZETA(40), TLEFT, TRIGHT, IZETA, IDUM
-      COMMON /COLNLN/ NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-      COMMON /COLEST/ TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40),
-     1                ROOT(40), JTOL(40), LTTOL(40), NTOL
-           integer i
-
-           open(100,file=trim("state_f77.txt"))
-          
-           write(*,*) "==========",PRECIS,IOUT,IPRINT
-
-           write(100,*) PRECIS,IOUT,IPRINT
-              
-           write(100,*) (RHO(i), i=1,7) 
-           write(100,*) (COEF(i), i=1,49) 
-          
-           ! COLORD
-           write(100,*) K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX,
-     .                  (MT(i), i=1,20) 
-           
-
-            ! COLAPR
-            write(100,*) N, NOLD, NMAX, NZ, NDMZ
-
-            !COLMSH
-            write(100,*) MSHFLG, MSHNUM, MSHLMT, MSHALT
-            
-            !COLSID
-            write(100,*) (TZETA(i),i=1,40)
-            write(100,*) TLEFT, TRIGHT, IZETA, IDUM
-
-            !COLNLN
-            write(100,*) NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
-            
-            !COLEST
-            write(100,*) NTOL
-            write(100,*) (TTL(i),i=1,40)
-            write(100,*) (WGTMSH(i),i=1,40)
-            write(100,*) (WGTERR(i),i=1,40)
-            write(100,*) (TOLIN(i),i=1,40)
-            write(100,*) (ROOT(i),i=1,40)
-            write(100,*) (JTOL(i),i=1,40)
-            write(100,*) (LTTOL(i),i=1,40)
-
-            close(100)
-      return
-      end 
-
-
-
-
-
 
       SUBROUTINE CONSTS (K, RHO, COEF)
 C
@@ -2417,6 +2302,10 @@ C
       ENDIF
       INFC = (MSTAR+NY) * NCOMP
       M1 = MODE + 1
+
+      ! write(*,*)"::::dgesl_d: ", W(9)
+
+
       GO TO (10, 30, 30, 30, 310), M1
 C
 C...  linear problem initialization
@@ -2463,7 +2352,6 @@ C
 C...  zero the matrices to be computed
 C
       LW = KDY * KDY * N
-      write(*,*) "LW=",LW
       DO 84 L = 1, LW
    84   W(L) = 0.D0
 C
@@ -2577,9 +2465,19 @@ C
 C
 C...         fill in ncy rows of  w and v
 C
-  210        CALL VWBLOK (XCOL, HRHO, J, W(IW), V(IV), IPVTW(IDMZ),
+
+  210      continue
+          ! write(*,*)"::::dgesl_e: ", W(9)
+
+            write(*,*)"vor VWBLOK  W(16) = ",W(16),""
+            ! write(*,*) XCOL, HRHO, J
+          CALL VWBLOK (XCOL, HRHO, J, W(IW), V(IV), IPVTW(IDMZ),
      1            KDY, ZVAL, YVAL, DF, ACOL(1,J), DMZO(IDMZO),
      2            NCY, DFSUB, MSING)
+
+              ! write(*,*)"::::dgesl_f: ", W(9)
+            write(*,*)"nach VWBLOK  W(16) = ",W(16)
+
 	     IF ( MSING .NE. 0 )                    RETURN
   220      CONTINUE
 C
@@ -2704,24 +2602,42 @@ C
 	 IZETA = NROW + 1 - MSTAR
 	 IF ( I .EQ. N ) IZETA = IZSAVE
   322    IF ( IZET .EQ. IZETA )                     GO TO 324
+             write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
 	   DELZ(IZ-1+IZET) = RHS(NDMZ+IZET)
 	   IZET = IZET + 1
 	 GO TO 322
   324    H = XI(I+1) - XI(I)
+      ! write(*,*) "..IZ=",IZ
+       write(*,*) "vorher DELZ = "
+       write(*,*) (DELZ(idx),idx=1,4)
+
+      ! write(*,*)"::::dgesl_c: ", W(9)
+
 	 CALL GBLOCK (H, G(1), NROW, IZETA, W(IW), V(1), KDY,
      1                DELZ(IZ), DELDMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
      +                XI1, ZVAL, YVAL, FC(IFC+INFC), DF, CB,
-     +		      IPVTCB, FC(IFC), DFSUB, ISING, NCOMP, NYCB, NCY )
+     +		     IPVTCB, FC(IFC), DFSUB, ISING, NCOMP, NYCB, NCY)
+
+       write(*,*) "nachher DELZ = "
+       write(*,*) (DELZ(idx),idx=1,4) ! geht eigentlich bis NZ
+
 	 IZ = IZ + MSTAR
 	 IDMZ = IDMZ + KDY
 	 IW = IW + KDY * KDY
 	 IFC = IFC + INFC+2*NCOMP
 	 IF ( I .LT. N )                            GO TO 320
   326    IF ( IZET .GT. MSTAR )                     GO TO 320
+            ! write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
 	   DELZ(IZ-1+IZET) = RHS(NDMZ+IZET)
 	   IZET = IZET + 1
 	 GO TO 326
   320 CONTINUE
+
+      do i=1,NZ
+            ! write(*,*)"# DQZ(i)=",DELZ(i)
+      enddo
+
+    
 C
 C...  perform forward and backward substitution for mode=0,2, or 3.
 C
@@ -2875,6 +2791,9 @@ C**********************************************************************
 C
       COMMON /COLORD/ K, NCOMP, NY, NDM, MSTAR, KD, KDYM, MMAX, M(20)
       COMMON /COLNLN/ NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
+
+      ! write(*,*)"::::dgesl_g: ", WI(1,2)
+
 C
 C...  initialize  wi
 C
@@ -2890,6 +2809,10 @@ C
 		FACT = FACT * HRHO / FLOAT(L)
 		BASM(L) = FACT
 		DO 35 J=1,K
+                  if(j.eq.1.and.j.eq.1)then
+                        write(*,*)"fact = ",fact,", acol=",acol(j,l)
+                  endif
+                  
 		   HA(J,L) = FACT * ACOL(J,L)
   35         CONTINUE
 C
@@ -2932,6 +2855,8 @@ C
 	DO 70 ID = 1, NCY
 	  VI(I0+ID,J) = DF(ID,J)
    70 CONTINUE
+
+      ! write(*,*)"::::dgesl_j: ", WI(1,2)
       JN = 1
       DO 140 JCOMP = 1, NCOMP
 	 MJ = M(JCOMP)
@@ -2942,6 +2867,13 @@ C
 	    DO 90 J = 1, K
 	      AJL = - HA(J,L)
 	      DO 80 IW = I1, I2
+
+            if( iw.eq.8 .and.jw.eq.2) then
+                  write(*,*) "j,l=",j,", ",l
+            write(*,*)"WI(IW, JW) = ", WI(IW, JW),", AJL = ",AJL,
+     .            ", VI(IW, JV) = ",VI(IW, JV)      
+            endif
+
 		 WI(IW,JW) = WI(IW,JW)  +  AJL * VI(IW,JV)
    80         CONTINUE
    90       JW = JW + NCY
@@ -2956,6 +2888,8 @@ C
   110       CONTINUE
   130    CONTINUE
   140 CONTINUE
+
+      ! write(*,*)"::::dgesl_h: ", WI(1,2)
 C
 C...  loop for the algebraic solution components
 C
@@ -2980,6 +2914,9 @@ C
       DO 250 J= 1,MSTAR
 	 CALL DGESL  (WI, KDY, KDY, IPVTW, VI(1,J), 0)
   250 CONTINUE
+
+      ! write(*,*)"::::dgesl_i: ", WI(1,2)
+
       RETURN
       END
 
@@ -3039,6 +2976,8 @@ C
 	 DO 20 J=1,K
    20       HB(J,L) = FACT * B(J,L)
    30 CONTINUE
+
+      ! write(*,*)"::::dgesl_b: ",WI(9)
 C
 C...  branch according to  m o d e
 C
@@ -3173,11 +3112,49 @@ C
   114   CONTINUE
   115 CONTINUE
       RETURN
+
+      
 C
 C...  compute the appropriate piece of  rhsz
 C
   120 CONTINUE
+ 
+      ! write(*,*)"check = ",RHSDMZ(1)
+
+      open(100,file=trim("dgesl_in.txt"))
+            do i = 1, 64 
+                  write(100,*) WI(i)
+            enddo
+            do i = 1, 8 
+                  write(100,*) IPVTW(i)
+            enddo
+            do i = 1, 8 
+                  write(100,*) RHSDMZ(i)
+            enddo
+      close(100)
+
+      ! write(*,*)"::::dgesl_a: ",WI(9)
+
       CALL DGESL  (WI, KDY, KDY, IPVTW, RHSDMZ, 0)
+
+      open(100,file=trim("dgesl_out.txt"))
+            do i = 1, 64 
+                  write(100,*) WI(i)
+            enddo
+            do i = 1, 8 
+                  write(100,*) IPVTW(i)
+            enddo
+            do i = 1, 8 
+                  write(100,*) RHSDMZ(i)
+            enddo
+      close(100)
+
+
+      !STOP
+
+      ! write(*,*)"nachcheck = ",RHSDMZ(1)
+
+
       IR = IROW
       DO 140 JCOMP = 1, NCOMP
 	 MJ = M(JCOMP)
@@ -3185,17 +3162,30 @@ C
 	 DO 130 L = 1, MJ
 	    IND = JCOMP
 	    RSUM = 0.D0
+          ! write(*,*)"**** K=",K
 	    DO 125 J = 1, K
 	       RSUM = RSUM  +  HB(J,L) * RHSDMZ(IND)
+              write(*,*)"** J=",J,"IND=",IND
+              write(*,*)"** J=",J,"HB(J,L)=",HB(J,L)
+              write(*,*)"** J=",J,"RHSDMZ(IND)=",RHSDMZ(IND)
+              write(*,*)"** J=",J,"RSUM=",RSUM
   125       IND = IND + NCY
 	    RHSZ(IR-L) = RSUM
   130    CONTINUE
   140 CONTINUE
+
+
+        
+
+
       IF (INDEX .EQ. 1 .OR. NY .EQ. 0)              RETURN
 C
 C...  projected collocation
 C...  calculate projected rhsz
 C
+            
+
+            ! write(*,*)"mach weiter"
       DO 160 I=1,NCOMP
 	FACT = 0
 	DO 150 L=1,MSTAR

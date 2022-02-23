@@ -66,6 +66,7 @@ struct sys2 {
 			g = z(1) - 1; // 0=z(0)-1 left
 		else if (i == 2)
 			g = z(2) + 0.1; // 0=z(0)-1 right
+		else assert(false);
 	}
 	static void dgsub(int i, dar1 z, dar1 dg) {
 		if (i == 1) {
@@ -76,12 +77,13 @@ struct sys2 {
 			dg(1) = 0;  // d/dz  g_right
 			dg(2) = 1;  // d/dz' g_right
 		}
+		else assert(false);
 	}
 };
 
 int main()
 {
-	sys1 sys;
+	sys2 sys;
 	iad1 ispace(10000);
 	dad1 fspace(10000);
 
