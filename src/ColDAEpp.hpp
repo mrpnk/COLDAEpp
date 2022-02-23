@@ -613,6 +613,13 @@ public:
 		this->data = mydata.data();
 		this->size = mydata.size();
 	}
+	void copyFrom(arrRef1<T> const& ar1) {
+		// copy from another existing data
+		assertm(ar1.size <= mydata.size(), "my size is too low");
+		std::copy(ar1.begin(), ar1.end(), mydata.begin());
+		this->data = mydata.data();
+		/// size remains
+	}
 };
 
 
@@ -734,133 +741,7 @@ int MIN0(int x, int y) { return std::min(x, y); }
 int MIN0(int x, int y, int z) { return std::min(x, std::min(z, y)); }
 
 
-namespace COLOUT {
-	double PRECIS; int IOUT, IPRINT; 
-}
-namespace COLLOC {
-	dad1 RHO(7), COEF(49);
-}
-namespace COLORD {
-	int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX;
-	iad1 MT(20);
 
-	// aliases
-	auto& NCD = NC;
-	auto& NYD = NNY;
-	auto& NCYD = NCY;
-	auto& KDUM = KDY;
-	auto& M = MT;
-
-	auto& NY = NNY;
-	auto& NCOMP = NC;
-	auto& NDM = NCY;
-	auto& KDYM = KDY;
-	auto& NCDUM = NC;
-}
-namespace COLAPR {
-	int N, NOLD, NMAX, NZ, NDMZ;
-}
-namespace COLMSH {
-	int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-}
-namespace COLSID {
-	dad1 TZETA(40);
-	double TLEFT, TRIGHT;
-	int IZETA, IDUM;
-
-	// aliases
-	auto& ZETA = TZETA;
-	auto& ALEFT = TLEFT;
-	auto& ARIGHT = TRIGHT;
-}
-namespace COLNLN {
-	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-}
-namespace COLEST {
-	dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);
-	iad1 JTOL(40), LTTOL(40);
-	int NTOL;
-
-	// aliases
-	auto& LTOL = LTTOL;
-	auto& TOL = TTL;
-}
-namespace COLBAS {
-	dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
-}
-
-
-void dumpState() {
-	std::ofstream file("state_cpp.txt");
-	{
-		file << COLOUT::PRECIS << " " << COLOUT::IOUT << " " << COLOUT::IPRINT << std::endl;
-	}
-	{
-		for (int i = 1; i <= 7; ++i)
-			file << COLLOC::RHO(i) << " ";
-		file << std::endl;
-		for (int i = 1; i <= 49; ++i)
-			file << COLLOC::COEF(i) << " ";
-		file << std::endl;
-	}
-	{
-		using namespace COLORD;
-		file << fmt::format("{} {} {} {} {} {} {} {} ", K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX);
-		for (int i = 1; i <= 20; ++i)
-			file << COLORD::MT(i) << " ";
-		file << std::endl;
-	}
-	{
-		using namespace COLAPR;
-		file << fmt::format("{} {} {} {} {} ", N, NOLD, NMAX, NZ, NDMZ);
-		file << std::endl;
-	}
-	{
-		using namespace COLMSH;
-		file << fmt::format("{} {} {} {} ", MSHFLG, MSHNUM, MSHLMT, MSHALT);
-		file << std::endl;
-	}
-	{
-		using namespace COLSID;
-		for (int i = 1; i <= 40; ++i)
-			file << TZETA(i) << " ";
-		file << std::endl;
-		file << fmt::format("{} {} {} {} ", TLEFT, TRIGHT, IZETA, IDUM);
-		file << std::endl;
-	}
-	{
-		using namespace COLNLN;
-		file << fmt::format("{} {} {} {} {} {} ", NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX);
-		file << std::endl;
-	}
-	{
-		using namespace COLEST;
-		file << NTOL << std::endl;
-		for (int i = 1; i <= 40; ++i)
-			file << TTL(i) << " ";
-		file << std::endl;
-		for (int i = 1; i <= 40; ++i)
-			file << WGTMSH(i) << " ";
-		file << std::endl;
-		for (int i = 1; i <= 40; ++i)
-			file << WGTERR(i) << " ";
-		file << std::endl;
-		for (int i = 1; i <= 40; ++i)
-			file << TOLIN(i) << " ";
-		file << std::endl; 
-		for (int i = 1; i <= 40; ++i)
-			file << ROOT(i) << " ";
-		file << std::endl;
-
-		for (int i = 1; i <= 40; ++i)
-			file << JTOL(i) << " ";
-		file << std::endl;
-		for (int i = 1; i <= 40; ++i)
-			file << LTTOL(i) << " ";
-		file << std::endl;
-	}
-	file.close();
-}
 
 
 //using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
@@ -886,11 +767,155 @@ using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
 class cda{
-public:
 
-void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const double ARIGHT,
-	dar1 ZETA, iar1 IPAR, iar1 LTOL,
-	dar1 TOL, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int& iflag,
+	struct { // COLOUT 
+		double PRECIS; int IOUT, IPRINT;
+	};
+	struct { // COLLOC {
+		dad1 RHO = dad1( 7 );
+		dad2 COEF = dad2( 7, 7 );
+	};
+	struct { // COLORD {
+		int K; 
+		union {
+			int NC;
+			int NCOMP;
+			int NCDUM;
+		};
+		union {
+			int NNY;
+			int NYD;
+			int NY;
+		};
+		union {
+			int NCY;
+			int NCYD;
+			int NDM;
+		};
+		int MSTAR, KD;
+		union {
+			int KDY;
+			int KDUM;
+			int KDYM;
+		};
+		int MMAX;
+		iad1 MT = iad1( 20);
+
+		//// aliases
+		//auto& M = MT;
+	};
+	struct { // COLAPR 
+		int N, NOLD, NMAX, NZ, NDMZ;
+	};
+	struct { // COLMSH 
+		int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	};
+	struct { // COLSID 
+		
+		dad1 TZETA = dad1( 40);
+		union {
+			double TLEFT;
+			double ALEFT;
+		};
+		union {
+			double TRIGHT;
+			double ARIGHT;
+		};
+		int IZETA;
+		union {
+			int IDUM;
+			int IZSAVE;
+		};
+
+		//// aliases
+		//auto& ZETA = TZETA;
+	};
+	struct { // COLNLN 
+		int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	};
+	struct { // COLEST 
+		dad1 TOL = dad1(40), WGTMSH = dad1(40), WGTERR = dad1(40), TOLIN = dad1(40), ROOT = dad1(40);
+		iad1 JTOL = iad1(40), LTOL = iad1(40);
+		int NTOL;
+
+		// aliases
+		/*auto& LTOL = LTTOL;
+		auto& TOL = TTL;*/
+	};
+	struct { // COLBAS 
+		dad2 B = dad2( 7, 4 ), ACOL = dad2( 28, 7 ), ASAVE = dad2( 28, 4 );
+	};
+
+	void dumpState() {
+		std::ofstream file("state_cpp.txt");
+		{
+			file << PRECIS << " " << IOUT << " " << IPRINT << std::endl;
+		}
+		{
+			for (int i = 1; i <= 7; ++i)
+				file << RHO(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 49; ++i)
+				file << COEF.contiguous()[i-1] << " ";
+			file << std::endl;
+		}
+		{
+			file << fmt::format("{} {} {} {} {} {} {} {} ", K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX);
+			for (int i = 1; i <= 20; ++i)
+				file << MT(i) << " ";
+			file << std::endl;
+		}
+		{
+			file << fmt::format("{} {} {} {} {} ", N, NOLD, NMAX, NZ, NDMZ);
+			file << std::endl;
+		}
+		{
+			file << fmt::format("{} {} {} {} ", MSHFLG, MSHNUM, MSHLMT, MSHALT);
+			file << std::endl;
+		}
+		{
+			for (int i = 1; i <= 40; ++i)
+				file << TZETA(i) << " ";
+			file << std::endl;
+			file << fmt::format("{} {} {} {} ", TLEFT, TRIGHT, IZETA, IDUM);
+			file << std::endl;
+		}
+		{
+			file << fmt::format("{} {} {} {} {} {} ", NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX);
+			file << std::endl;
+		}
+		{
+			file << NTOL << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << TOL(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << WGTMSH(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << WGTERR(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << TOLIN(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << ROOT(i) << " ";
+			file << std::endl;
+
+			for (int i = 1; i <= 40; ++i)
+				file << JTOL(i) << " ";
+			file << std::endl;
+			for (int i = 1; i <= 40; ++i)
+				file << LTOL(i) << " ";
+			file << std::endl;
+		}
+		file.close();
+	}
+
+public:
+void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const double tright,
+	dar1 ZETA, iar1 IPAR, iar1 ltol,
+	dar1 tol, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	M.assertDim(1);
@@ -902,26 +927,35 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	ISPACE.assertDim(1);
 	FSPACE.assertDim(1);
 
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	
 
-	/*COLORD::NCOMP = NCOMP;
-	COLORD::NY = NY;
-	COLORD::M = M;
+	this->NCOMP = ncomp;
+	this->NY = ny;
+	this->ALEFT = tleft;
+	this->ARIGHT = tright;
 
-	COLSID::ALEFT = ALEFT;
-	COLSID::ARIGHT = ARIGHT;
-	COLSID::IZETA = IZETA;
+	this->LTOL.copyFrom(ltol);
+	this->TOL.copyFrom(tol);
+
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//
+
+	/*NCOMP = NCOMP;
+	NY = NY;
+	M = M;
+
+	ALEFT = ALEFT;
+	ARIGHT = ARIGHT;
+	IZETA = IZETA;
 	
-	COLEST::LTOL = LTOL;
-	COLEST::TOL = TOL;*/
+	LTOL = LTOL;
+	TOL = TOL;*/
 	
 
 	dad1 DUMMY(1), DUMMY2(840);
@@ -952,7 +986,6 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	do {
 		PRECIS = PRECIS / 2.0;
 		PRECP1 = PRECIS + 1.0;
-		fmt::print(fg(fmt::color::cornflower_blue), "PRECIS = {}\n", PRECIS);
 	} while (PRECP1 > 1.0);
 
 	PRECIS = PRECIS * 100.0;
@@ -1001,7 +1034,7 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	for (int i = 1; i <= MSTAR; ++i)
 		TZETA(i) = ZETA(i);
 	for (int i = 1; i <= NTOL; ++i) {
-		LTTOL(i) = LTOL(i);
+		LTOL(i) = LTOL(i);
 		TOLIN(i) = TOL(i);
 	}
 	TLEFT = ALEFT;
@@ -1161,8 +1194,10 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 		}
 	}
 
+	dumpState();
+
 	//  initialize collocation points, constants, mesh.
-	CONSTS(K, RHO, COEF);
+	CONSTS();
 	int NYCB;
 	if (NY == 0)
 		NYCB = 1;
@@ -1170,9 +1205,11 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 		NYCB = NY;
 
 	int meshmode = 3 + IREAD;
-	NEWMSH(meshmode, FSPACE.sub(LXI), FSPACE.sub(LXIOLD), DUMMY,
-		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, NFXPNT, FIXPNT,
-		DUMMY2, dfsub, DUMMY2, DUMMY2, NCOMP, NYCB);
+	NEWMSH(meshmode, FSPACE.sub(LXI), FSPACE.sub(LXIOLD),
+ DUMMY,
+		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY,
+ NFXPNT, FIXPNT,
+		DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
 
 	//  determine first approximation, if the problem is nonlinear.
 	if (IGUESS < 2) {
@@ -1191,7 +1228,7 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 	if (IGUESS >= 2)  
 		IGUESS = 0;
 
-	dumpState();
+	
 	CONTRL(FSPACE.sub(LXI), FSPACE.sub(LXIOLD), FSPACE.sub(LZ), FSPACE.sub(LDMZ), FSPACE.sub(LDMV),
 		FSPACE.sub(LRHS), FSPACE.sub(LDELZ), FSPACE.sub(LDELDZ), FSPACE.sub(LDQZ),
 		FSPACE.sub(LDQDMZ), FSPACE.sub(LG), FSPACE.sub(LW), FSPACE.sub(LV), FSPACE.sub(LFC),
@@ -1219,7 +1256,7 @@ void COLDAE(const int NCOMP, const int NY, iar1 M, const double ALEFT, const dou
 		FSPACE(IDMZ + i) = FSPACE(LDMZ - 1 + i);
 	int IC = IDMZ + NDMZ;
 	for (int i = 1; i <= K2; ++i)
-		FSPACE(IC + i) = COEF(i);
+		FSPACE(IC + i) = COEF.contiguous()[i-1];
 }
 
 
@@ -1302,14 +1339,14 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	IPVTG.assertDim(1);
 	IPVTW.assertDim(1);
 
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//
 	//dumpState();
 
 	dad1 DUMMY(1), DF(800);
@@ -1341,6 +1378,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	double ANORM = 0.0;
 	double ANFIX = 0.0;
 
+	
 	//  the main iteration begins here .
 	//  loop 20 is executed until error tolerances are satisfied or
 	//  the code fails (due to a singular matrix or storage limitations)
@@ -1503,8 +1541,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 
 			// update old mesh
-			int NP1 = N + 1;
-			for (int i = 1; i <= NP1; ++i)
+			for (int i = 1; i <= N + 1; ++i)
 				XIOLD(i) = XI(i);
 			NOLD = N;
 			ITER = 0;
@@ -1534,9 +1571,11 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				IGUESS = 0;
 
 			// find initial scaling
-			SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
-			double RLXOLD = RELAX;
-			int IPRED = 1;
+			SKALE(Z, DMZ, XI, SCALE, DSCALE);
+			
+			RLXOLD = RELAX;
+			IPRED = 1;
+
 			goto n220;
 		}
 	n170:
@@ -1547,7 +1586,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				goto n430;
 
 			// update scaling
-			SKALE(N, MSTAR, KDY, Z, DMZ, XI, SCALE, DSCALE);
+			SKALE(Z, DMZ, XI, SCALE, DSCALE);
 
 			// compute norm of newton correction with new scaling
 			double ANSCL = 0.0;
@@ -1798,9 +1837,11 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				NYCB = NY;
 
 
-			NEWMSH(IMESH, XI, XIOLD, Z, DMZ, DMV, VALSTR,
-				SLOPE, ACCUM, NFXPNT, FIXPNT, DF, dfsub,
-				FCSP, CBSP, NCOMP, NYCB);
+			NEWMSH(IMESH, XI, XIOLD, Z, DMZ,
+				DMV, VALSTR,
+				SLOPE, ACCUM, NFXPNT,
+				FIXPNT, DF, dfsub,
+				FCSP, CBSP, NYCB);
 
 			// exit if expected n is too large (but may try n=nmax once)
 			if (N > NMAX){
@@ -1838,19 +1879,23 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 //            dscale = scaling vector for dmz
 //
 //**********************************************************************
-void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
+void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 {
+	Z.reshape(MSTAR, 1);
 	Z.assertDim(MSTAR, 1);
+	SCALE.reshape(MSTAR, 1); 
 	SCALE.assertDim(MSTAR, 1);
+	DMZ.reshape(KDY, N); 
 	DMZ.assertDim(KDY, N);
+	DSCALE.reshape(KDY, N); 
 	DSCALE.assertDim(KDY, N);
 	XI.assertDim(1);
 	
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
 
-	//COLAPR::N = N;
-	//COLORD::MSTAR = MSTAR;
-	//COLORD::KDY = KDY;
+	//N = N;
+	//MSTAR = MSTAR;
+	//KDY = KDY;
 
 	dad1 BASM(5);
 
@@ -1863,7 +1908,7 @@ void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 X
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
 			double SCAL = (abs(Z(IZ, j)) + abs(Z(IZ, j + 1))) * .5 + 1.0;
-			int MJ = M(ICOMP);
+			int MJ = MT(ICOMP);
 			for (int l = 1; l <= MJ; ++l) {
 				SCALE(IZ, j) = BASM(l) / SCAL;
 				IZ = IZ + 1;
@@ -1967,19 +2012,21 @@ void SKALE(const int N, const int MSTAR, const int KDY, dar2 Z, dar2 DMZ, dar1 X
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VALSTR,
-	dar1 SLOPE, dar1 ACCUM, const int NFXPNT, dar1 FIXPNT, dar2 DF, dfsub_t dfsub,
-	dar2 FC, dar2 CB, const int NCOMP, const int NYCB)
+void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
+ dar1 VALSTR,
+	dar1 SLOPE, dar1 ACCUM, const int NFXPNT, dar1 FIXPNT,
+ dar2 DF, dfsub_t dfsub,
+	dar2 FC, dar2 CB, const int NYCB)
 {
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	SLOPE.assertDim(1);
 	ACCUM.assertDim(1);
@@ -2024,8 +2071,8 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VAL
 				}
 			}
 		}
-		XI(1) = ALEFT;
-		XI(N + 1) = ARIGHT;
+		XI(1) = TLEFT;
+		XI(N + 1) = TRIGHT;
 		break;
 	}
 	case 3: {
@@ -2034,13 +2081,13 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VAL
 		if (N < NFXP1)
 			N = NFXP1;
 		int NP1 = N + 1;
-		XI(1) = ALEFT;
+		XI(1) = TLEFT;
 		int ILEFT = 1;
-		double XLEFT = ALEFT;
+		double XLEFT = TLEFT;
 
 		//  loop over the subregions between fixed points.
 		for (int j = 1; j <= NFXP1; ++j) {
-			double XRIGHT = ARIGHT;
+			double XRIGHT = TRIGHT;
 			int IRIGHT = NP1;
 			if (j != NFXP1) {
 				XRIGHT = FIXPNT(j);
@@ -2048,7 +2095,7 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 VAL
 				// determine where the j-th fixed point should fall in the
 				// new mesh - this is xi(iright) and the (j-1)st fixed
 				// point is in xi(ileft)
-				int NMIN = int((XRIGHT - ALEFT) / (ARIGHT - ALEFT) * double(N) + 1.5);
+				int NMIN = int((XRIGHT - TLEFT) / (TRIGHT - TLEFT) * double(N) + 1.5);
 				if (NMIN > N - NFXPNT + j)
 					NMIN = N - NFXPNT + j;
 				IRIGHT = std::max(ILEFT + 1, NMIN);
@@ -2098,11 +2145,11 @@ n100:
 				double HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0;
 				double X = XIOLD(i) + HD6;
 				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 1), DUMMY, XIOLD,
-					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
 				X = X + 4.0 * HD6;
 				KSTORE = KSTORE + 3 * MSTAR;
 				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 4), DUMMY, XIOLD,
-					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
 				KSTORE = KSTORE + MSTAR;
 			}
 		}
@@ -2118,7 +2165,8 @@ n100:
 					X = X + HD6;
 					if (j == 3)
 						X = X + HD6;
-					APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+					APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY,
+						XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
 					KSTORE = KSTORE + MSTAR;
 				}
 			}
@@ -2160,13 +2208,14 @@ n100:
 				IDMZ = 1;
 				for (int i = 1; i <= NOLD; ++i) {
 					double XI1 = XIOLD(i + 1);
-					APPROX(i, XI1, ZVAL, YVAL, A, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 3, DUMMY, 1);
+					APPROX(i, XI1, ZVAL, YVAL, A, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP,
+						NY, MMAX, MT, MSTAR, 3, DUMMY, 1);
 					dfsub(XI1, ZVAL, YVAL, DF);
 
 					// if index=2, form projection matrices directly
 					// otherwise use svd to define appropriate projection
 					if (INDEX == 0) {
-						PRJSVD(FC, DF, CB, U, V, NCOMP, NCY, NY, IPVTCB, ISING, 2);
+						PRJSVD(FC, DF, CB, U, V, IPVTCB, ISING, 2);
 					}
 					else {
 						// form cb
@@ -2174,7 +2223,7 @@ n100:
 							for (int J1 = 1; J1 <= NY; ++J1) {
 								double FACT = 0.0;
 								for (int l = 1, ML = 0; l <= NCOMP; ++l) {
-									ML = ML + M(l);
+									ML = ML + MT(l);
 									FACT = FACT + DF(j + NCOMP, ML) * DF(l, MSTAR + J1);
 								}
 								CB(j, J1) = FACT;
@@ -2189,7 +2238,7 @@ n100:
 						// form columns of fc
 						int ML = 0;
 						for (int l = 1; l <= NCOMP; ++l) {
-							ML += M(l);
+							ML += MT(l);
 							for (int J1 = 1; J1 <= NY; ++J1)
 								BCOL(J1) = DF(J1 + NCOMP, ML);
 
@@ -2262,20 +2311,20 @@ n100:
 
 
 				// evaluate function to be equidistributed
-				for (int j = 1; j <= COLEST::NTOL; ++j) {
-					int JJ = COLEST::JTOL(j);
-					int JZ = COLEST::LTOL(j) + (i - 1) * COLORD::MSTAR;
-					auto temp = abs(D2(JJ) - D1(JJ)) * COLEST::WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ)));
+				for (int j = 1; j <= NTOL; ++j) {
+					int JJ = JTOL(j);
+					int JZ = LTOL(j) + (i - 1) * MSTAR;
+					auto temp = abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ)));
 					SLOPE(i) = DMAX1(SLOPE(i),
 						pow(temp,
-							COLEST::ROOT(j))
+							ROOT(j))
 					);
 					fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
-					fmt::print(fg(fmt::color::orange), "COLEST::WGTMSH(j)  = {}\n", COLEST::WGTMSH(j));
+					fmt::print(fg(fmt::color::orange), "WGTMSH(j)  = {}\n", WGTMSH(j));
 					fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
 					fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
 					fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
-					fmt::print(fg(fmt::color::orange), "COLEST::ROOT(j)  = {}\n", COLEST::ROOT(j));
+					fmt::print(fg(fmt::color::orange), "ROOT(j)  = {}\n", ROOT(j));
 					fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));
 				}
 
@@ -2293,12 +2342,11 @@ n100:
 			}
 
 			
-			auto test = ACCUM(COLAPR::NOLD + 1);
-			double AVRG = ACCUM(COLAPR::NOLD + 1) / double(COLAPR::NOLD);
-			double DEGEQU = AVRG / DMAX1(SLPHMX, COLOUT::PRECIS);
+			double AVRG = ACCUM(NOLD + 1) / double(NOLD);
+			double DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS);
 
 			//  naccum=expected n to achieve .1x user requested tolerances
-			int NACCUM = int(ACCUM(COLAPR::NOLD + 1) + 1.0);
+			int NACCUM = int(ACCUM(NOLD + 1) + 1.0);
 			if (IPRINT < 0)  
 				fmt::print("MESH SELECTION INFO: DEGREE OF EQUIDISTRIBUTION = {}, "
 							"PREDICTION FOR REQUIRED N = {}\n", DEGEQU, NACCUM);
@@ -2344,8 +2392,8 @@ n100:
 			int IN = 1;
 			double ACCL = 0.0;
 			int LOLD = 2;
-			XI(1) = ALEFT;
-			XI(N + 1) = ARIGHT;
+			XI(1) = TLEFT;
+			XI(N + 1) = TRIGHT;
 			for (int i = 1; i <= NFXP1; ++i) {
 				double ACCR; int LNEW, NREGN;
 				if (i != NFXP1) {
@@ -2434,15 +2482,15 @@ n100:
 //              points
 //
 //**********************************************************************
-void CONSTS(int K, dar1 RHO, dar2 COEF)
+void CONSTS()
 {
 	RHO.assertDim(7);
 	COEF.reshape(K, K);
 	COEF.assertDim(K, K);
 	
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	dad1 CNSTS1(28), CNSTS2(28), DUMMY(1);
 
@@ -2463,7 +2511,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 	int KOFF = K * (K + 1) / 2;
 	int IZ = 1;
 	for (int j = 1; j <= NCOMP; ++j) {
-		int MJ = M(j);
+		int MJ = MT(j);
 		for (int l = 1; l <= MJ; ++l) {
 			WGTERR(IZ) = CNSTS1(KOFF - MJ + l);
 			IZ = IZ + 1;
@@ -2472,21 +2520,21 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 
 	// assign array values for mesh selection: wgtmsh, jtol, and root
 	int JCOMP = 1;
-	int MTOT = M(1);
+	int MTOT = MT(1);
 	for (int i = 1; i <= NTOL; ++i) {
 		int LTOLI = LTOL(i);
 		while (true) {
 			if (LTOLI <= MTOT)
 				break;
 			JCOMP = JCOMP + 1;
-			MTOT = MTOT + M(JCOMP);
+			MTOT = MTOT + MT(JCOMP);
 		}
 		JTOL(i) = JCOMP;
 		WGTMSH(i) = 1.e1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i);
 		ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1);
 	}
 
-	// pecify collocation points
+	// specify collocation points
 	switch (K) {
 	case 1: RHO(1) = 0.0;
 		break;
@@ -2548,7 +2596,7 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 		for (int i = 1; i <= K; ++i)
 			COEF(i, j) = 0.0;
 		COEF(j, j) = 1.0;
-		VMONDE(RHO, COEF.sub(1, j), K);
+		VMONDE(COEF.sub(1, j), K);
 	}
 	RKBAS(1.0, COEF, K, MMAX, B, DUMMY, 0);
 	for (int i = 1; i <= K; ++i)
@@ -2587,21 +2635,21 @@ void CONSTS(int K, dar1 RHO, dar2 COEF)
 //                 the array valstr. (0 for no, 1 for yes)
 //
 //**********************************************************************
-void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
+void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 {
 	XI.assertDim(1);
 	Z.assertDim(1);
 	DMZ.assertDim(1);
 	VALSTR.assertDim(1);
 
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
-	COLMSH::MSHFLG = 1;
+	MSHFLG = 1;
 
 	dad1 ERR(40), ERREST(40), DUMMY(1);
 
@@ -2609,62 +2657,61 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int IFIN)
 	//  error estimates are to be generated and tested
 	//  to see if the tolerance requirements are satisfied.
 	IFIN = 1;
-	for (int j = 1; j <= COLORD::MSTAR; ++j)
+	for (int j = 1; j <= MSTAR; ++j)
 		ERREST(j) = 0.0;
 	for (int IBACK = 1; IBACK <= N; ++IBACK) {
 		int i = N + 1 - IBACK;
 
-		//       the error estimates are obtained by combining values of
-		//       the numerical solutions for two meshes.
-		//       for each value of iback we will consider the two
-		//       approximations at 2 points in each of
-		//       the new subintervals.  we work backwards through
-		//       the subinterval so that new values can be stored
-		//       in valstr in case they prove to be needed later
-		//       for an error estimate. the routine  newmsh
-		//       filled in the needed values of the old solution
-		//       in valstr.
-		int KNEW = (4 * (i - 1) + 2) * COLORD::MSTAR + 1;
-		int KSTORE = (2 * (i - 1) + 1) * COLORD::MSTAR + 1;
+		// the error estimates are obtained by combining values of
+		// the numerical solutions for two meshes.
+		// for each value of iback we will consider the two approximations at 2 points in each of
+		// the new subintervals. 
+		// we work backwards through the subinterval so that new values can be stored
+		// in valstr in case they prove to be needed later for an error estimate.
+		// The routine  newmsh filled in the needed values of the old solution in valstr.
+		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
+		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
 		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
-		for (int l = 1; l <= COLORD::MSTAR; ++l) {
+		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP,
+			NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
 			KSTORE = KSTORE + 1;
 		}
-		KNEW = (4 * (i - 1) + 1) * COLORD::MSTAR + 1;
-		KSTORE = 2 * (i - 1) * COLORD::MSTAR + 1;
+		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
+		KSTORE = 2 * (i - 1) * MSTAR + 1;
 		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
-		for (int l = 1; l <= COLORD::MSTAR; ++l) {
+		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP,
+			NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = ERR(l) + WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
 			KSTORE = KSTORE + 1;
 		}
 
 		// find component-wise maximum error estimate
-		for (int l = 1; l <= COLORD::MSTAR; ++l)
+		for (int l = 1; l <= MSTAR; ++l)
 			ERREST(l) = DMAX1(ERREST(l), ERR(l));
 
 		// test whether the tolerance requirements are satisfied
 		// in the i-th interval.
 		if (IFIN == 0)
 			continue;
-		for (int j = 1; j <= COLEST::NTOL; ++j) {
-			int LTOLJ = COLEST::LTOL(j);
-			int LTJZ = LTOLJ + (i - 1) * COLORD::MSTAR;
-			if (ERR(LTOLJ) > COLEST::TOLIN(j) * (abs(Z(LTJZ)) + 1.0))
+		for (int j = 1; j <= NTOL; ++j) {
+			int LTOLJ = LTOL(j);
+			int LTJZ = LTOLJ + (i - 1) * MSTAR;
+			if (ERR(LTOLJ) > TOLIN(j) * (abs(Z(LTJZ)) + 1.0))
 				IFIN = 0;
 		}
 	}
 
-	if (COLOUT::IPRINT >= 0)
+	if (IPRINT >= 0)
 		return;
 	fmt::print("THE ESTIMATED ERRORS ARE\n");
 	int LJ = 1;
-	for (int j = 1; j <= COLORD::NCOMP; ++j) {
-		int MJ = LJ - 1 + M(j);
+	for (int j = 1; j <= NCOMP; ++j) {
+		int MJ = LJ - 1 + MT(j);
 		fmt::print("{}:  ", j);
 		for (int l = LJ; l <= MJ; ++l)
 			fmt::print("{}, ", ERREST(l));
@@ -2766,13 +2813,13 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 	IPVTW.assertDim(1);
 	FC.assertDim(1);
 
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLLOC; // dad1 RHO(7), COEF(49);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
+	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	dad1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
 	dad1 DUMMY(1), Y(1), AT(28), CB(400);
@@ -2786,9 +2833,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 
 	int INFC = (MSTAR + NY) * NCOMP;
 	int M1 = MODE + 1;
-	double XI1 = NAN;
+	double XI1 = 0;
 
-	int IZSAVE = 0;
 
 	switch (M1) {
 	case 1: {
@@ -2829,7 +2875,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					while (true) {
 						if (LSIDE == MSTAR)
 							break;
-						if (ZETA(LSIDE + 1) >= XI(i) + PRECIS)
+						if (TZETA(LSIDE + 1) >= XI(i) + PRECIS)
 							break;
 						LSIDE = LSIDE + 1;
 					}
@@ -2856,7 +2902,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			while (true) {
 				if (IZETA > MSTAR)
 					break;
-				if (ZETA(IZETA) > XII + PRECIS)
+				if (TZETA(IZETA) > XII + PRECIS)
 					break;
 
 				// build equation for a side condition.
@@ -2868,10 +2914,12 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					else {
 						// other nonlinear case
 						if (MODE == 1) {
-							APPROX(IOLD, XII, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2, DUMMY, 0);
+							APPROX(IOLD, XII, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP,
+								NY, MMAX, MT, MSTAR, 2, DUMMY, 0);
 						}
 						else {
-							APPROX(i, XII, ZVAL, Y, AT, DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+							APPROX(i, XII, ZVAL, Y, AT, DUMMY, XI, N, Z, DMZ, K, NCOMP, 
+								NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
 							if (MODE == 3)
 								goto n120;
 						}
@@ -2911,7 +2959,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				if (MODE == 1) {
 					// find  rhs  values
 					APPROX(IOLD, XCOL, ZVAL, YVAL, AT, COEF, XIOLD,
-						NOLD, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 2,
+						NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 2,
 						DMZO.sub(IRHS), 2);
 
 				n170:
@@ -2929,7 +2977,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				else {
 					// evaluate former collocation solution
 					APPROX(i, XCOL, ZVAL, Y, ACOL.sub(1, j), COEF, XI, N, Z,
-						DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 4, DUMMY, 0);
+						DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
 					if (MODE == 3)
 						break;
 
@@ -2951,8 +2999,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					IRHS = IRHS + NCY;
 				}
 				// fill in ncy rows of  w and v
-				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW.sub(IDMZ), KDY,
-					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO.sub(IDMZO), NCY, dfsub, MSING);
+				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW.sub(IDMZ),
+					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO.sub(IDMZO), dfsub, MSING);
 				if (MSING != 0)
 					return;
 			}
@@ -2969,22 +3017,22 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 						if (MODE == 1) {
 							APPROX(IOLD, XI1, ZVAL, YVAL, AT, COEF, // here IOLD gets changed! simon
 								XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-								M, MSTAR, 2, DUMMY, 1);
+								MT, MSTAR, 2, DUMMY, 1);
 							if (i == N) {
 								auto temp = NOLD + 1;
 								APPROX(temp, XI1, ZVAL, YVAL, AT, COEF,
 									XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-									M, MSTAR, 1, DUMMY, 0);
+									MT, MSTAR, 1, DUMMY, 0);
 							}
 						}
 						else {
 							APPROX(i, XI1, ZVAL, YVAL, AT, COEF,
 								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-								M, MSTAR, 3, DUMMY, 1);
+								MT, MSTAR, 3, DUMMY, 1);
 							auto temp = i + 1;
 							APPROX(temp, XI1, ZVAL, YVAL, AT, COEF,
 								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-								M, MSTAR, 1, DUMMY, 0);
+								MT, MSTAR, 1, DUMMY, 0);
 						}
 					}
 				}
@@ -3015,11 +3063,12 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 							if (MODE == 1) {
 								auto temp = NOLD + 1;
 								APPROX(temp, ARIGHT, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, 
-									NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+									NCOMP, NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
 							}
 							else {
 								auto temp = N + 1;
-								APPROX(temp, ARIGHT, ZVAL, Y, AT, COEF, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, M, MSTAR, 1, DUMMY, 0);
+								APPROX(temp, ARIGHT, ZVAL, Y, AT, COEF, XI, N, Z, DMZ, K, 
+									NCOMP, NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
 								if (MODE == 3)
 									goto n260;
 							}
@@ -3189,9 +3238,9 @@ void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const 
 	ZVAL.assertDim(1);
 	DGZ.assertDim(1);
 	
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 	
 	dad1 DG(40);
 
@@ -3256,8 +3305,9 @@ void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const 
 //      jcomp  - counter for the component being dealt with.
 //
 //**********************************************************************
-void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI, iar1 IPVTW, const int KDY, dar1 ZVAL,
-	dar1 YVAL, dar2 DF, dar2 ACOL, dar1 DMZO, const int NCY, dfsub_t dfsub, int& MSING)
+void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI, iar1 IPVTW,
+	dar1 ZVAL,
+	dar1 YVAL, dar2 DF, dar2 acol, dar1 DMZO, dfsub_t dfsub, int& MSING)
 {
 	WI.reshape(KDY, 1);
 	WI.assertDim(KDY, 1);
@@ -3268,12 +3318,12 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 	DF.reshape(NCY, 1);
 	DF.assertDim(NCY, 1);
 	IPVTW.assertDim(1);
-	ACOL.reshape(7, 4); // !simon
-	ACOL.assertDim(7, 4);
+	acol.reshape(7, 4); // !simon
+	acol.assertDim(7, 4);
 	YVAL.assertDim(1);
 
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 	
 	dad1 BASM(5);
 	dad2 HA(7, 4);
@@ -3336,7 +3386,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 	}
 	int JN = 1;
 	for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
-		int MJ = M(JCOMP);
+		int MJ = MT(JCOMP);
 		JN = JN + MJ;
 		for (int l = 1; l <= MJ;++l) {
 			int JV = JN - l;
@@ -3401,7 +3451,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 //
 //**********************************************************************
 void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
-	const int NCOMP, const int NCY, const int NY, iar1 IPVTCB, int& ISING, const int MODE)
+	iar1 IPVTCB, int& ISING, const int MODE)
 {
 	FC.assertDim(NCOMP, 1);
 	DF.assertDim(NCY, 1);
@@ -3410,17 +3460,17 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	V.assertDim(NY, NY);
 	IPVTCB.assertDim(1);
 
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
 	
 	dad1 WORK(20), S(21), E(20);
 
 
 	//  compute the maximum tolerance
 	double CHECK = 0.0;
-	for (int i = 1; i <= COLEST::NTOL; ++i)
-		CHECK = DMAX1(COLEST::TOLIN(i), CHECK);
+	for (int i = 1; i <= NTOL; ++i)
+		CHECK = DMAX1(TOLIN(i), CHECK);
 
 	//  construct d and find its svd
 	for (int i = 1; i <= NY; ++i)
@@ -3455,7 +3505,7 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 				double FACT = 0;
 				int ML = 0;
 				for (int l = 1; l <= NCOMP; ++l) {
-					ML = ML + M(l);
+					ML = ML + MT(l);
 					FACT = FACT + DF(i + NCOMP, ML) * DF(l, MSTAR + j);
 				}
 				D(i, j) = FACT;
@@ -3520,7 +3570,7 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 			{
 				int MJ = 0;
 				for (int j = 1; j <= NCOMP; ++j) {
-					MJ = MJ + M(j);
+					MJ = MJ + MT(j);
 					double FACT = 0;
 					for (int l = 1; l <= NY; ++l)
 						FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, MJ);
@@ -3589,9 +3639,9 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 	FC.reshape(NCOMP, 1);
 	FC.assertDim(NCOMP, 1);
 
-	using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
+	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
 	dad2 HB(7, 4);
 	dad1 BASM(5), BCOL(40), U(400), V(400);
@@ -3624,7 +3674,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 			//  compute the block gi
 			int IR = IROW;
 			for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-				int MJ = M(ICOMP);
+				int MJ = MT(ICOMP);
 				IR = IR + MJ;
 				for (int l = 1; l <= MJ; ++l) {
 					int ID = IR - l;
@@ -3649,14 +3699,12 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 
 			//  projected collocation
 			//  set up projection matrix and update gi-block
-
 			dfsub(XI1, ZVAL, YVAL, DF);
 
 			//  if index=2 then form projection matrices directly
 			//  otherwise use svd to define appropriate projection
-
 			if (INDEX == 0) {
-				PRJSVD(FC, DF, CB, U, V, NCOMP, NCY, NY, IPVTCB, ISING, 1);
+				PRJSVD(FC, DF, CB, U, V, IPVTCB, ISING, 1);
 				if (ISING != 0)
 					return;
 			}
@@ -3667,7 +3715,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 						FACT = 0;
 						int ML = 0;
 						for (int l = 1; l <= NCOMP; ++l) {
-							ML = ML + M(l);
+							ML = ML + MT(l);
 							FACT = FACT + DF(i + NCOMP, ML) * DF(l, MSTAR + j);
 						}
 						CB(i, j) = FACT;
@@ -3714,7 +3762,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 				}
 				int ML = 0;
 				for (int i = 1; i <= NCOMP; ++i) {
-					ML = ML + M(i);
+					ML = ML + MT(i);
 					GI(IROW - 1 + ML, j) = GI(IROW - 1 + ML, j) - BCOL(i);
 				}
 			}
@@ -3750,7 +3798,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
-			int MJ = M(JCOMP);
+			int MJ = MT(JCOMP);
 			IR = IR + MJ;
 			for (int l = 1; l <= MJ; ++l) {
 				int	IND = JCOMP;
@@ -3775,7 +3823,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI, da
 		}
 		int ML = 0;
 		for (int i = 1; i <= NCOMP; ++i) {
-			ML = ML + M(i);
+			ML = ML + MT(i);
 			RHSZ(IROW - 1 + ML) = RHSZ(IROW - 1 + ML) - BCOL(i) - F(i);
 		}
 	}
@@ -3885,7 +3933,7 @@ void RKBAS(const double S, dar2 COEF, const int k, const int M, dar2 RKB, dar1 D
 //
 // * *********************************************************************
 void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI, // TODO int& i?
-	const int N, dar1 Z, dar1 DMZ, const int k, int NCOMP, const int NY, const int MMAX, iar1 M,
+	const int N, dar1 Z, dar1 DMZ, const int k, const int NCOMP, const int NY, const int MMAX, iar1 M,
 	const int MSTAR, const int MODE, dar1 DMVAL, const int MODM)
 {
 	ZVAL.assertDim(1);
@@ -3899,7 +3947,7 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
 	COEF.assertDim(1);
 	YVAL.assertDim(1);
 	
-	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT;
+//	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT;
 
 	dad1 BM(4), DM(7);
 	int IZ, ILEFT, IRIGHT;
@@ -3917,7 +3965,7 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 COEF, dar1 XI,
 
 	case 2:
 		//  mode = 2, locate i so  xi(i).le.x.lt.xi(i + 1)
-		if (X < XI(1) - COLOUT::PRECIS || X > XI(N + 1) + COLOUT::PRECIS)
+		if (X < XI(1) - PRECIS || X > XI(N + 1) + PRECIS)
 		{
 			if (IPRINT < 1)
 				fmt::print("****** DOMAIN ERROR IN APPROX ******\n"
@@ -4053,7 +4101,7 @@ purpose
 		with  v(i, j) = rho(j) * *(i - 1) / (i - 1)!.
 
 * **********************************************************************/
-void VMONDE(dar1 RHO, dar1 COEF, const int k)
+void VMONDE(dar1 COEF, int k)
 {
 	int IFAC, KM1, KMI;
 	RHO.assertDim(k);
@@ -4099,12 +4147,13 @@ variables
 						j
 
 * **********************************************************************/
-void HORDER(const int i, dar1 UHIGH, const double HI, dar1 DMZ, const int NCOMP, const  int NCY, const int k)
+void HORDER(const int i, dar1 UHIGH, const double HI, dar1 DMZ, const int NCOMP, 
+	const int NCY, const int k)
 {
 	UHIGH.assertDim(1);
 	DMZ.assertDim(1);
 
-	using namespace COLLOC; // dad1 RHO(7), COEF(49);
+//	using namespace COLLOC; // dad1 RHO(7), COEF(49);
 	
 	double DN = 1.0 / pow(HI, (k - 1));
 
@@ -4115,7 +4164,7 @@ void HORDER(const int i, dar1 UHIGH, const double HI, dar1 DMZ, const int NCOMP,
 	int KIN = 1;
 	int IDMZ = (i - 1) * k * NCY + 1;
 	for (int j = 1; j <= k;++j) {
-		double FACT = DN * COLLOC::COEF(KIN);
+		double FACT = DN * COEF.contiguous()[KIN-1];
 		for (int ID = 1; ID <= NCOMP;++ID) {
 			UHIGH(ID) = UHIGH(ID) + FACT * DMZ(IDMZ);
 			IDMZ = IDMZ + 1;

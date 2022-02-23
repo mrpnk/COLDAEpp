@@ -763,6 +763,9 @@ C
 C
 C...  initialize collocation points, constants, mesh.
 C
+      call dumpState()
+    
+
       CALL CONSTS ( K, RHO, COEF )
       IF (NY.EQ.0) THEN
 	 NYCB = 1
@@ -793,8 +796,7 @@ C
   230 CONTINUE
       IF (IGUESS .GE. 2)  IGUESS = 0
 
-      call dumpState()
-    
+     
       CALL CONTRL (FSPACE(LXI),FSPACE(LXIOLD),FSPACE(LZ),FSPACE(LDMZ),
      +     FSPACE(LDMV),
      1     FSPACE(LRHS),FSPACE(LDELZ),FSPACE(LDELDZ),FSPACE(LDQZ),
