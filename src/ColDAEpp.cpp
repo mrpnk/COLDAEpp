@@ -1,27 +1,28 @@
 ﻿#pragma warning( disable : 5045 )
 
+// break on nan
 #include <float.h>
 unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
-
-#include "ColDAEpp.hpp"
 #include "timer.h"
+#include "ColDAEpp.hpp"
 
 
 
 // f'(x) = x, f(0)=1
 struct sys1 {
-	int ncomp = 1;
-	int ny = 0;
-	iad1 orders = { 1 };
-	double left = 0, right = 1;
-	dad1 bcpoints = { 0 };
-	iad1 ltol = { 1 };
-	dad1 tol = { 0.1 };
-	dad1 fixpnt = {};
-
-
-	iad1 ipar = { 0,0,0,1,10000,10000,-1,0,0,0,0,0 };
+	systemParams params;
+	sys1() {
+		params.ncomp = 1;
+		params.ny = 0;
+		params.orders = { 1 };
+		params.left = 0;
+		params.right = 1;
+		params.bcpoints = { 0 };
+		params.isNonLinear = 1;
+		params.reg = regularControl::regular;
+		params.index = indexControl::automatic; // not used
+	}
 
 	static void fsub(double x, dar1 z, dar1 y, dar1 f) {
 		f(1) = x;
@@ -39,7 +40,19 @@ struct sys1 {
 
 // f''(x) = sin(0.6*f'(x)) + x, f(0)=1, f(1)=-0.1
 struct sys2 {
-	
+	systemParams params;
+	sys2() {
+		params.ncomp = 2;
+		params.ny = 0;
+		params.orders = { 1,1 };
+		params.left = 0;
+		params.right = 1;
+		params.bcpoints = { 0, 1 };
+		params.isNonLinear = 1;
+		params.reg = regularControl::regular;
+		params.index = indexControl::automatic; // not used
+	}
+
 	static void fsub(double x, dar1 z, dar1 y, dar1 f) {
 		f(1) = z(2); // z'(x)
 		f(2) = sin(0.6 * z(2)) + x; // z''(x)
@@ -70,36 +83,55 @@ struct sys2 {
 	}
 };
 
+
 int main()
 {
 	sys2 sys;
-	
 
-	int iflag;
-	cda solver;
-
-	startParams sp;
-
-	for(int i = 0;i<10;++i)
+	options opts;
 	{
-		AutoTimer at(g_timer, "COLDAE "+std::to_string(i));
-		solver.COLDAE(sp.ncomp, sp.ny, sp.orders, sp.left, sp.right, sp.bcpoints,
-			sp.opts, sp.ltol, sp.tol, sp.fixpnt, sp.ispace, sp.fspace, iflag,
-			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub, decltype(sys)::dgsub, nullptr);
+		opts.numCollPoints = 0;
+		opts.numSubIntervals = 0;
+		opts.numTolerances = 1;
+
+		opts.fdim = 10000;
+		opts.idim = 10000;
+
+		opts.printLevel = printMode::full;
+		opts.meshSource = meshMode::generate;
+		opts.guessSource = guessMode::none;
+
+		opts.numFixedPoints = 0;
+		opts.ltol = { 1 };
+		opts.tol = { 0.0001 };
+	}
+
+	iad1 ispace(opts.idim);
+	dad1 fspace(opts.fdim);
+
+	cda solver;
+	output_t iflag;
+	{
+		AutoTimer at(g_timer, "COLDAE");
+		solver.COLDAE(sys.params, opts, ispace, fspace, iflag,
+			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub,
+			decltype(sys)::dgsub, nullptr);
 	}
 	
-	fmt::print("iflag = {}", iflag);
-
-	if (iflag == 1) {
+	
+	if (iflag == output_t::normal) {
+		fmt::print(fg(fmt::color::green_yellow), "Successful return!\n");
 		std::ofstream file("result_cpp.txt");
-		for (int i = 1; i <= sp.ispace(1) + 1; ++i) {
-			double x = sp.fspace(i);
+		for (int i = 1; i <= ispace(1) + 1; ++i) {
+			double x = fspace(i);
 			dad1 z(2), y(0);
-			solver.APPSLN(x, z, y, sp.fspace, sp.ispace);
+			solver.APPSLN(x, z, y, fspace, ispace);
 			file << x << " " << z(1) << std::endl;
 		}
 		file.close();
 	}
+	else
+		fmt::print(fg(fmt::color::red), "Error return!\n");
 
 	g_timer.print();
 	std::cin.get();

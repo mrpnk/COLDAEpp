@@ -1,11 +1,11 @@
 ﻿#pragma once
 
+#include "linpack/linpack_d.hpp"
+
 #define FMT_HEADER_ONLY 
 #include "../fmt/include/fmt/format.h"
 #include "../fmt/include/fmt/ranges.h"
 #include "../fmt/include/fmt/color.h"
-
-#include "linpack/linpack_d.hpp"
 
 #include <iostream>
 #include <vector>
@@ -163,179 +163,8 @@
 //         linear systems,
 //         acm trans. math. software 6 (1980), 80-87.
 //
-//
-//**********************************************************************
-//
-//     ***************     input to coldae     ***************
-//
-//     variables
-//
-//     ncomp - no. of differential equations   (ncomp .le. 20)
-//
-//     ny   - no. of constraints     (ny .le. 20)
-//
-//     m(j) - order of the j-th differential equation
-//            ( mstar = m(1) + ... + m(ncomp) .le. 40 )
-//
-//     aleft - left end of interval
-//
-//     aright - right end of interval
-//
-//     zeta(j) - j-th side condition point (boundary point). must
-//               have  zeta(j) .le. zeta(j+1). all side condition
-//               points must be mesh points in all meshes used,
-//               see description of ipar(11) and fixpnt below.
-//
-//     ipar - an integer array dimensioned at least 11.
-//            a list of the parameters in ipar and their meaning follows
-//            some parameters are renamed in coldae; these new names are
-//            given in parentheses.
-//
-//     ipar(1)     ( = nonlin )
-//             = 0 if the problem is linear
-//             = 1 if the problem is nonlinear
-//
-//     ipar(2) = no. of collocation points per subinterval  (= k )
-//               where max m(i) .le.  k .le. 7 . if ipar(2)=0 then
-//               coldae sets  k = max ( max m(i)+1, 5-max m(i) )
-//
-//     ipar(3) = no. of subintervals in the initial mesh  ( = n ).
-//               if ipar(3) = 0 then coldae arbitrarily sets n = 5.
-//
-//     ipar(4) = no. of solution and derivative tolerances.  ( = ntol )
-//               we require  0 .lt. ntol .le. mstar.
-//
-//     ipar(5) = dimension of fspace.     ( = ndimf )
-//
-//     ipar(6) = dimension of ispace.     ( = ndimi )
-//
-//     ipar(7) -  output control ( = iprint )
-//              = -1 for full diagnostic printout
-//              = 0 for selected printout
-//              = 1 for no printout
-//
-//     ipar(8)     ( = iread )
-//             = 0 causes coldae to generate a uniform initial mesh.
-//             = 1 if the initial mesh is provided by the user.  it
-//                 is defined in fspace as follows:  the mesh
-//                 aleft=x(1).lt.x(2).lt. ... .lt.x(n).lt.x(n+1)=aright
-//                 will occupy  fspace(1), ..., fspace(n+1). the
-//                 user needs to supply only the interior mesh
-//                 points  fspace(j) = x(j), j = 2, ..., n.
-//             = 2 if the initial mesh is supplied by the user
-//                 as with ipar(8)=1, and in addition no adaptive
-//                 mesh selection is to be done.
-//
-//     ipar(9)     ( = iguess )
-//             = 0 if no initial guess for the solution is
-//                 provided.
-//             = 1 if an initial guess is provided by the user
-//                 in subroutine  guess.
-//             = 2 if an initial mesh and approximate solution
-//                 coefficients are provided by the user in  fspace.
-//                 (the former and new mesh are the same).
-//             = 3 if a former mesh and approximate solution
-//                 coefficients are provided by the user in fspace,
-//                 and the new mesh is to be taken twice as coarse;
-//                 i.e.,every second point from the former mesh.
-//             = 4 if in addition to a former initial mesh and
-//                 approximate solution coefficients, a new mesh
-//                 is provided in fspace as well.
-//                 (see description of output for further details
-//                 on iguess = 2, 3, and 4.)
-//
-//     ipar(10)= -1 if the first relax factor is RSTART
-//		(use for an extra sensitive nonlinear problem only)
-//	      =  0 if the problem is regular
-//	      =  1 if the newton iterations are not to be damped
-//                 (use for initial value problems).
-//	      =  2 if we are to return immediately upon  (a) two
-//                 successive nonconvergences, or  (b) after obtaining
-//                 error estimate for the first time.
-//
-//     ipar(11)= no. of fixed points in the mesh other than aleft
-//               and aright. ( = nfxpnt , the dimension of fixpnt)
-//               the code requires that all side condition points
-//               other than aleft and aright (see description of
-//               zeta ) be included as fixed points in fixpnt.
-//
-//     ipar(12)    ( = index )
-//                 this parameter is ignored if ny=0.
-//             = 0 if the index of the dae is not as per one of the
-//                 following cases
-//             = 1 if the index of the dae is 1. in this case the
-//                 ny x ny jacobian matrix of the constraints with
-//                 respect to the algebraic unknowns, i.e.
-//                 df(i,j), i=ncomp+1,...,ncomp+ny,
-//                          j=mstar+1,...,mstar+ny
-//                 (see description of dfsub below)
-//                 is nonsingular wherever it is evaluated. this
-//                 allows usual collocation to be safely used.
-//             = 2 if the index of the dae is 2 and it is in Hessenberg
-//                 form. in this case the
-//                 ny x ny jacobian matrix of the constraints with
-//                 respect to the algebraic unknowns is 0, and the
-//                 ny x ny matrix  CB  is nonsingular, where
-//                 (i,j) = df(i+ncomp, m(j)), i=1,...,ny,
-//                                             j=1,...,ncomp
-//                 B(i,j) = df(i,j+mstar),     i=1,...,ncomp,
-//                                             j=1,...,ny
-//                 the projected collocation method described in [2]
-//                 is then used.
-//             in case of ipar(12)=0 and ny > 0, coldae determines the
-//             appropriate projection needed at the right end of each
-//             mesh subinterval using SVD. this is the most expensive
-//             and most general option.
-//
-//     ltol  -  an array of dimension ipar(4). ltol(j) = l  specifies
-//              that the j-th tolerance in  tol  controls the error
-//              in the l-th component of z(u).   also require that
-//              1.le.ltol(1).lt.ltol(2).lt. ... .lt.ltol(ntol).le.mstar
-//
-//     tol    - an array of dimension ipar(4). tol(j) is the
-//              error tolerance on the ltol(j) -th component
-//              of z(u). thus, the code attempts to satisfy
-//              for j=1,...,ntol  on each subinterval
-//              abs(z(v)-z(u))       .le. tol(j)*abs(z(u))       +tol(j)
-//                            ltol(j)                     ltol(j)
-//
-//              if v(x) is the approximate solution vector.
-//
-//     fixpnt - an array of dimension ipar(11).   it contains
-//              the points, other than aleft and aright, which
-//              are to be included in every mesh.
-//
-//     ispace - an integer work array of dimension ipar(6).
-//              its size provides a constraint on nmax,
-//              the maximum number of subintervals. choose
-//              ipar(6) according to the formula
-//                      ipar(6)  .ge.  nmax*nsizei
-//                where
-//                      nsizei = 3 + kdm
-//                with
-//                      kdm = kdy + mstar  ;  kdy = k * (ncomp+ny) ;
-//                      nrec = no. of right end boundary conditions.
-//
-//
-//     fspace - a real work array of dimension ipar(5).
-//              its size provides a constraint on nmax.
-//              choose ipar(5) according to the formula
-//                      ipar(5)  .ge.  nmax*nsizef
-//                where
-//                      nsizef = 4 + 3 * mstar + (5+kdy) * kdm +
-//                              (2*mstar-nrec) * 2*mstar +
-//                              ncomp*(mstar+ny+2) + kdy.
-//
-//
-//     iflag - the mode of return from coldae.
-//           = 1 for normal return
-//           = 0 if the collocation matrix is singular.
-//           =-1 if the expected no. of subintervals exceeds storage
-//               specifications.
-//           =-2 if the nonlinear iteration has not converged.
-//           =-3 if there is an input data error.
-//
-//
+
+
 //**********************************************************************
 //
 //     *************    user supplied subroutines   *************
@@ -415,7 +244,8 @@
 //             and  ncomp  components of  dmval  should be specified
 //             for any x,  aleft .le. x .le. aright .
 //
-//
+
+
 //**********************************************************************
 //
 //     ************   use of output from coldae   ************
@@ -461,7 +291,8 @@
 //     and the new mesh is then specified in fspace(1),..., fspace(n+1).
 //     also set ipar(3) = n.
 //
-//
+
+
 //**********************************************************************
 //
 //     ***************      package subroutines      ***************
@@ -546,6 +377,7 @@
 
 
 
+//------------------------------------------------------------------------------------------------------
 
 
 template<typename T>
@@ -565,6 +397,10 @@ public:
 		assertm(size == dim0, "Dimension 1 does not match!");
 	}
 
+	const T& operator()(int idx) const {
+		assertm(idx >= 1 && idx <= size, "Dimension 1 index out of range!");
+		return data[idx - 1];
+	}
 	T& operator()(int idx) {
 		assertm(idx>=1 && idx <= size,"Dimension 1 index out of range!");
 		return data[idx - 1];
@@ -709,7 +545,6 @@ public:
 };
 
 
-
 using dad1 = arrData1<double>;
 using iad1 = arrData1<int>;
 using dar1 = arrRef1<double>;
@@ -720,58 +555,43 @@ using iad2 = arrData2<int>;
 using dar2 = arrRef2<double>;
 using iar2 = arrRef2<int>;
 
+//------------------------------------------------------------------------------------------------------
 
-// The three functions from Linpack
+
+/* The three functions from Linpack */
 void DGEFA(dar2 a, int lda, int n, iar1 ipvt, int info) {
+	AutoTimer at(g_timer, "DGEFA"); 
 	info = dgefa(a.contiguous(), lda, n, ipvt.contiguous());
 }
 void DGESL(dar2 a, int lda, int n, iar1 ipvt, dar1 b, int job) {
+	AutoTimer at(g_timer, "DGESL"); 
 	dgesl(a.contiguous(), lda, n, ipvt.contiguous(),b.contiguous(), job);
 }
 void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
 	dar2 u, int ldu, dar2 v, int ldv, dar1 work, int job, int info) {
+	AutoTimer at(g_timer, "DSVDC"); 
 	info = dsvdc(x.contiguous(), lda, n, p, s.contiguous(), e.contiguous(),u.contiguous(),
 		ldu, v.contiguous(), ldv, work.contiguous(), job);
 }
 
+
+
 //------------------------------------------------------------------------------------------------------
 
-double DMAX1(double x, double y) { return std::max(x, y); }
-int MIN0(int x, int y) { return std::min(x, y); }
-int MIN0(int x, int y, int z) { return std::min(x, std::min(z, y)); }
-
-
-
-
-
-//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-//using namespace COLLOC; // dad1 RHO(7), COEF(49);
-//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
-
-
-using fsub_t = void (*)(double x, dar1 z, dar1 y, dar1 f);
+/* Define callback function types */
+using fsub_t  = void (*)(double x, dar1 z, dar1 y, dar1 f);
 using dfsub_t = void (*)(double x, dar1 z, dar1 y, dar2 df);
-using gsub_t = void (*)(int i, dar1 z, double& g);
+using gsub_t  = void (*)(int i, dar1 z, double& g);
 using dgsub_t = void (*)(int i, dar1 z, dar1 dg);
 using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
-
-//------------------------------------------------------------------------------------------------------
-
-
-enum class printControl {
+enum class printMode {
 	full = -1,
 	selected = 0,
 	none = 1
 };
-enum class meshControl {
+enum class meshMode {
 	generate = 0, // causes coldae to generate a uniform initial mesh
 	custom = 1,   /* if the initial mesh is provided by the user.
 					 it is defined in fspace as follows : the mesh
@@ -779,74 +599,78 @@ enum class meshControl {
 					 will occupy  fspace(1), ..., fspacen + 1).
 					 the user needs to supply only the interior mesh
 					 points  fspace(j) = x(j), j = 2, ..., n.*/
-					 customNoAdaptive = 2 /* if the initial mesh is supplied by the user
-											 as with ipar(8) = 1, and in addition no adaptive
-											 mesh selection is to be done.*/
+	customNoAdaptive = 2 /* if the initial mesh is supplied by the user
+						as with ipar(8) = 1, and in addition no adaptive
+						mesh selection is to be done.*/
 };
-enum class guessControl {
+enum class guessMode {
 	none = 0,  // if no initial guess for the solution is provided
 	custom = 1, // if an initial guess is provided by the user in subroutine  guess
 	customCoefficients = 2, /*if an initial mesh and approximate solution
 							 coefficients are provided by the user in  fspace.
 							 (the former and new mesh are the same).*/
-							 customCoefficientsRefine = 3, /* if a former meshand approximate solution
-														 coefficients are provided by the user in fspace,
-														 and the new mesh is to be taken twice as coarse;
-														 i.e., every second point from the former mesh.*/
-														 newMesh = 4  /*if in addition to a former initial mesh
-																	   approximate solution coefficients, a new mesh  is provided in fspace as well.
-																		 (see description of output for further details on iguess = 2, 3, and 4.)*/
+	customCoefficientsRefine = 3, /* if a former meshand approximate solution
+								coefficients are provided by the user in fspace,
+								and the new mesh is to be taken twice as coarse;
+								i.e., every second point from the former mesh.*/
+	newMesh = 4  /*if in addition to a former initial mesh
+					approximate solution coefficients, a new mesh  is provided in fspace as well.
+						(see description of output for further details on iguess = 2, 3, and 4.)*/
 };
 enum class regularControl {
 	sensitive = -1, //if the first relax factor is RSTART (use for an extra sensitive nonlinear problem only)
-	regular = 0, // if the problem is regular
+	regular = 0,    // if the problem is regular
 	noDamping = 1, /*if the newton iterations are not to be damped
 					 (use for initial value problems).*/
 	lazy = 2 /* if we are to return immediately upon(a) two
-									  successive nonconvergences, or (b)after obtaining
-									  error estimate for the first time.*/
+			successive nonconvergences, or (b)after obtaining
+			error estimate for the first time.*/
 };
 enum class indexControl {
 	automatic = 0, /* determines the appropriate projection needed at the right end of each
-				mesh subinterval using SVD. this is the most expensive and most general option. */
-				one = 1,           // if the index of the dae is 1.
-				twoHessenberg = 2  //if the index of the dae is 2 and it is in Hessenberg form
+					mesh subinterval using SVD. this is the most expensive and most general option. */
+	one = 1,           // if the index of the dae is 1.
+	twoHessenberg = 2  //if the index of the dae is 2 and it is in Hessenberg form
+};
+enum class output_t {
+	normal = 1,        // for normal return
+	singular = 0,      // if the collocation matrix is singular
+	outOfMemory = -1,  // if the expected no. of subintervals exceeds storage specifications
+	notConverged = -2, // if the nonlinear iteration has not converged
+	inputError = -3    // if there is an input data error.
 };
 
-struct options {
-	int isNonLinear;      // if the problem is nonlinear
-	int numCollPoints;	  // no. of collocation points per subinterval
-	int numSubIntervals;  // no. of subintervals in the initial mesh
-	int numTolerances;    // no. of solution and derivative tolerances
-	int fdim;             // dimension of fspace
-	int idim;             // dimension of ispace
-	printControl printLevel;  // output control
-	meshControl meshSource; // mesh control
-	guessControl guessSource; // guess control
+/* System specific properties */
+struct systemParams {
+	int ncomp;          // number of differential equations (<= 20)
+	int ny;             // number of constraints (<= 20)
+	iad1 orders ;       // orders of odes
+	double left;        // left end of interval
+	double right;       // right end of interval
+	dad1 bcpoints;      // j-th side condition point (boundary point)
+
+	int isNonLinear;    // if the problem is nonlinear
 	regularControl reg;
-	int numFixedPoints;   // no. of fixed points in the mesh other than aleft and aright.
-	indexControl index;   // index of DAE (ignored if ny=0)
+	indexControl index; // index of DAE (ignored if ny=0)
 };
-struct startParams {
-	int ncomp = 2;               // number of differential equations (<= 20)
-	int ny = 0;                  // number of constraints (<= 20)
-	iad1 orders = { 1,1 };       // orders of odes
-	double left = 0;             // left end of interval
-	double right = 1;            // right end of interval
-	dad1 bcpoints = { 0, 1 };    // j-th side condition point (boundary point)
 
-	options opts = { 1,0,0,1,10000,10000,
-		printControl::selected,meshControl::generate,
-		guessControl::none,regularControl::regular,
-		0, indexControl::automatic };
 
-	iad1 ltol = { 1 };
-	dad1 tol = { 0.0001 };
-	dad1 fixpnt = {};
+/* Options for the solver */
+struct options {
+	int numCollPoints;	   // no. of collocation points per subinterval
+	int numSubIntervals;   // no. of subintervals in the initial mesh
+	int fdim;              // dimension of fspace
+	int idim;              // dimension of ispace
+	printMode printLevel;  // output control
+	meshMode meshSource;   // mesh control
+	guessMode guessSource; // guess control
+	
+	int numTolerances;     // no. of solution and derivative tolerances
+	iad1 ltol;
+	dad1 tol;
 
-	iad1 ispace = iad1(10000);
-	dad1 fspace = dad1(10000);
-
+	int numFixedPoints;    // no. of fixed points in the mesh other than aleft and aright.
+	dad1 fixpnt;
 };
 
 
@@ -855,11 +679,11 @@ class cda{
 	struct { // COLOUT 
 		double PRECIS; int IOUT, IPRINT;
 	};
-	struct { // COLLOC {
+	struct { // COLLOC 
 		dad1 RHO = dad1( 7 );
 		dad2 COEF = dad2( 7, 7 );
 	};
-	struct { // COLORD {
+	struct { // COLORD 
 		int K; 
 		union {
 			int NC;
@@ -997,52 +821,23 @@ class cda{
 	}
 
 public:
-void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const double tright,
-	dar1 ZETA, options IPAR, iar1 ltol,
-	dar1 tol, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int& iflag,
+void COLDAE(systemParams const& params, options const& opts,
+	iar1 ispace, dar1 fspace, output_t& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
-	M.assertDim(1);
-	ZETA.assertDim(1);
-	LTOL.assertDim(1);
-	TOL.assertDim(1);
-	FIXPNT.assertDim(1);
-	ISPACE.assertDim(1);
-	FSPACE.assertDim(1);
+	ispace.assertDim(opts.idim);
+	fspace.assertDim(opts.fdim);
 
+	this->NCOMP = params.ncomp;
+	this->NY = params.ny;
+	this->ALEFT = params.left;
+	this->ARIGHT = params.right;
 
-	this->NCOMP = ncomp;
-	this->NY = ny;
-	this->ALEFT = tleft;
-	this->ARIGHT = tright;
+	this->LTOL.copyFrom(opts.ltol);
+	this->TOL.copyFrom(opts.tol);
 
-	this->LTOL.copyFrom(ltol);
-	this->TOL.copyFrom(tol);
-
-	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	//using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	//
-
-	/*NCOMP = NCOMP;
-	NY = NY;
-	M = M;
-
-	ALEFT = ALEFT;
-	ARIGHT = ARIGHT;
-	IZETA = IZETA;
-	
-	LTOL = LTOL;
-	TOL = TOL;*/
-	
 
 	dad1 DUMMY(1), DUMMY2(840);
-
 
 
 	//*********************************************************************
@@ -1061,7 +856,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	//  dependent constant  precis = 100 * machine unit roundoff
 
 
-	if (IPAR.printLevel != printControl::none) 
+	if (opts.printLevel != printMode::none) 
 		fmt::print("VERSION *1* OF COLDAE\n");
 
 	IOUT = 6;
@@ -1076,7 +871,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 
 	//  in case incorrect input data is detected, the program returns
 	//  immediately with iflag=-3.
-	iflag = -3;
+	iflag = output_t::inputError;
 	NCY = NCOMP + NY;
 	if (NCOMP < 0 || NCOMP > 20)
 		return;
@@ -1085,39 +880,39 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	if (NCY < 1 || NCY > 40)
 		return;
 	for (int i = 1; i <= NCOMP; ++i)
-		if (M(i) < 1 || M(i) > 4)
+		if (params.orders(i) < 1 || params.orders(i) > 4)
 			return;
 
 
 	//  rename some of the parameters and set default values.
-	NONLIN = IPAR.isNonLinear;
-	K = IPAR.numCollPoints;
-	N = IPAR.numSubIntervals;
+	NONLIN = params.isNonLinear;
+	K = opts.numCollPoints;
+	N = opts.numSubIntervals;
 	if (N == 0)  
 		N = 5;
-	int IREAD = static_cast<int>(IPAR.meshSource);
-	IGUESS = static_cast<int>(IPAR.guessSource);
+	int IREAD = static_cast<int>(opts.meshSource);
+	IGUESS = static_cast<int>(opts.guessSource);
 	if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
 	if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
-	ICARE = static_cast<int>(IPAR.reg);
-	NTOL = IPAR.numTolerances;
-	int NDIMF = IPAR.fdim;
-	int NDIMI = IPAR.idim;
-	int NFXPNT = IPAR.numFixedPoints;
-	IPRINT = static_cast<int>(IPAR.printLevel);
-	INDEX = static_cast<int>(IPAR.index);
+	ICARE = static_cast<int>(params.reg);
+	NTOL = opts.numTolerances;
+	int NDIMF = opts.fdim;
+	int NDIMI = opts.idim;
+	int NFXPNT = opts.numFixedPoints;
+	IPRINT = static_cast<int>(opts.printLevel);
+	INDEX = static_cast<int>(params.index);
 	if (NY == 0) INDEX = 0;
 	MSTAR = 0;
 	MMAX = 0;
 
 	for (int i = 1; i <= NCOMP; ++i) {
-		MMAX = std::max(MMAX, M(i));
-		MSTAR = MSTAR + M(i);
-		MT(i) = M(i);
+		MMAX = std::max(MMAX, params.orders(i));
+		MSTAR = MSTAR + params.orders(i);
+		MT(i) = params.orders(i);
 	}
 	if (K == 0)   K = std::max(MMAX + 1, 5 - MMAX);
 	for (int i = 1; i <= MSTAR; ++i)
-		TZETA(i) = ZETA(i);
+		TZETA(i) = params.bcpoints(i);
 	for (int i = 1; i <= NTOL; ++i) {
 		LTOL(i) = LTOL(i);
 		TOLIN(i) = TOL(i);
@@ -1133,10 +928,12 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	if (IPRINT <= -1)
 	{
 		if (NONLIN == 0) {
-			fmt::print("THE NUMBER OF (LINEAR) DIFF EQNS IS {}, THEIR ORDERS ARE {}\n", NCOMP, M);
+			fmt::print("THE NUMBER OF (LINEAR) DIFF EQNS IS {}, THEIR ORDERS ARE {}\n",
+				NCOMP, params.orders);
 		}
 		else {
-			fmt::print("THE NUMBER OF (NONLINEAR) DIFF EQNS IS {}, THEIR ORDERS ARE {}\n", NCOMP, M);
+			fmt::print("THE NUMBER OF (NONLINEAR) DIFF EQNS IS {}, THEIR ORDERS ARE {}\n", 
+				NCOMP, params.orders);
 		}
 
 		fmt::print("THERE ARE {} ALGEBRAIC CONSTRAINTS\n", NY);
@@ -1146,9 +943,10 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 		else {
 			fmt::print("THE INDEX IS {}\n", INDEX);
 		}
-		fmt::print("SIDE CONDITION POINTS ZETA: {}\n", ZETA);		
+		fmt::print("SIDE CONDITION POINTS ZETA: {}\n", params.bcpoints);		
 		if (NFXPNT > 0) {
-			fmt::print("THERE ARE {} FIXED POINTS IN THE MESH - {}\n", NFXPNT, FIXPNT);
+			fmt::print("THERE ARE {} FIXED POINTS IN THE MESH - {}\n",
+				NFXPNT, opts.fixpnt);
 		}
 		fmt::print("NUMBER OF COLLOC PTS PER INTERVAL IS {}\n", K);	
 		fmt::print("COMPONENTS OF Z REQUIRING TOLERANCES: {}\n", LTOL);
@@ -1176,25 +974,24 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 
 	int IP = 1;
 	for (int i = 1; i <= MSTAR; ++i) {
-		if (abs(ZETA(i) - ALEFT) < PRECIS || abs(ZETA(i) - ARIGHT) < PRECIS)
+		if (abs(params.bcpoints(i) - ALEFT) < PRECIS || abs(params.bcpoints(i) - ARIGHT) < PRECIS)
 			continue;
 
 		while (true) {
 			if (IP > NFXPNT)
 				return;
-			if (ZETA(i) - PRECIS < FIXPNT(IP))
+			if (params.bcpoints(i) - PRECIS < opts.fixpnt(IP))
 				break;
 			IP = IP + 1;
 		}
 
-		if (ZETA(i) + PRECIS < FIXPNT(IP))
+		if (params.bcpoints(i) + PRECIS < opts.fixpnt(IP))
 			return;
 	}
 
 	//  set limits on iterations and initialize counters.
 	//  limit = maximum number of newton iterations per mesh.
 	//  see subroutine  newmsh  for the roles of  mshlmt , mshflg , mshnum , and  mshalt .
-
 	MSHLMT = 3;
 	MSHFLG = 0;
 	MSHNUM = 1;
@@ -1205,7 +1002,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	int NREC = 0;
 	for (int i = 1; i <= MSTAR; ++i) {
 		int IB = MSTAR + 1 - i;
-		if (ZETA(IB) >= ARIGHT)  NREC = i;
+		if (params.bcpoints(IB) >= ARIGHT)  NREC = i;
 	}
 	int NFIXI = MSTAR;
 	int NSIZEI = 3 + KDY + MSTAR;
@@ -1217,7 +1014,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 		fmt::print("THE MAXIMUM NUMBER OF SUBINTERVALS IS MIN({}(ALLOWED FROM FSPACE),{}(ALLOWED FROM ISPACE))\n",
 			NMAXF, NMAXI);
 	}
-	NMAX = MIN0(NMAXF, NMAXI);
+	NMAX = std::min(NMAXF, NMAXI);
 	if (NMAX < N)
 		return;
 	if (NMAX < NFXPNT + 1)   
@@ -1257,25 +1054,25 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	if (IGUESS >= 2) {
 		NOLD = N;
 		if (IGUESS == 4)
-			NOLD = ISPACE(1);
+			NOLD = ispace(1);
 		NZ = MSTAR * (NOLD + 1);
 		NDMZ = KDY * NOLD;
 		int NP1 = N + 1;
 		if (IGUESS == 4)
 			NP1 = NP1 + NOLD + 1;
 		for (int i = 1; i <= NZ; ++i)
-			FSPACE(LZ + i - 1) = FSPACE(NP1 + i);
+			fspace(LZ + i - 1) = fspace(NP1 + i);
 		int IDMZ = NP1 + NZ;
 		for (int i = 1; i <= NDMZ; ++i)
-			FSPACE(LDMZ + i - 1) = FSPACE(IDMZ + i);
+			fspace(LDMZ + i - 1) = fspace(IDMZ + i);
 		NP1 = NOLD + 1;
 		if (IGUESS == 4) {
 			for (int i = 1; i <= NP1; ++i)
-				FSPACE(LXIOLD + i - 1) = FSPACE(N + 1 + i);
+				fspace(LXIOLD + i - 1) = fspace(N + 1 + i);
 		}
 		else {
 			for (int i = 1; i <= NP1; ++i)
-				FSPACE(LXIOLD + i - 1) = FSPACE(LXI + i - 1);
+				fspace(LXIOLD + i - 1) = fspace(LXI + i - 1);
 		}
 	}
 
@@ -1290,60 +1087,89 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 		NYCB = NY;
 
 	int meshmode = 3 + IREAD;
-	NEWMSH(meshmode, FSPACE.sub(LXI), FSPACE.sub(LXIOLD),
- DUMMY,
-		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY,
- NFXPNT, FIXPNT,
-		DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
+	NEWMSH(meshmode, fspace.sub(LXI), fspace.sub(LXIOLD),
+		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, DUMMY,
+		NFXPNT, opts.fixpnt, DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
 
 	//  determine first approximation, if the problem is nonlinear.
 	if (IGUESS < 2) {
 		for (int i = 1; i <= N + 1; ++i)
-			FSPACE(i + LXIOLD - 1) = FSPACE(i + LXI - 1);
+			fspace(i + LXIOLD - 1) = fspace(i + LXI - 1);
 		NOLD = N;
 		if (NONLIN != 0 && IGUESS != 1) {
 			//  system provides first approximation of the solution.
 			//  choose z(j) = 0  for j=1,...,mstar.
 			for (int i = 1; i <= NZ; ++i)
-				FSPACE(LZ - 1 + i) = 0.0;
+				fspace(LZ - 1 + i) = 0.0;
 			for (int i = 1; i <= NDMZ; ++i)
-				FSPACE(LDMZ - 1 + i) = 0.0;
+				fspace(LDMZ - 1 + i) = 0.0;
 		}
 	}
 	if (IGUESS >= 2)  
 		IGUESS = 0;
 
 	
-	CONTRL(FSPACE.sub(LXI), FSPACE.sub(LXIOLD), FSPACE.sub(LZ), FSPACE.sub(LDMZ), FSPACE.sub(LDMV),
-		FSPACE.sub(LRHS), FSPACE.sub(LDELZ), FSPACE.sub(LDELDZ), FSPACE.sub(LDQZ),
-		FSPACE.sub(LDQDMZ), FSPACE.sub(LG), FSPACE.sub(LW), FSPACE.sub(LV), FSPACE.sub(LFC),
-		FSPACE.sub(LVALST), FSPACE.sub(LSLOPE), FSPACE.sub(LSCL), FSPACE.sub(LDSCL),
-		FSPACE.sub(LACCUM), ISPACE.sub(LPVTG), ISPACE.sub(LINTEG), ISPACE.sub(LPVTW),
-		NFXPNT, FIXPNT, iflag, fsub, dfsub, gsub, dgsub, guess);
+	CONTRL(fspace.sub(LXI), fspace.sub(LXIOLD), fspace.sub(LZ), fspace.sub(LDMZ), fspace.sub(LDMV),
+		fspace.sub(LRHS), fspace.sub(LDELZ), fspace.sub(LDELDZ), fspace.sub(LDQZ),
+		fspace.sub(LDQDMZ), fspace.sub(LG), fspace.sub(LW), fspace.sub(LV), fspace.sub(LFC),
+		fspace.sub(LVALST), fspace.sub(LSLOPE), fspace.sub(LSCL), fspace.sub(LDSCL),
+		fspace.sub(LACCUM), ispace.sub(LPVTG), ispace.sub(LINTEG), ispace.sub(LPVTW),
+		NFXPNT, opts.fixpnt, iflag, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
-	ISPACE(1) = N;
-	ISPACE(2) = K;
-	ISPACE(3) = NCOMP;
-	ISPACE(4) = NY;
-	ISPACE(5) = MSTAR;
-	ISPACE(6) = MMAX;
-	ISPACE(7) = NZ + NDMZ + N + 2;
+	ispace(1) = N;
+	ispace(2) = K;
+	ispace(3) = NCOMP;
+	ispace(4) = NY;
+	ispace(5) = MSTAR;
+	ispace(6) = MMAX;
+	ispace(7) = NZ + NDMZ + N + 2;
 	int K2 = K * K;
-	ISPACE(8) = ISPACE(7) + K2 - 1;
+	ispace(8) = ispace(7) + K2 - 1;
 	for (int i = 1; i <= NCOMP; ++i)
-		ISPACE(8 + i) = M(i);
+		ispace(8 + i) = params.orders(i);
 	for (int i = 1; i <= NZ; ++i)
-		FSPACE(N + 1 + i) = FSPACE(LZ - 1 + i);
+		fspace(N + 1 + i) = fspace(LZ - 1 + i);
 	int IDMZ = N + 1 + NZ;
 
 	for (int i = 1; i <= NDMZ; ++i)
-		FSPACE(IDMZ + i) = FSPACE(LDMZ - 1 + i);
+		fspace(IDMZ + i) = fspace(LDMZ - 1 + i);
 	int IC = IDMZ + NDMZ;
 	for (int i = 1; i <= K2; ++i)
-		FSPACE(IC + i) = COEF.contiguous()[i-1];
+		fspace(IC + i) = COEF.contiguous()[i-1];
 }
 
+// * ****************************************************************
+//
+//     purpose
+//
+//           set up a standard call to  approx  to evaluate the
+//           approximate solution  z = z(u(x)), y = y(x)  at a
+//           point x(it has been computed by a call to  coldae).
+//           the parameters needed for  approx  are retrieved
+//           from the work arrays  ispaceand fspace .
+//
+//*****************************************************************
+void APPSLN(double& X, dar1 Z, dar1 Y, dar1 FSPACE, iar1 ISPACE) {
+	Z.assertDim(1);
+	Y.assertDim(1);
+	FSPACE.assertDim(1);
+	ISPACE.assertDim(1);
+
+	dad1 A(28), DUMMY(1);
+
+	int IS6 = ISPACE(7);
+	int IS5 = ISPACE(1) + 2;
+	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
+	int i = 1;
+	APPROX(i, X, Z, Y, A, FSPACE.sub(IS6), FSPACE.sub(1), ISPACE(1),
+		FSPACE.sub(IS5), FSPACE.sub(IS4), ISPACE(2), ISPACE(3),
+		ISPACE(4), ISPACE(6), ISPACE.sub(9), ISPACE(5), 2, DUMMY, 1);
+}
+
+
+
+private:
 
 //**********************************************************************
 //
@@ -1394,7 +1220,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 //**********************************************************************
 void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
 	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
-	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, const int NFXPNT, dar1 FIXPNT, int& iflag,
+	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, const int NFXPNT, dar1 FIXPNT, output_t& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	XI.assertDim(1);
@@ -1447,7 +1273,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	// compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
-		CHECK = DMAX1(TOLIN(i), CHECK);
+		CHECK = std::max(TOLIN(i), CHECK);
 	int IMESH = 1;
 	int ICONV = 0;
 	if (NONLIN == 0) ICONV = 1;
@@ -1488,7 +1314,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					if (IPRINT < 1) {
 						fmt::print("SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n"); 
 					}
-					iflag = 0;
+					iflag = output_t::singular;
 					return;
 				}
 				if (MSING == 0)
@@ -1505,7 +1331,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				if (IPRINT < 1) {
 					fmt::print(fg(fmt::color::red), "THE GLOBAL BVP - MATRIX IS SINGULAR\n");
 				}
-				iflag = 0;
+				iflag = output_t::singular;
 				return;
 			}
 
@@ -1566,7 +1392,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				if (IPRINT < 1) {
 					fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
 				}
-				iflag = 0;
+				iflag = output_t::singular;
 				return;
 			}
 			if (IFREEZ != 1) {
@@ -1660,7 +1486,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				goto n30;
 			if (ISING != 0) {
 				if (IPRINT < 1)  fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
-				iflag = 0;
+				iflag = output_t::singular;
 				return;
 			}
 
@@ -1708,7 +1534,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 			if (ISING != 0) {
 				if (IPRINT < 1)  fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
-				iflag = 0;
+				iflag = output_t::singular;
 				return;
 			}
 
@@ -1913,7 +1739,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 						ERRCHK(XI, Z, DMZ, VALSTR, IFIN);
 					if (IMESH == 1 || IFIN == 0 && ICARE != 2)
 						goto n460;
-					iflag = 1;
+					iflag = output_t::normal;
 					return;
 				}
 			n430: ;
@@ -1930,7 +1756,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			}
 
-			iflag = -2;
+			iflag = output_t::notConverged;
 			NOCONV = NOCONV + 1;
 			if (ICARE == 2 && NOCONV > 1)
 				return;
@@ -1969,7 +1795,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			// exit if expected n is too large (but may try n=nmax once)
 			if (N > NMAX){
 				N = N / 2;
-				iflag = -1;
+				iflag = output_t::outOfMemory;
 				if (ICONV == 0 && IPRINT < 1)
 					fmt::print("NO CONVERGENCE\n"); 
 				if (ICONV == 1 && IPRINT < 1)  
@@ -2410,7 +2236,7 @@ n100:
 			for (int j = 1; j <= NTOL; ++j) {
 				int JJ = JTOL(j);
 				int JZ = LTOL(j);
-				SLOPE(1) = DMAX1(SLOPE(1),
+				SLOPE(1) = std::max(SLOPE(1),
 					pow(abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ))),
 						ROOT(j)));
 			}
@@ -2435,22 +2261,19 @@ n100:
 					int JJ = JTOL(j);
 					int JZ = LTOL(j) + (i - 1) * MSTAR;
 					auto temp = abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ)));
-					SLOPE(i) = DMAX1(SLOPE(i),
-						pow(temp,
-							ROOT(j))
-					);
-				/*	fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
-					fmt::print(fg(fmt::color::orange), "WGTMSH(j)  = {}\n", WGTMSH(j));
-					fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
-					fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
-					fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
-					fmt::print(fg(fmt::color::orange), "ROOT(j)  = {}\n", ROOT(j));
-					fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));*/
+					SLOPE(i) = std::max(SLOPE(i), pow(temp, ROOT(j)));
+					/*	fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
+						fmt::print(fg(fmt::color::orange), "WGTMSH(j)  = {}\n", WGTMSH(j));
+						fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
+						fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
+						fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
+						fmt::print(fg(fmt::color::orange), "ROOT(j)  = {}\n", ROOT(j));
+						fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));*/
 				}
 
 				// accumulate approximate integral of function to be equidistributed
 				double TEMP = SLOPE(i) * (XIOLD(i + 1) - XIOLD(i));
-				SLPHMX = DMAX1(SLPHMX, TEMP);
+				SLPHMX = std::max(SLPHMX, TEMP);
 				ACCUM(i + 1) = ACCUM(i) + TEMP;
 				IFLIP = -IFLIP;
 				/*fmt::print(fg(fmt::color::green), "SLOPE({}) = {}\n", i, SLOPE(i)); 
@@ -2463,7 +2286,7 @@ n100:
 
 			
 			double AVRG = ACCUM(NOLD + 1) / double(NOLD);
-			double DEGEQU = AVRG / DMAX1(SLPHMX, PRECIS);
+			double DEGEQU = AVRG / std::max(SLPHMX, PRECIS);
 
 			//  naccum=expected n to achieve .1x user requested tolerances
 			int NACCUM = int(ACCUM(NOLD + 1) + 1.0);
@@ -2485,7 +2308,7 @@ n100:
 			int NMAX2 = NMAX / 2;
 
 			//  the mesh is at most halved
-			N = MIN0(NMAX2, NOLD, NMX);
+			N = std::min({ NMAX2, NOLD, NMX });
 		}
 	n220:
 		{
@@ -2810,7 +2633,7 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 
 		// find component-wise maximum error estimate
 		for (int l = 1; l <= MSTAR; ++l)
-			ERREST(l) = DMAX1(ERREST(l), ERR(l));
+			ERREST(l) = std::max(ERREST(l), ERR(l));
 
 		// test whether the tolerance requirements are satisfied
 		// in the i-th interval.
@@ -3682,7 +3505,7 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	//  compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
-		CHECK = DMAX1(TOLIN(i), CHECK);
+		CHECK = std::max(TOLIN(i), CHECK);
 
 	//  construct d and find its svd
 	for (int i = 1; i <= NY; ++i)
@@ -4335,35 +4158,6 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 
 
 
-// * ****************************************************************
-//
-//     purpose
-//
-//           set up a standard call to  approx  to evaluate the
-//           approximate solution  z = z(u(x)), y = y(x)  at a
-//           point x(it has been computed by a call to  coldae).
-//           the parameters needed for  approx  are retrieved
-//           from the work arrays  ispaceand fspace .
-//
-//*****************************************************************
-void APPSLN(double& X, dar1 Z, dar1 Y, dar1 FSPACE, iar1 ISPACE) {
-	Z.assertDim(1);
-	Y.assertDim(1);
-	FSPACE.assertDim(1);
-	ISPACE.assertDim(1);
-
-	dad1 A(28), DUMMY(1);
-
-	int IS6 = ISPACE(7);
-	int IS5 = ISPACE(1) + 2;
-	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
-	int i = 1;
-	APPROX(i, X, Z, Y, A, FSPACE.sub(IS6), FSPACE.sub(1), ISPACE(1),
-		FSPACE.sub(IS5), FSPACE.sub(IS4), ISPACE(2), ISPACE(3),
-		ISPACE(4), ISPACE(6), ISPACE.sub(9), ISPACE(5), 2, DUMMY, 1);
-}
-
-
 
 /* * *********************************************************************
 
@@ -4527,7 +4321,7 @@ void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, const int NROW, const int NCOL, const i
 
 	for (int j = 1; j <= NCOL; ++j)
 		for (int i = 1; i <= NROW; ++i)
-			D(i) = DMAX1(D(i), abs(W(i, j)));
+			D(i) = std::max(D(i), abs(W(i, j)));
 
 	//  gauss elimination with pivoting of scaled rows, loop over
 	//  k = 1, ., last
@@ -4650,7 +4444,7 @@ void SHIFTB(dar2 AI, const int NROWI, const int NCOLI, const int LAST, dar2 AI1,
 	AI1.reshape(NROWI1, NCOLI1);
 	AI1.assertDim(NROWI1, NCOLI1);
 
-	int MMAX = NROWI - LAST;
+	int MMAX = NROWI - LAST; // soll ausblenden
 	int JMAX = NCOLI - LAST;
 	if (MMAX < 1 || JMAX < 1)
 		return;
@@ -4714,7 +4508,7 @@ void FCBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 SCRTCH,
 	//  loop over the blocks. i is loop index
 	int i = 1;
 	while (true) {
-		int INDEX = INDEXN;
+		int INDEX = INDEXN;  // soll ausblenden
 		int NROW = INTEGS(1, i);
 		int NCOL = INTEGS(2, i);
 		int LAST = INTEGS(3, i);
@@ -4823,7 +4617,7 @@ void SUBFOR(dar2 W, iar1 IPIVOT, const int NROW, const int LAST, dar1 X)
 
 	if (NROW == 1)
 		return;
-	LSTEP = MIN0(NROW - 1, LAST);
+	LSTEP = std::min(NROW - 1, LAST);
 	for (k = 1; k <= LSTEP; ++k)
 	{
 		KP1 = k + 1;
@@ -4866,7 +4660,7 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
 	int NCOL, NROW, LAST;
 
 	//  forward substitution pass
-	int INDEX = 1;
+	int INDEX = 1;  // soll ausblenden
 	int INDEXX = 1;
 	for (int i = 1; i <= NBLOKS; ++i) {
 		NROW = INTEGS(1, i);
