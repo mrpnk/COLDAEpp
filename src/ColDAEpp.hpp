@@ -1194,7 +1194,7 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 		}
 	}
 
-	dumpState();
+	//dumpState();
 
 	//  initialize collocation points, constants, mesh.
 	CONSTS();
@@ -1386,7 +1386,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 	while (true) {
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "while:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "while:\n");
 
 			// initialization for a new mesh
 			ITER = 0;
@@ -1409,7 +1409,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				if (MSING == 0)
 					goto n400;
 			n30:
-				fmt::print(fg(fmt::color::cornflower_blue), "30:\n");
+				//fmt::print(fg(fmt::color::cornflower_blue), "30:\n");
 
 				if (MSING >= 0) {
 					if (IPRINT < 1) {
@@ -1458,7 +1458,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n60:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "60:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "60:\n");
 			// solve for the next iterate .
 			// the value of ifreez determines whether this is a full
 			// newton step (=0) or a fixed jacobian iteration (=1).
@@ -1472,7 +1472,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n70:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "70:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "70:\n");
 
 			// check for a singular matrix
 			if (MSING != 0)
@@ -1514,7 +1514,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n110:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "110:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "110:\n");
 
 			// verify that the linear convergence with fixed jacobian
 			// is fast enough.
@@ -1538,7 +1538,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n130:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "130:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "130:\n");
 
 			// convergence of fixed jacobian iteration failed.
 			if (IPRINT < 0) 
@@ -1560,7 +1560,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n160:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "160:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "160:\n");
 			// no previous convergence has been obtained. proceed
 			// with the damped newton method.
 			// evaluate rhs and find the first newton correction.
@@ -1593,7 +1593,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n170:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "170:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "170:\n");
 			// main iteration loop
 			RNOLD = RNORM;
 			if (ITER >= LIMIT)
@@ -1610,7 +1610,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			for (int i = 1; i <= NDMZ; ++i)
 				ANSCL = ANSCL + pow(DELDMZ(i) * DSCALE(i), 2);
 
-			ANSCL = sqrt(ANSCL / float(NZ + NDMZ));
+			ANSCL = sqrt(ANSCL / double(NZ + NDMZ));
 
 			// find a newton direction
 			LSYSLV(MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
@@ -1636,7 +1636,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				for (int i = 1; i <= NDMZ; ++i)
 					ANDIF = ANDIF + pow((DQDMZ(i) - DELDMZ(i)) * DSCALE(i), 2);
 
-				ANDIF = sqrt(ANDIF / float(NZ + NDMZ) + PRECIS);
+				ANDIF = sqrt(ANDIF / double(NZ + NDMZ) + PRECIS);
 				RELAX = RELAX * ANSCL / ANDIF;
 				if (RELAX > 1.0)  RELAX = 1.0;
 				RLXOLD = RELAX;
@@ -1645,7 +1645,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n220:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "220:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "220:\n");
 			ITER = ITER + 1;
 
 			// determine a new  z and dmz  and find new  rhs  and its norm
@@ -1657,39 +1657,39 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n250:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "250:\n");
+			//fmt::print(fg(fmt::color::cornflower_blue), "250:\n");
 
-			for (int i = 1; i <= NZ; ++i) {
+			/*for (int i = 1; i <= NZ; ++i) {
 				fmt::print("+ DQZ(i)={:10.6f}\n", DQZ(i));
-			}
+			}*/
 
 			LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
 				W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
-			for (int i = 1; i <= NZ; ++i) {
+			/*for (int i = 1; i <= NZ; ++i) {
 				fmt::print("++ DQZ(i)={:10.6f}\n", DQZ(i));
-			}
+			}*/
 
 			// compute a fixed jacobian iterate (used to control relax)
 			LSYSLV(MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
 				W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 4,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
-			for (int i = 1; i <= NZ; ++i) {
-				fmt::print("+++ DQZ(i)={:10.6f}\n", DQZ(i));
-			}
+			//for (int i = 1; i <= NZ; ++i) {
+			//	fmt::print("+++ DQZ(i)={:10.6f}\n", DQZ(i));
+			//}
 
 			// find scaled norms of various terms used to correct relax
 			ANORM = 0.0;
 			ANFIX = 0.0;
 			for (int i = 1; i <= NZ; ++i) {
-				fmt::print("---- DQZ(i)={:10.6f}, SCALE(i)={:10.6f}\n", DQZ(i), SCALE(i));
+				//fmt::print("---- DQZ(i)={:10.6f}, SCALE(i)={:10.6f}\n", DQZ(i), SCALE(i));
 				ANORM = ANORM + pow(DELZ(i) * SCALE(i), 2);
 				ANFIX = ANFIX + pow(DQZ(i) * SCALE(i), 2);
 			}
 			for (int i = 1; i <= NDMZ; ++i) {
-				fmt::print("---- DQDMZ(i)={:10.6f}, DSCALE(i)={:10.6f}\n", DQDMZ(i), DSCALE(i));
+				//fmt::print("---- DQDMZ(i)={:10.6f}, DSCALE(i)={:10.6f}\n", DQDMZ(i), DSCALE(i));
 				ANORM = ANORM + pow(DELDMZ(i) * DSCALE(i), 2);
 				ANFIX = ANFIX + pow(DQDMZ(i) * DSCALE(i), 2);
 			}
@@ -1768,7 +1768,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}			
 			n350: 
 				{
-					fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
+					//fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
 					// check convergence (iconv = 0).
 					for (int IT = 1; IT <= NTOL; ++IT) {
 						int INZ = LTOL(IT);
@@ -1792,7 +1792,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n390:
 				{
-					fmt::print(fg(fmt::color::cornflower_blue), "390:\n");
+					//fmt::print(fg(fmt::color::cornflower_blue), "390:\n");
 					if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1) 
 						fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 					ICONV = 1;
@@ -1800,7 +1800,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n400:
 				{
-					fmt::print(fg(fmt::color::cornflower_blue), "400:\n");
+					//fmt::print(fg(fmt::color::cornflower_blue), "400:\n");
 					// if full output has been requested, print values of the
 					// solution components   z  at the meshpoints and  y  at
 					// collocation points.
@@ -1821,7 +1821,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				}
 			n420:
 				{
-					fmt::print(fg(fmt::color::cornflower_blue), "420:\n");
+					//fmt::print(fg(fmt::color::cornflower_blue), "420:\n");
 					// check for error tolerance satisfaction
 					int IFIN = 1;
 					if (IMESH == 2)
@@ -1832,7 +1832,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					return;
 				}
 			n430: ;
-				fmt::print(fg(fmt::color::cornflower_blue), "430:\n");
+				//fmt::print(fg(fmt::color::cornflower_blue), "430:\n");
 
 				// diagnostics for failure of nonlinear iteration.
 				if (IPRINT < 1)  
@@ -1854,7 +1854,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n460:
 		{
-			fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
+		//fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
 			// update old mesh
 			for (int i = 1; i <= N + 1; ++i)
 				XIOLD(i) = XI(i);
@@ -1942,7 +1942,7 @@ void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 		int IZ = 1;
 		double H = XI(j + 1) - XI(j);
 		for (int l = 1; l <= MMAX; ++l)
-			BASM(l + 1) = BASM(l) * H / float(l);
+			BASM(l + 1) = BASM(l) * H / double(l);
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
 			double SCAL = (abs(Z(IZ, j)) + abs(Z(IZ, j + 1))) * .5 + 1.0;
@@ -2142,9 +2142,9 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 			// j-th fixed points.
 			int NREGN = IRIGHT - ILEFT - 1;
 			if (NREGN != 0) {
-				double DX = (XRIGHT - XLEFT) / float(NREGN + 1);
+				double DX = (XRIGHT - XLEFT) / double(NREGN + 1);
 				for (int i = 1; i <= NREGN; ++i)
-					XI(ILEFT + i) = XLEFT + float(i) * DX;
+					XI(ILEFT + i) = XLEFT + double(i) * DX;
 				ILEFT = IRIGHT;
 			}
 			XLEFT = XRIGHT;
@@ -2354,13 +2354,13 @@ n100:
 						pow(temp,
 							ROOT(j))
 					);
-					fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
+				/*	fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
 					fmt::print(fg(fmt::color::orange), "WGTMSH(j)  = {}\n", WGTMSH(j));
 					fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
 					fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
 					fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
 					fmt::print(fg(fmt::color::orange), "ROOT(j)  = {}\n", ROOT(j));
-					fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));
+					fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));*/
 				}
 
 				// accumulate approximate integral of function to be equidistributed
@@ -2371,9 +2371,9 @@ n100:
 				/*fmt::print(fg(fmt::color::green), "SLOPE({}) = {}\n", i, SLOPE(i)); 
 				fmt::print(fg(fmt::color::green), "ACCUM({} + 1) = {}\n", i, ACCUM(i + 1));*/
 
-				fmt::print(fg(fmt::color::green), "SLOPE = {}\n", SLOPE(i));
+				/*fmt::print(fg(fmt::color::green), "SLOPE = {}\n", SLOPE(i));
 				fmt::print(fg(fmt::color::green), "diff  = {}\n", (XIOLD(i + 1) - XIOLD(i)));
-				fmt::print(fg(fmt::color::green), "TEMP  = {}\n", TEMP);
+				fmt::print(fg(fmt::color::green), "TEMP  = {}\n", TEMP);*/
 			}
 
 			
@@ -2449,7 +2449,7 @@ n100:
 				}
 				if (NREGN != 0) {
 					double TEMP = ACCL;
-					double TSUM = (ACCR - ACCL) / float(NREGN + 1);
+					double TSUM = (ACCR - ACCL) / double(NREGN + 1);
 					for (int j = 1; j <= NREGN; ++j) {
 						IN = IN + 1;
 						TEMP = TEMP + TSUM;
@@ -2566,7 +2566,7 @@ void CONSTS()
 		}
 		JTOL(i) = JCOMP;
 		WGTMSH(i) = 1.e1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i);
-		ROOT(i) = 1.0 / float(K + MTOT - LTOLI + 1);
+		ROOT(i) = 1.0 / double(K + MTOT - LTOLI + 1);
 	}
 
 	// specify collocation points
@@ -2857,13 +2857,13 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
-	fmt::print(fg(fmt::color::orange_red),"Enter LSYSLV and RHS(41) = {}\n", RHS(41));
-	fmt::print(fg(fmt::color::orange_red), "Address is {}\n", 
-		(void*)(RHS.contiguous() + 40));
-	observer = RHS.contiguous() + 40;
+	//fmt::print(fg(fmt::color::orange_red),"Enter LSYSLV and RHS(41) = {}\n", RHS(41));
+	//fmt::print(fg(fmt::color::orange_red), "Address is {}\n", 
+		//(void*)(RHS.contiguous() + 40));
+	//observer = RHS.contiguous() + 40;
 
 
-	fmt::print(fg(fmt::color::medium_purple), "observer = {}\n", *observer);
+	//fmt::print(fg(fmt::color::medium_purple), "observer = {}\n", *observer);
 	
 	dad1 YVAL(20), ZVAL(40), F(40), DGZ(40), DMVAL(20), DF(800);
 	dad1 DUMMY(1), Y(1), AT(28), CB(400);
@@ -2930,6 +2930,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		}
 		if (MODE != 2) {
 			//  zero the matrices to be computed
+			//fmt::print(fg(fmt::color::yellow_green), "Zero the W matrix\n");
 			int LW = KDY * KDY * N;
 			for (int l = 1; l <= LW; ++l)
 				W(l) = 0.0;
@@ -2972,6 +2973,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				// find  rhs  boundary value.
 				double GVAL;
 				gsub(IZETA, ZVAL, GVAL); // TODO problem: ZVAL ist immer 0,0
+				//fmt::print(bg(fmt::color::blue),"Called gsub and got = {}\n", GVAL);
 				RHS(NDMZ + IZETA) = -GVAL;
 				RNORM = RNORM + GVAL * GVAL;
 				if (MODE != 2) {
@@ -3023,7 +3025,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					APPROX(i, XCOL, ZVAL, Y, ACOL.sub(1, j), COEF, XI, N, Z,
 						DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
 					if (MODE == 3)
-						break;
+						goto n210;
 
 					// fill in  rhs  values (and accumulate its norm).
 					fsub(XCOL, ZVAL, DMZ.sub(IRHS + NCOMP), F);
@@ -3042,12 +3044,12 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					fsub(XCOL, ZVAL, YVAL, RHS.sub(IRHS));
 					IRHS = IRHS + NCY;
 				}
-
+			n210:
 				auto test1 = W(16);
 
-				fmt::print(fg(fmt::color::light_blue), "vor VWBLOK W(16) = {}\n", W(16));
+				//fmt::print(fg(fmt::color::light_blue), "vor VWBLOK W(9) = {}\n", W(9));
 
-				static int counter = 0;
+				/*static int counter = 0;
 				counter ++;
 				if (counter == 4)
 					logall = true;
@@ -3058,15 +3060,16 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 							"{:6.4f} ", ACOL(ii, jj));
 					std::cout << std::endl;
 				}
+			*/
 
 				// fill in ncy rows of  w and v
 				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW.sub(IDMZ),
 					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO.sub(IDMZO), dfsub, MSING);
 
-				logall = false;
+				//logall = false;
 
-				auto test2 = W(16);
-				fmt::print(fg(fmt::color::light_blue), "nach VWBLOK W(16) = {}\n", W(16));
+				//auto test2 = W(16);
+				//fmt::print(fg(fmt::color::light_blue), "nach VWBLOK W(9) = {}\n", W(9));
 
 				if (MSING != 0)
 					return;
@@ -3107,6 +3110,11 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				// find rhs at next mesh point (also for linear case)
 				fsub(XI1, ZVAL, YVAL, F);
 			}
+
+			//fmt::print(fg(fmt::color::yellow_green), "W(9) = {}\n",W(9));
+
+			if (W(9) == 0)
+				int sdfk = 3254;
 
 			GBLOCK(H, G.sub(IG), NROW, IZETA, W.sub(IW), V.sub(IV), DUMMY, DELDMZ.sub(IDMZ),
 				IPVTW.sub(IDMZ), 1, MODE, XI1, ZVAL, YVAL, F, DF,
@@ -3169,9 +3177,9 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 
 		// assembly process completed
 		if (MODE != 0 && MODE != 3) {
-			RNORM = sqrt(RNORM / float(NZ + NDMZ));
+			RNORM = sqrt(RNORM / double(NZ + NDMZ));
 			if (MODE == 2) {
-				fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
+				//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 				return;
 			}
 		}
@@ -3202,34 +3210,34 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			while (true) {
 				if (IZET == IZETA)
 					break;
-				fmt::print("---------------------------------------\n");
-				fmt::print("Set DELZ({}) = {}\n", IZ - 1 + IZET, RHS(NDMZ + IZET));
+				/*fmt::print("---------------------------------------\n");
+				fmt::print("Set DELZ({}) = {}\n", IZ - 1 + IZET, RHS(NDMZ + IZET));*/
 				DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET);
 				IZET = IZET + 1;
 			}
 			double H = XI(i + 1) - XI(i);
-			logall = true;
+//			logall = true;
 			
-			std::ofstream file("dgesl_prev.txt");
-			for (int i = 0; i < KDY * KDY; ++i)
-				file << W.sub(IW).contiguous()[i] << std::endl;
+			/*std::ofstream file("dgesl_prev.txt");
+			for (int ii = 0; ii < KDY * KDY; ++ii)
+				file << W.sub(IW).contiguous()[ii] << std::endl;
 			file.close();
 
 			fmt::print(fg(fmt::color::gold), "vorher DELZ = \n");
-			for(int i = 1; i<=4;++i)
-				fmt::print(fg(fmt::color::gold), "{}  ", DELZ(i));
-			std::cout << std::endl;
+			for(int ii = 1; ii<=4;++ii)
+				fmt::print(fg(fmt::color::gold), "{}  ", DELZ(ii));
+			std::cout << std::endl;*/
 
 			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW), V.sub(1), DELZ.sub(IZ), DELDMZ.sub(IDMZ),
 				IPVTW.sub(IDMZ), 2, MODE, XI1, ZVAL, YVAL, FC.sub(IFC + INFC),
 				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NYCB);
 			
-			fmt::print(fg(fmt::color::golden_rod), "nachher DELZ = \n");
-			for (int i = 1; i <= 4; ++i)
-				fmt::print(fg(fmt::color::golden_rod), "{}  ", DELZ(i));
-			std::cout << std::endl;
+		/*	fmt::print(fg(fmt::color::golden_rod), "nachher DELZ = \n");
+			for (int ii = 1; ii <= 4; ++ii)
+				fmt::print(fg(fmt::color::golden_rod), "{}  ", DELZ(ii));
+			std::cout << std::endl;*/
 
-			logall = false;
+			//logall = false;
 			IZ = IZ + MSTAR;
 			IDMZ = IDMZ + KDY;
 			IW = IW + KDY * KDY;
@@ -3239,14 +3247,14 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			while (true) {
 				if (IZET > MSTAR)
 					break;
-				fmt::print("Set DELZ({}) = {}\n", IZ - 1 + IZET, RHS(NDMZ + IZET));
+				//fmt::print("Set DELZ({}) = {}\n", IZ - 1 + IZET, RHS(NDMZ + IZET));
 				DELZ(IZ - 1 + IZET) = RHS(NDMZ + IZET);
 				IZET = IZET + 1;
 			}
 		}
 
 		for (int i = 1; i <= NZ; ++i) {
-			fmt::print("# DQZ(i)={:10.6f}\n", DELZ(i));
+			//fmt::print("# DQZ(i)={:10.6f}\n", DELZ(i));
 		}
 
 		//  perform forward and backward substitution for mode=0,2, or 3.
@@ -3256,7 +3264,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		DMZSOL(V, DELZ, DELDMZ);
 
 		if (MODE != 1) {
-			fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
+			//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 			return;
 		}
 
@@ -3314,7 +3322,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		DMZSOL(V, Z, DMZ);
 	}
 	}
-	fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
+	//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 }
 
 
@@ -3447,9 +3455,9 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 		FACT = FACT * HRHO / double(l);
 		BASM(l) = FACT;
 		for (int j = 1; j <= K; ++j) {
-			if (j==1&&l==1) {
+			/*if (j==1&&l==1) {
 				fmt::print(fg(logall?fmt::color::orange : fmt::color::blue), "FACT = {}, acol(j, l) = {}\n", FACT, acol(j, l));
-			}
+			}*/
 			HA(j, l) = FACT * acol(j, l);
 		}
 	}
@@ -3504,15 +3512,15 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 			for (int j = 1; j <= K; ++j) {
 				double AJL = -HA(j, l);
 				for (int IW = I1; IW <= I2; ++IW) {
-					if (logall && IW == 8 && JW == 2) {
+					/*if (logall && IW == 8 && JW == 2) {
 						fmt::print(fg(fmt::color::orange), "j = {}, l = {}\n",j,l); 
 						fmt::print(fg(fmt::color::red), "WI(IW, JW) = {}, AJL = {}, VI(IW, JV) = {}\n",
 							WI(IW, JW), AJL, VI(IW, JV));
-					}
+					}*/
 					WI(IW, JW) = WI(IW, JW) + AJL * VI(IW, JV);
-					if (logall && IW == 8 && JW == 2)
+					/*if (logall && IW == 8 && JW == 2)
 						fmt::print(fg(fmt::color::red), "neu WI(IW, JW) = {}\n",
-							WI(IW, JW));
+							WI(IW, JW));*/
 				}
 				JW = JW + NCY;
 			}
@@ -3702,7 +3710,7 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 	}
 }
 
-bool logall = false;
+//bool logall = false;
 
 //**********************************************************************
 //
@@ -3772,7 +3780,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 	double FACT = 1.0;
 	BASM(1) = 1.0;
 	for (int l = 1; l <= MMAX; ++l) {
-		FACT = FACT * H / float(l);
+		FACT = FACT * H / double(l);
 		BASM(l + 1) = FACT;
 		for (int j = 1; j <= K; ++j)
 			HB(j, l) = FACT * B(j, l);
@@ -3916,19 +3924,19 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 
 
 	case 2:
-		if (logall) {
-			for (int i = 1; i <= NZ; ++i) {
-				fmt::print("#- RHSZ(i)={:10.6f}\n", RHSZ(i));
-			}
-			
-		}
+		//if (logall) {
+		//	for (int i = 1; i <= NZ; ++i) {
+		//		//	fmt::print("#- RHSZ(i)={:10.6f}\n", RHSZ(i));
+		//	}
+		//	
+		//}
 		auto check = RHSDMZ(1);
 
 		static int niters = 0;
 		niters++;
 
 		//  compute the appropriate piece of  rhsz
-		if (logall||true) {
+		/*if (logall||true) {
 			std::ofstream file("dgesl_in"+std::to_string(niters)+".txt");
 			for (int i = 0; i < KDY * KDY; ++i)
 				file << WI.contiguous()[i] << std::endl;
@@ -3937,9 +3945,9 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			for (int i = 0; i < KDY; ++i)
 				file << RHSDMZ.contiguous()[i] << std::endl;
 			file.close();
-		}
+		}*/
 		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
-		if (logall || true) {
+	/*	if (logall || true) {
 			std::ofstream file("dgesl_out.txt");
 			for (int i = 0; i < KDY * KDY; ++i)
 				file << WI.contiguous()[i] << std::endl;
@@ -3948,14 +3956,14 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			for (int i = 0; i < KDY; ++i)
 				file << RHSDMZ.contiguous()[i] << std::endl;
 			file.close();
-		}
+		}*/
 		auto nachcheck = RHSDMZ(1);
 
-		if (logall) {
-			for (int i = 1; i <= NZ; ++i) {
-				fmt::print("#= RHSZ(i)={:10.6f}\n", RHSZ(i));
-			}
-		}
+		//if (logall) {
+		//	for (int i = 1; i <= NZ; ++i) {
+		//		//	fmt::print("#= RHSZ(i)={:10.6f}\n", RHSZ(i));
+		//	}
+		//}
 
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
@@ -3966,24 +3974,24 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 				double RSUM = 0.0;
 				for (int j = 1; j <= K; ++j) {
 					RSUM = RSUM + HB(j, l) * RHSDMZ(IND);
-					if (logall) {
+					/*if (logall) {
 						auto test1 = HB(j, l);
 						auto test2 = RHSDMZ(IND);
 						auto test3 = test1 * test2;
-					}
+					}*/
 					IND = IND + NCY;
 				}
-				if (logall)
-					int skdjhf = 2345;
+				/*if (logall)
+					int skdjhf = 2345;*/
 				RHSZ(IR - l) = RSUM;
 			}
 		}
 
-		if (logall) {
-			for (int i = 1; i <= NZ; ++i) {
-				fmt::print("#+ RHSZ(i)={:10.6f}\n", RHSZ(i));
-			}
-		}
+		//if (logall) {
+		//	for (int i = 1; i <= NZ; ++i) {
+		//		//fmt::print("#+ RHSZ(i)={:10.6f}\n", RHSZ(i));
+		//	}
+		//}
 
 		if (INDEX == 1 || NY == 0)
 			return;
@@ -4044,7 +4052,7 @@ void RKBAS(const double S, const int k, const int M, dar2 RKB, dar1 DM, const in
 	if (k != 1) {
 		int KPM1 = k + M - 1;
 		for (int i = 1; i <= KPM1; ++i)
-			T(i) = S / float(i);
+			T(i) = S / double(i);
 		for (int l = 1; l <= M; ++l) {
 			int LB = k + l + 1;
 			for (int i = 1; i <= k; ++i) {
@@ -4184,7 +4192,7 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 		BM(1) = X - XI(i);
 
 		for (int l = 2; l <= mmax; ++l)
-			BM(l) = BM(1) / float(l);
+			BM(l) = BM(1) / double(l);
 
 		//  evaluate  z(u(x)).
 		int IR = 1;
@@ -4300,10 +4308,10 @@ void VMONDE(dar1 coef, int k)
 		KMI = k + 1 - i;
 		for (int j = 2; j <= KMI; ++j)
 			coef(j) = coef(j) - RHO(j + i - 1) * coef(j - 1);
-		coef(KMI) = float(IFAC) * coef(KMI);
+		coef(KMI) = double(IFAC) * coef(KMI);
 		IFAC = IFAC * i;
 	}
-	coef(1) = float(IFAC) * coef(1);
+	coef(1) = double(IFAC) * coef(1);
 }
 
 

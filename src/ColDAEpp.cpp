@@ -5,7 +5,7 @@ unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 
 #include "ColDAEpp.hpp"
-
+#include "timer.h"
 
 
 
@@ -83,16 +83,21 @@ struct sys2 {
 
 int main()
 {
+	
+
 	sys2 sys;
 	iad1 ispace(10000);
 	dad1 fspace(10000);
 
 	int iflag;
 	cda solver;
-	solver.COLDAE(sys.ncomp, sys.ny, sys.orders, sys.left, sys.right, sys.bcpoints,
-		sys.ipar, sys.ltol, sys.tol, sys.fixpnt,ispace,fspace,iflag,
-		decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub, decltype(sys)::dgsub, nullptr);
-	
+
+	{
+		AutoTimer at(g_timer, "COLDAE");
+		solver.COLDAE(sys.ncomp, sys.ny, sys.orders, sys.left, sys.right, sys.bcpoints,
+			sys.ipar, sys.ltol, sys.tol, sys.fixpnt, ispace, fspace, iflag,
+			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub, decltype(sys)::dgsub, nullptr);
+	}
 	
 	fmt::print("iflag = {}", iflag);
 
@@ -100,13 +105,14 @@ int main()
 		std::ofstream file("result_cpp.txt");
 		for (int i = 1; i <= ispace(1) + 1; ++i) {
 			double x = fspace(i);
-			dad1 z(1), y(0);
+			dad1 z(2), y(0);
 			solver.APPSLN(x, z, y, fspace, ispace);
 			file << x << " " << z(1) << std::endl;
 		}
 		file.close();
 	}
 
+	g_timer.print();
 	std::cin.get();
 	return 0;
 }

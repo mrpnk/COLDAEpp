@@ -921,7 +921,7 @@ C...  constants for control of nonlinear iteration
 C
 
       DO 2600 I = 1, NZ
-            ! write(*,*) "+ DQZ(I)=",DQZ(I)
+            ! !write(*,*) "+ DQZ(I)=",DQZ(I)
 
  2600      CONTINUE
 
@@ -950,7 +950,7 @@ C
    20      CONTINUE
 
 
-            write(*,*) "while-loop"
+            !write(*,*) "while-loop"
 C
 C...       initialization for a new mesh
 C
@@ -972,7 +972,8 @@ C
 	     RETURN
 	   END IF
 	   IF ( MSING .EQ. 0 )                      GO TO 400
-   30      write(*,*) "30:"
+   30    continue
+        !write(*,*) "30:"
              IF ( MSING .LT. 0 )                      GO TO 40
 	   IF ( IPRINT .LT. 1 )  WRITE (IOUT,495)
 	   GO TO 460
@@ -1013,7 +1014,8 @@ C...       solve for the next iterate .
 C...       the value of ifreez determines whether this is a full
 C...       newton step (=0) or a fixed jacobian iteration (=1).
 C
-   60     write(*,*) "60:"
+   60   continue
+        !write(*,*) "60:"
         IF ( IPRINT .LT. 0 )  WRITE (IOUT,510) ITER, RNORM
 	   RNOLD = RNORM
 	   CALL LSYSLV (MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
@@ -1022,7 +1024,8 @@ C
 C
 C...       check for a singular matrix
 C
-   70      write(*,*) "70:"
+   70   continue
+         !write(*,*) "70:"
        IF ( MSING .NE. 0 )                      GO TO 30
 	   IF (ISING .NE. 0) THEN
 	     IF ( IPRINT .LT. 1 )  WRITE (IOUT,497)
@@ -1062,7 +1065,8 @@ C
 C...       verify that the linear convergence with fixed jacobian
 C...       is fast enough.
 C
-  110    write(*,*) "110:"
+  110   continue
+       !write(*,*) "110:"
         IFRZ = IFRZ + 1
 	   IF ( IFRZ .GE. LMTFRZ )       IFREEZ = 0
 	   IF ( RNOLD .LT. 4.D0*RNORM )  IFREEZ = 0
@@ -1083,7 +1087,8 @@ C
 C
 C...      convergence of fixed jacobian iteration failed.
 C
-  130     write(*,*) "130:"
+  130    continue
+       !write(*,*) "130:"
              IF ( IPRINT .LT. 0 )  WRITE (IOUT,510) ITER, RNORM
 	   IF ( IPRINT .LT. 0 )  WRITE (IOUT,540)
 	   ICONV = 0
@@ -1108,7 +1113,8 @@ C...       no previous convergence has been obtained. proceed
 C...       with the damped newton method.
 C...       evaluate rhs and find the first newton correction.
 C
-  160     write(*,*) "160:"
+  160   continue
+        !write(*,*) "160:"
        IF(IPRINT .LT. 0)  WRITE (IOUT,500)
 	   CALL LSYSLV (MSING, XI, XIOLD, Z, DMZ, DELZ, DELDMZ, G,
      1          W, V, FC, RHS, DQDMZ, INTEGS, IPVTG, IPVTW, RNOLD, 1,
@@ -1136,7 +1142,8 @@ C
 C
 C...       main iteration loop
 C
-  170    write(*,*) "170:"
+  170   continue
+       !write(*,*) "170:"
         RNOLD = RNORM
 	   IF ( ITER .GE. LIMIT )                   GO TO 430
 C
@@ -1186,7 +1193,8 @@ C
            RLXOLD = RELAX
 	   IPRED = 1
            END IF
-  220     write(*,*) "220:"
+  220    continue
+       !write(*,*) "220:"
              ITER = ITER + 1
 C
 C...       determine a new  z and dmz  and find new  rhs  and its norm
@@ -1197,7 +1205,8 @@ C
 	   DO 240 I = 1, NDMZ
 	     DMZ(I) = DMZ(I)  +  RELAX * DELDMZ(I)
   240      CONTINUE
-  250     write(*,*) "250:"
+  250    continue
+       !write(*,*) "250:"
              CALL LSYSLV (MSING, XI, XIOLD, Z, DMZ, DQZ, DQDMZ, G,
      1          W, V, FC, RHS, DUMMY, INTEGS, IPVTG, IPVTW, RNORM, 2,
      2          FSUB, DFSUB, GSUB, DGSUB, GUESS, ISING )
@@ -1211,17 +1220,17 @@ C
 C...       find scaled norms of various terms used to correct relax
 C
 
-             write(*,*) "-------- NZ=",NZ
+             !write(*,*) "-------- NZ=",NZ
 	   ANORM = 0.D0
 	   ANFIX = 0.D0
 	   DO 260 I = 1, NZ
-             write(*,*) "----- DQZ(I)=",DQZ(I),", SCALE(I)=",SCALE(I)
+             !write(*,*) "----- DQZ(I)=",DQZ(I),", SCALE(I)=",SCALE(I)
 	     ANORM = ANORM  +  (DELZ(I) * SCALE(I))**2
 	     ANFIX = ANFIX  +  (DQZ(I) * SCALE(I))**2
   260      CONTINUE
-              write(*,*) "-------- NDMZ=",NDMZ
+              !write(*,*) "-------- NDMZ=",NDMZ
 	   DO 270 I = 1, NDMZ
-       write(*,*) "---- DQDMZ(I)=",DQDMZ(I),", DSCALE(I)=",DSCALE(I)
+       !write(*,*) "---- DQDMZ(I)=",DQDMZ(I),", DSCALE(I)=",DSCALE(I)
 	     ANORM = ANORM  +  (DELDMZ(I) * DSCALE(I))**2
 	     ANFIX = ANFIX  +  (DQDMZ(I) * DSCALE(I))**2
   270      CONTINUE
@@ -1281,7 +1290,8 @@ C
 C
 C...       check convergence (iconv = 0).
 C
-  350  write(*,*) "350:"
+  350  continue
+      !write(*,*) "350:"
           CONTINUE
 	   DO 360 IT = 1, NTOL
 	     INZ = LTOL(IT)
@@ -1303,7 +1313,8 @@ C
 	   DO 380 I = 1, NDMZ
 	     DMZ(I) = DMZ(I)  +  DQDMZ(I)
   380      CONTINUE
-  390     write(*,*) "390:"
+  390   continue
+        !write(*,*) "390:"
              IF ( (ANFIX .LT. PRECIS .OR. RNORM .LT. PRECIS)
      1          .AND. IPRINT .LT. 1 )  WRITE (IOUT,560) ITER
 	   ICONV = 1
@@ -1316,7 +1327,8 @@ C
   400      IF ( IPRINT .GE. 0 )                     GO TO 420
 	   DO 410 J = 1, MSTAR
 	     WRITE(IOUT,610) J
-  410     write(*,*) "400:"
+  410   continue
+        !write(*,*) "400:"
          WRITE(IOUT,620) (Z(LJ), LJ = J, NZ, MSTAR)
 	   DO 415 J = 1, NY
 	     WRITE(IOUT,630) J
@@ -1324,7 +1336,8 @@ C
 C
 C...       check for error tolerance satisfaction
 C
-  420     write(*,*) "420:"
+  420   continue
+        !write(*,*) "420:"
        IFIN = 1
 	   IF (IMESH .EQ. 2) CALL ERRCHK (XI, Z, DMZ, VALSTR, IFIN)
 	   IF ( IMESH .EQ. 1 .OR.
@@ -1334,7 +1347,8 @@ C
 C
 C...       diagnostics for failure of nonlinear iteration.
 C
-  430     write(*,*) "430:"
+  430  continue
+         !write(*,*) "430:"
              IF ( IPRINT .LT. 1 )  WRITE (IOUT,570) ITER
 	   GO TO 450
   440	   IF( IPRINT .LT. 1 )	THEN
@@ -1348,7 +1362,8 @@ C
 C
 C...       update old mesh
 C
-  460    write(*,*) "460:"
+  460  continue
+        !write(*,*) "460:"
         NP1 = N + 1
 	   DO 470 I = 1, NP1
   470        XIOLD(I) = XI(I)
@@ -2325,7 +2340,7 @@ C
       INFC = (MSTAR+NY) * NCOMP
       M1 = MODE + 1
 
-      write(*,*)"enter LSYSLV and RHS(41) = ", RHS(41)
+      !write(*,*)"enter LSYSLV and RHS(41) = ", RHS(41)
 
 
       GO TO (10, 30, 30, 30, 310), M1
@@ -2373,6 +2388,7 @@ C
 C
 C...  zero the matrices to be computed
 C
+      !write(*,*) "Zero the W matrix"
       LW = KDY * KDY * N
       DO 84 L = 1, LW
    84   W(L) = 0.D0
@@ -2417,8 +2433,8 @@ C
 C...       find  rhs  boundary value.
 C
   110      CALL GSUB (IZETA, ZVAL, GVAL)
-      write(*,*)"Called gsub with i=",IZETA,", z=",ZVAL(1),",",ZVAL(2),
-     .            " and got result ",GVAL, ", -> ", NDMZ+IZETA
+      !write(*,*)"Called gsub with i=",IZETA,", z=",ZVAL(1),",",ZVAL(2),
+      !.            " and got result ",GVAL, ", -> ", NDMZ+IZETA
 	   RHS(NDMZ+IZETA) = -GVAL
 	   RNORM = RNORM + GVAL**2
 	   IF ( MODE .EQ. 2 )                       GO TO 130
@@ -2491,16 +2507,16 @@ C...         fill in ncy rows of  w and v
 C
 
   210      continue
-          ! write(*,*)"::::dgesl_e: ", W(9)
+          ! !write(*,*)"::::dgesl_e: ", W(9)
 
-            !write(*,*)"vor VWBLOK  W(16) = ",W(16),""
-            ! write(*,*) XCOL, HRHO, J
+          !write(*,*)"vor VWBLOK  W(9) = ",W(9),""
+            ! !write(*,*) XCOL, HRHO, J
           CALL VWBLOK (XCOL, HRHO, J, W(IW), V(IV), IPVTW(IDMZ),
      1            KDY, ZVAL, YVAL, DF, ACOL(1,J), DMZO(IDMZO),
      2            NCY, DFSUB, MSING)
 
-              ! write(*,*)"::::dgesl_f: ", W(9)
-           ! write(*,*)"nach VWBLOK  W(16) = ",W(16)
+              ! !write(*,*)"::::dgesl_f: ", W(9)
+          !write(*,*)"nach VWBLOK  W(9) = ",W(9)
 
 	     IF ( MSING .NE. 0 )                    RETURN
   220      CONTINUE
@@ -2598,7 +2614,7 @@ C
       IF ( MODE .EQ. 0 .OR. MODE .EQ. 3 )           GO TO 300
       RNORM = DSQRT(RNORM / FLOAT(NZ+NDMZ))
       IF ( MODE .EQ. 2 ) then
-            write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
+            !write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
              RETURN
       endif
 C
@@ -2629,25 +2645,24 @@ C
 	 IZETA = NROW + 1 - MSTAR
 	 IF ( I .EQ. N ) IZETA = IZSAVE
   322    IF ( IZET .EQ. IZETA )                     GO TO 324
-            write(*,*) "----------------------------------------"
-            write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
+            !write(*,*) "----------------------------------------"
+            !write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
 	   DELZ(IZ-1+IZET) = RHS(NDMZ+IZET)
 	   IZET = IZET + 1
 	 GO TO 322
   324    H = XI(I+1) - XI(I)
-      ! write(*,*) "..IZ=",IZ
-       write(*,*) "vorher DELZ = "
-       write(*,*) (DELZ(idx),idx=1,4)
-
-      ! write(*,*)"::::dgesl_c: ", W(9)
+      ! !write(*,*) "..IZ=",IZ
+       !write(*,*) "vorher DELZ = "
+       !write(*,*) (DELZ(idx),idx=1,4)
+       !write(*,*)"W(9) = ", W(9)
 
 	 CALL GBLOCK (H, G(1), NROW, IZETA, W(IW), V(1), KDY,
      1                DELZ(IZ), DELDMZ(IDMZ), IPVTW(IDMZ), 2, MODE,
      +                XI1, ZVAL, YVAL, FC(IFC+INFC), DF, CB,
      +		     IPVTCB, FC(IFC), DFSUB, ISING, NCOMP, NYCB, NCY)
 
-       write(*,*) "nachher DELZ = "
-       write(*,*) (DELZ(idx),idx=1,4) ! geht eigentlich bis NZ
+       !write(*,*) "nachher DELZ = "
+       !write(*,*) (DELZ(idx),idx=1,4) ! geht eigentlich bis NZ
 
 	 IZ = IZ + MSTAR
 	 IDMZ = IDMZ + KDY
@@ -2655,14 +2670,14 @@ C
 	 IFC = IFC + INFC+2*NCOMP
 	 IF ( I .LT. N )                            GO TO 320
   326    IF ( IZET .GT. MSTAR )                     GO TO 320
-             write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
+             !write(*,*) "set DELZ(",(IZ-1+IZET),")=",RHS(NDMZ+IZET)
 	   DELZ(IZ-1+IZET) = RHS(NDMZ+IZET)
 	   IZET = IZET + 1
 	 GO TO 326
   320 CONTINUE
 
       do i=1,NZ
-            ! write(*,*)"# DQZ(i)=",DELZ(i)
+            ! !write(*,*)"# DQZ(i)=",DELZ(i)
       enddo
 
     
@@ -2676,7 +2691,7 @@ C
       CALL DMZSOL (KDY, MSTAR, N, V, DELZ, DELDMZ)
 C
       IF ( MODE .NE. 1 )  then
-            write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
+            !write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
              RETURN
       endif
 
@@ -2722,7 +2737,7 @@ C
 C
 
       
-            write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
+            !write(*,*)"Leave LSYSLV and RHS(41) = ", RHS(41)
             RETURN
       
       END
@@ -2827,7 +2842,7 @@ C
       COMMON /COLORD/ K, NCOMP, NY, NDM, MSTAR, KD, KDYM, MMAX, M(20)
       COMMON /COLNLN/ NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX
 
-      ! write(*,*)"::::dgesl_g: ", WI(1,2)
+      ! !write(*,*)"::::dgesl_g: ", WI(1,2)
 
 C
 C...  initialize  wi
@@ -2845,7 +2860,7 @@ C
 		BASM(L) = FACT
 		DO 35 J=1,K
                   if(j.eq.1.and.j.eq.1)then
-                        write(*,*)"fact = ",fact,", acol=",acol(j,l)
+                        !write(*,*)"fact = ",fact,", acol=",acol(j,l)
                   endif
                   
 		   HA(J,L) = FACT * ACOL(J,L)
@@ -2891,7 +2906,7 @@ C
 	  VI(I0+ID,J) = DF(ID,J)
    70 CONTINUE
 
-      ! write(*,*)"::::dgesl_j: ", WI(1,2)
+      ! !write(*,*)"::::dgesl_j: ", WI(1,2)
       JN = 1
       DO 140 JCOMP = 1, NCOMP
 	 MJ = M(JCOMP)
@@ -2903,11 +2918,11 @@ C
 	      AJL = - HA(J,L)
 	      DO 80 IW = I1, I2
 
-            if( iw.eq.8 .and.jw.eq.2) then
-                  write(*,*) "j,l=",j,", ",l
-            write(*,*)"WI(IW, JW) = ", WI(IW, JW),", AJL = ",AJL,
-     .            ", VI(IW, JV) = ",VI(IW, JV)      
-            endif
+      !       if( iw.eq.8 .and.jw.eq.2) then
+      !             !write(*,*) "j,l=",j,", ",l
+      !       !write(*,*)"WI(IW, JW) = ", WI(IW, JW),", AJL = ",AJL,
+      ! !.            ", VI(IW, JV) = ",VI(IW, JV)      
+      !       endif
 
 		 WI(IW,JW) = WI(IW,JW)  +  AJL * VI(IW,JV)
    80         CONTINUE
@@ -2924,7 +2939,7 @@ C
   130    CONTINUE
   140 CONTINUE
 
-      ! write(*,*)"::::dgesl_h: ", WI(1,2)
+      ! !write(*,*)"::::dgesl_h: ", WI(1,2)
 C
 C...  loop for the algebraic solution components
 C
@@ -2950,7 +2965,7 @@ C
 	 CALL DGESL  (WI, KDY, KDY, IPVTW, VI(1,J), 0)
   250 CONTINUE
 
-      ! write(*,*)"::::dgesl_i: ", WI(1,2)
+      ! !write(*,*)"::::dgesl_i: ", WI(1,2)
 
       RETURN
       END
@@ -3015,7 +3030,7 @@ C
    20       HB(J,L) = FACT * B(J,L)
    30 CONTINUE
 
-      ! write(*,*)"::::dgesl_b: ",WI(9)
+      ! !write(*,*)"::::dgesl_b: ",WI(9)
 C
 C...  branch according to  m o d e
 C
@@ -3157,7 +3172,7 @@ C...  compute the appropriate piece of  rhsz
 C
   120 CONTINUE
  
-      ! write(*,*)"check = ",RHSDMZ(1)
+      ! !write(*,*)"check = ",RHSDMZ(1)
       niters=niters+1;
       write(fmt,"(i0)") niters
       open(100,file=trim("dgesl_in"//trim(fmt)//".txt"))
@@ -3172,7 +3187,7 @@ C
             enddo
       close(100)
 
-      ! write(*,*)"::::dgesl_a: ",WI(9)
+      ! !write(*,*)"::::dgesl_a: ",WI(9)
 
       CALL DGESL  (WI, KDY, KDY, IPVTW, RHSDMZ, 0)
 
@@ -3191,7 +3206,7 @@ C
 
       !STOP
 
-      ! write(*,*)"nachcheck = ",RHSDMZ(1)
+      ! !write(*,*)"nachcheck = ",RHSDMZ(1)
 
 
       IR = IROW
@@ -3201,13 +3216,13 @@ C
 	 DO 130 L = 1, MJ
 	    IND = JCOMP
 	    RSUM = 0.D0
-          ! write(*,*)"**** K=",K
+          ! !write(*,*)"**** K=",K
 	    DO 125 J = 1, K
 	       RSUM = RSUM  +  HB(J,L) * RHSDMZ(IND)
-              write(*,*)"** J=",J,"IND=",IND
-              write(*,*)"** J=",J,"HB(J,L)=",HB(J,L)
-              write(*,*)"** J=",J,"RHSDMZ(IND)=",RHSDMZ(IND)
-              write(*,*)"** J=",J,"RSUM=",RSUM
+              !write(*,*)"** J=",J,"IND=",IND
+              !write(*,*)"** J=",J,"HB(J,L)=",HB(J,L)
+              !write(*,*)"** J=",J,"RHSDMZ(IND)=",RHSDMZ(IND)
+              !write(*,*)"** J=",J,"RSUM=",RSUM
   125       IND = IND + NCY
 	    RHSZ(IR-L) = RSUM
   130    CONTINUE
@@ -3224,7 +3239,7 @@ C...  calculate projected rhsz
 C
             
 
-            ! write(*,*)"mach weiter"
+            ! !write(*,*)"mach weiter"
       DO 160 I=1,NCOMP
 	FACT = 0
 	DO 150 L=1,MSTAR

@@ -25,7 +25,7 @@
       end
       subroutine dgsub(i,z,dg)
             integer i
-            double precision z(2), dg(1)
+            double precision z(2), dg(2)
             go to (10,20) i
    10       dg(1)=1 ! d/dz  g_left
             dg(2)=0 ! d/dz' g_left
@@ -42,7 +42,7 @@
             double precision left,right,fspace(10000),x,z(2),y(0)
             double precision sides(2), tol(1), fixpnt(0)
             external fsub,dfsub,gsub,dgsub
-
+            double precision start, finish
             character(len = 32) :: outFormat = '(32(e19.12,1x))'
 
             ncomp=2;
@@ -69,9 +69,17 @@
             ipar(11)=0 ! no fixed points
             ipar(12)=0 ! dae index, ignored
 
+           
+            call cpu_time(start)
+                         
             call coldae(ncomp,ny,orders,left,right,sides,
      .                 ipar,ltol,tol,fixpnt,ispace,fspace,iflag,
      .                 fsub,dfsub,gsub,dgsub,0)
+
+            call cpu_time(finish)
+            print '("Time = ",f6.3," seconds.")',finish-start
+
+            
 
             write(*,*) "iflag = ", iflag
 
