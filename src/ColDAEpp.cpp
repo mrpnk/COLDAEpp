@@ -1,8 +1,8 @@
 ﻿#pragma warning( disable : 5045 )
 
 // break on nan
-#include <float.h>
-unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
+//#include <float.h>
+//unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 #include "timer.h"
 #include "ColDAEpp.hpp"
@@ -84,26 +84,77 @@ struct sys2 {
 };
 
 
+
+// f1''(x) = f2+f1', 0 = f2 + f1*f1' - x, f1(0)=1, f1'(0)=0.1
+struct sys3 {
+	systemParams params;
+	sys3() {
+		params.ncomp = 1;
+		params.ny = 1;
+		params.orders = { 2 };
+		params.left = 0;
+		params.right = 5;
+		params.bcpoints = { 0, 5 };
+		params.isNonLinear = true;
+		params.reg = regularControl::regular;
+		params.index = indexControl::automatic;
+	}
+
+	static void fsub(double x, dar1 z, dar1 y, dar1 f) {
+		f(1) = y(1) + z(2); // f_1 = f1''(x)
+		f(2) = y(1) + z(1) * z(2) - x; // f_2 = 0 = algebraic
+	}
+	static void dfsub(double x, dar1 z, dar1 y, dar2 df) {
+		df(1, 1) = 0; // df_1 / df1
+		df(1, 2) = 1; // df_1 / df1'
+		df(1, 3) = 1; // df_1 / df2
+
+		df(2, 1) = z(2); // df_2 / df1
+		df(2, 2) = z(1); // df_2 / df1'
+		df(2, 3) = 1;    // df_2 / df2
+	}
+	static void gsub(int i, dar1 z, double& g) {
+		if (i == 1)
+			g = z(1) + z(2) + 0.15;   // g_1 = 0 = z(0)-1   left
+		else if (i == 2)
+			g = z(1) - 6.5; // g_2 = 0 = z(0)-1   left
+		else assert(false);
+	}
+	static void dgsub(int i, dar1 z, dar1 dg) {
+		if (i == 1) {
+			dg(1) = 1; // dg_1 / df1
+			dg(2) = 1; // dg_1 / df1' 
+		}
+		else if (i == 2) {
+			dg(1) = 1;  // dg_2/df1  
+			dg(2) = 0;  // dg_2/df1' 
+		}
+		else assert(false);
+	}
+};
+
+
 int main()
 {
-	sys2 sys;
+	sys3 sys;
 
 	options opts;
 	{
 		opts.numCollPoints = 0;
 		opts.numSubIntervals = 0;
-		opts.numTolerances = 1;
-
-		opts.fdim = 10000;
-		opts.idim = 10000;
+		
+		opts.fdim = 1000000;
+		opts.idim = 100000;
 
 		opts.printLevel = printMode::full;
 		opts.meshSource = meshMode::generate;
-		opts.guessSource = guessMode::none;
+		opts.guessSource = guessMode::none;	
+		
+		opts.numTolerances = 1;
+		opts.ltol = { 1, 2 };
+		opts.tol = { 0.0001, 0.0001 };
 
 		opts.numFixedPoints = 0;
-		opts.ltol = { 1 };
-		opts.tol = { 0.0001 };
 	}
 
 	iad1 ispace(opts.idim);
@@ -111,8 +162,10 @@ int main()
 
 	cda solver;
 	output_t iflag;
+	for (int i = 0; i < 1; ++i) 
 	{
 		AutoTimer at(g_timer, "COLDAE");
+	
 		solver.COLDAE(sys.params, opts, ispace, fspace, iflag,
 			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub,
 			decltype(sys)::dgsub, nullptr);
@@ -124,9 +177,9 @@ int main()
 		std::ofstream file("result_cpp.txt");
 		for (int i = 1; i <= ispace(1) + 1; ++i) {
 			double x = fspace(i);
-			dad1 z(2), y(0);
+			dad1 z(2), y(1);
 			solver.APPSLN(x, z, y, fspace, ispace);
-			file << x << " " << z(1) << std::endl;
+			file << x << " " << z(1) << " " << y(1) << std::endl;
 		}
 		file.close();
 	}

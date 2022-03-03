@@ -477,13 +477,13 @@ public:
 	void assertDim(int s1, int s2) {
 		assertm(s1 * s2 <= cap, "Capacity too low!");
 
-		//
-		//if (size1 == 0) {
-		//	// The reference comes from a one-dimensional and the dimensions are not yet specified.
-		//	// In this case we set the dimensions now.
-		//	size1 = s1;
-		//	size2 = s2;
-		//}
+		
+		if (size1 == 0) {
+			// The reference comes from a one-dimensional and the dimensions are not yet specified.
+			// In this case we set the dimensions now.
+			size1 = s1;
+			size2 = s2;
+		}
 		//else if (s2 == 1) {
 		//	// The last dimension is left unspecified
 		//	assertm(size1 == s1, "Dimension 1 does not match!");
@@ -649,7 +649,7 @@ struct systemParams {
 	double right;       // right end of interval
 	dad1 bcpoints;      // j-th side condition point (boundary point)
 
-	int isNonLinear;    // if the problem is nonlinear
+	bool isNonLinear;   // if the problem is nonlinear
 	regularControl reg;
 	indexControl index; // index of DAE (ignored if ny=0)
 };
@@ -885,7 +885,7 @@ void COLDAE(systemParams const& params, options const& opts,
 
 
 	//  rename some of the parameters and set default values.
-	NONLIN = params.isNonLinear;
+	NONLIN = params.isNonLinear ? 1 : 0;
 	K = opts.numCollPoints;
 	N = opts.numSubIntervals;
 	if (N == 0)  
@@ -1724,7 +1724,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 						fmt::print("\n");
 					}
 					for (int j = 1; j <= NY; ++j) {	
-						fmt::print("VALUES AT 1st COLLOCATION POINTS FOR Y({})", j);
+						fmt::print("VALUES AT 1st COLLOCATION POINTS FOR Y({}): ", j);
 						for (int LJ = j + NCOMP; LJ <= NDMZ; LJ += KDY)
 							fmt::print("{:.4}, ", DMZ(LJ));
 						fmt::print("\n");
