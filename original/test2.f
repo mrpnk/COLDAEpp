@@ -62,7 +62,7 @@
             ipar(4)=1 ! number of tolerances
             ipar(5)=10000 ! dim of fspace
             ipar(6)=10000 ! dim of ispace
-            ipar(7)=-1 ! full printout 
+            ipar(7)=0 ! -1 for full printout 
             ipar(8)=0 ! generate new mesh
             ipar(9)=0 ! no guess provided
             ipar(10)=0 ! problem is regular

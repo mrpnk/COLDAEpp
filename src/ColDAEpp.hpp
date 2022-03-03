@@ -766,6 +766,90 @@ using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 //------------------------------------------------------------------------------------------------------
 
 
+enum class printControl {
+	full = -1,
+	selected = 0,
+	none = 1
+};
+enum class meshControl {
+	generate = 0, // causes coldae to generate a uniform initial mesh
+	custom = 1,   /* if the initial mesh is provided by the user.
+					 it is defined in fspace as follows : the mesh
+					 aleft = x(1).lt.x(2).lt. ....lt.x(n).lt.x(n + 1) = aright
+					 will occupy  fspace(1), ..., fspacen + 1).
+					 the user needs to supply only the interior mesh
+					 points  fspace(j) = x(j), j = 2, ..., n.*/
+					 customNoAdaptive = 2 /* if the initial mesh is supplied by the user
+											 as with ipar(8) = 1, and in addition no adaptive
+											 mesh selection is to be done.*/
+};
+enum class guessControl {
+	none = 0,  // if no initial guess for the solution is provided
+	custom = 1, // if an initial guess is provided by the user in subroutine  guess
+	customCoefficients = 2, /*if an initial mesh and approximate solution
+							 coefficients are provided by the user in  fspace.
+							 (the former and new mesh are the same).*/
+							 customCoefficientsRefine = 3, /* if a former meshand approximate solution
+														 coefficients are provided by the user in fspace,
+														 and the new mesh is to be taken twice as coarse;
+														 i.e., every second point from the former mesh.*/
+														 newMesh = 4  /*if in addition to a former initial mesh
+																	   approximate solution coefficients, a new mesh  is provided in fspace as well.
+																		 (see description of output for further details on iguess = 2, 3, and 4.)*/
+};
+enum class regularControl {
+	sensitive = -1, //if the first relax factor is RSTART (use for an extra sensitive nonlinear problem only)
+	regular = 0, // if the problem is regular
+	noDamping = 1, /*if the newton iterations are not to be damped
+					 (use for initial value problems).*/
+	lazy = 2 /* if we are to return immediately upon(a) two
+									  successive nonconvergences, or (b)after obtaining
+									  error estimate for the first time.*/
+};
+enum class indexControl {
+	automatic = 0, /* determines the appropriate projection needed at the right end of each
+				mesh subinterval using SVD. this is the most expensive and most general option. */
+				one = 1,           // if the index of the dae is 1.
+				twoHessenberg = 2  //if the index of the dae is 2 and it is in Hessenberg form
+};
+
+struct options {
+	int isNonLinear;      // if the problem is nonlinear
+	int numCollPoints;	  // no. of collocation points per subinterval
+	int numSubIntervals;  // no. of subintervals in the initial mesh
+	int numTolerances;    // no. of solution and derivative tolerances
+	int fdim;             // dimension of fspace
+	int idim;             // dimension of ispace
+	printControl printLevel;  // output control
+	meshControl meshSource; // mesh control
+	guessControl guessSource; // guess control
+	regularControl reg;
+	int numFixedPoints;   // no. of fixed points in the mesh other than aleft and aright.
+	indexControl index;   // index of DAE (ignored if ny=0)
+};
+struct startParams {
+	int ncomp = 2;               // number of differential equations (<= 20)
+	int ny = 0;                  // number of constraints (<= 20)
+	iad1 orders = { 1,1 };       // orders of odes
+	double left = 0;             // left end of interval
+	double right = 1;            // right end of interval
+	dad1 bcpoints = { 0, 1 };    // j-th side condition point (boundary point)
+
+	options opts = { 1,0,0,1,10000,10000,
+		printControl::selected,meshControl::generate,
+		guessControl::none,regularControl::regular,
+		0, indexControl::automatic };
+
+	iad1 ltol = { 1 };
+	dad1 tol = { 0.0001 };
+	dad1 fixpnt = {};
+
+	iad1 ispace = iad1(10000);
+	dad1 fspace = dad1(10000);
+
+};
+
+
 class cda{
 
 	struct { // COLOUT 
@@ -914,13 +998,12 @@ class cda{
 
 public:
 void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const double tright,
-	dar1 ZETA, iar1 IPAR, iar1 ltol,
+	dar1 ZETA, options IPAR, iar1 ltol,
 	dar1 tol, dar1 FIXPNT, iar1 ISPACE, dar1 FSPACE, int& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	M.assertDim(1);
 	ZETA.assertDim(1);
-	IPAR.assertDim(1);
 	LTOL.assertDim(1);
 	TOL.assertDim(1);
 	FIXPNT.assertDim(1);
@@ -978,7 +1061,8 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 	//  dependent constant  precis = 100 * machine unit roundoff
 
 
-	if (IPAR(7) <= 0)  fmt::print("VERSION *1* OF COLDAE .\n");
+	if (IPAR.printLevel != printControl::none) 
+		fmt::print("VERSION *1* OF COLDAE\n");
 
 	IOUT = 6;
 	PRECIS = 1.0;
@@ -1006,21 +1090,22 @@ void COLDAE(const int ncomp, const int ny, iar1 M, const double tleft, const dou
 
 
 	//  rename some of the parameters and set default values.
-	NONLIN = IPAR(1);
-	K = IPAR(2);
-	N = IPAR(3);
-	if (N == 0)  N = 5;
-	int IREAD = IPAR(8);
-	IGUESS = IPAR(9);
+	NONLIN = IPAR.isNonLinear;
+	K = IPAR.numCollPoints;
+	N = IPAR.numSubIntervals;
+	if (N == 0)  
+		N = 5;
+	int IREAD = static_cast<int>(IPAR.meshSource);
+	IGUESS = static_cast<int>(IPAR.guessSource);
 	if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
 	if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
-	ICARE = IPAR(10);
-	NTOL = IPAR(4);
-	int NDIMF = IPAR(5);
-	int NDIMI = IPAR(6);
-	int NFXPNT = IPAR(11);
-	IPRINT = IPAR(7);
-	INDEX = IPAR(12);
+	ICARE = static_cast<int>(IPAR.reg);
+	NTOL = IPAR.numTolerances;
+	int NDIMF = IPAR.fdim;
+	int NDIMI = IPAR.idim;
+	int NFXPNT = IPAR.numFixedPoints;
+	IPRINT = static_cast<int>(IPAR.printLevel);
+	INDEX = static_cast<int>(IPAR.index);
 	if (NY == 0) INDEX = 0;
 	MSTAR = 0;
 	MMAX = 0;

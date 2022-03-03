@@ -39,18 +39,7 @@ struct sys1 {
 
 // f''(x) = sin(0.6*f'(x)) + x, f(0)=1, f(1)=-0.1
 struct sys2 {
-	int ncomp = 2;
-	int ny = 0;
-	iad1 orders = { 1,1 };
-	double left = 0, right = 1;
-	dad1 bcpoints = { 0, 1 };
-	iad1 ltol = { 1 };
-	dad1 tol = { 0.0001 };
-	dad1 fixpnt = {};
-
-
-	iad1 ipar = { 1,0,0,1,10000,10000,-1,0,0,0,0,0 };
-
+	
 	static void fsub(double x, dar1 z, dar1 y, dar1 f) {
 		f(1) = z(2); // z'(x)
 		f(2) = sin(0.6 * z(2)) + x; // z''(x)
@@ -83,19 +72,19 @@ struct sys2 {
 
 int main()
 {
-	
-
 	sys2 sys;
-	iad1 ispace(10000);
-	dad1 fspace(10000);
+	
 
 	int iflag;
 	cda solver;
 
+	startParams sp;
+
+	for(int i = 0;i<10;++i)
 	{
-		AutoTimer at(g_timer, "COLDAE");
-		solver.COLDAE(sys.ncomp, sys.ny, sys.orders, sys.left, sys.right, sys.bcpoints,
-			sys.ipar, sys.ltol, sys.tol, sys.fixpnt, ispace, fspace, iflag,
+		AutoTimer at(g_timer, "COLDAE "+std::to_string(i));
+		solver.COLDAE(sp.ncomp, sp.ny, sp.orders, sp.left, sp.right, sp.bcpoints,
+			sp.opts, sp.ltol, sp.tol, sp.fixpnt, sp.ispace, sp.fspace, iflag,
 			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub, decltype(sys)::dgsub, nullptr);
 	}
 	
@@ -103,10 +92,10 @@ int main()
 
 	if (iflag == 1) {
 		std::ofstream file("result_cpp.txt");
-		for (int i = 1; i <= ispace(1) + 1; ++i) {
-			double x = fspace(i);
+		for (int i = 1; i <= sp.ispace(1) + 1; ++i) {
+			double x = sp.fspace(i);
 			dad1 z(2), y(0);
-			solver.APPSLN(x, z, y, fspace, ispace);
+			solver.APPSLN(x, z, y, sp.fspace, sp.ispace);
 			file << x << " " << z(1) << std::endl;
 		}
 		file.close();
