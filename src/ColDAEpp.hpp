@@ -1156,15 +1156,16 @@ void APPSLN(double& X, dar1 Z, dar1 Y, dar1 FSPACE, iar1 ISPACE) {
 	FSPACE.assertDim(1);
 	ISPACE.assertDim(1);
 
-	dad1 A(28), DUMMY(1);
+	dad1 A(28);
 
 	int IS6 = ISPACE(7);
 	int IS5 = ISPACE(1) + 2;
 	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
 	int i = 1;
-	APPROX(i, X, Z, Y, A, FSPACE.sub(IS6), FSPACE.sub(1), ISPACE(1),
-		FSPACE.sub(IS5), FSPACE.sub(IS4), ISPACE(2), ISPACE(3),
-		ISPACE(4), ISPACE(6), ISPACE.sub(9), ISPACE(5), 2, DUMMY, 1);
+	APPROX(i, X, Z.contiguous(), Y.contiguous(), A.contiguous(), FSPACE.sub(IS6).contiguous(),
+		FSPACE.sub(1).contiguous(), ISPACE(1),
+		FSPACE.sub(IS5).contiguous(), FSPACE.sub(IS4).contiguous(), ISPACE(2), ISPACE(3),
+		ISPACE(4), ISPACE(6), ISPACE.sub(9).contiguous(), ISPACE(5), 2, nullptr, 1);
 }
 
 
@@ -2091,13 +2092,17 @@ n100:
 			for (int i = 1; i <= NOLD; ++i) {
 				double HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0;
 				double X = XIOLD(i) + HD6;
-				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 1), DUMMY, XIOLD,
-					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+				APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr,
+					ASAVE.sub(1, 1).contiguous(), nullptr, XIOLD.contiguous(),
+					NOLD, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX,
+					MT.contiguous(), MSTAR, 4, nullptr, 0);
 				X = X + 4.0 * HD6;
 				KSTORE = KSTORE + 3 * MSTAR;
-				APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, 4), DUMMY, XIOLD,
-					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
-				KSTORE = KSTORE + MSTAR;
+				APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr,
+					ASAVE.sub(1, 4).contiguous(), nullptr, XIOLD.contiguous(),
+					NOLD, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX, 
+					MT.contiguous(), MSTAR, 4, nullptr, 0);
+				KSTORE += MSTAR;
 			}
 		}
 		//  save in  valstr  the values of the old solution
@@ -2112,8 +2117,10 @@ n100:
 					X = X + HD6;
 					if (j == 3)
 						X = X + HD6;
-					APPROX(i, X, VALSTR.sub(KSTORE), DUMMY, ASAVE.sub(1, j), DUMMY,
-						XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+					APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr, 
+						ASAVE.sub(1, j).contiguous(), nullptr,
+						XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
+						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
 					KSTORE = KSTORE + MSTAR;
 				}
 			}
@@ -2155,7 +2162,9 @@ n100:
 				IDMZ = 1;
 				for (int i = 1; i <= NOLD; ++i) {
 					double XI1 = XIOLD(i + 1);
-					APPROX(i, XI1, ZVAL, YVAL, A, COEF, XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 3, DUMMY, 1);
+					APPROX(i, XI1, ZVAL.contiguous(), YVAL.contiguous(), A.contiguous(),
+						COEF.contiguous(), XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
+						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 3, nullptr, 1);
 					dfsub(XI1, ZVAL, YVAL, DF);
 
 					// if index=2, form projection matrices directly
@@ -2614,7 +2623,9 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
 		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
 		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 3), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR.sub(KNEW).contiguous(), nullptr, ASAVE.sub(1, 3).contiguous(),
+			nullptr, XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, 
+			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
 		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2623,7 +2634,9 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
 		KSTORE = 2 * (i - 1) * MSTAR + 1;
 		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW), DUMMY, ASAVE.sub(1, 2), DUMMY, XI, N, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+		APPROX(i, X, VALSTR.sub(KNEW).contiguous(), nullptr, ASAVE.sub(1, 2).contiguous(), 
+			nullptr, XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY,
+			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
 		for (int l = 1; l <= MSTAR; ++l) {
 			ERR(l) = ERR(l) + WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
 			KNEW = KNEW + 1;
@@ -2866,12 +2879,15 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					else {
 						// other nonlinear case
 						if (MODE == 1) {
-							APPROX(IOLD, XII, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, 
-								K, NCOMP, NY, MMAX, MT, MSTAR, 2, DUMMY, 0);
+							APPROX(IOLD, XII, ZVAL.contiguous(), Y.contiguous(), AT.contiguous(),
+								COEF.contiguous(), XIOLD.contiguous(), NOLD, Z.contiguous(),
+								DMZ.contiguous(),K, NCOMP, NY, MMAX, MT.contiguous(),
+								MSTAR, 2, nullptr, 0);
 						}
 						else {
-							APPROX(i, XII, ZVAL, Y, AT, DUMMY, XI, N, Z, DMZ,
-								K, NCOMP, NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
+							APPROX(i, XII, ZVAL.contiguous(), Y.contiguous(), AT.contiguous(),
+								nullptr, XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(),
+								K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
 							if (MODE == 3)
 								goto n120;
 						}
@@ -2911,9 +2927,11 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			n160:
 				if (MODE == 1) {
 					// find  rhs  values
-					APPROX(IOLD, XCOL, ZVAL, YVAL, AT, COEF, XIOLD,
-						NOLD, Z, DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 2,
-						DMZO.sub(IRHS), 2);
+					APPROX(IOLD, XCOL, ZVAL.contiguous(), YVAL.contiguous(), AT.contiguous(),
+						COEF.contiguous(), XIOLD.contiguous(),
+						NOLD, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX,
+						MT.contiguous(), MSTAR, 2,
+						DMZO.sub(IRHS).contiguous(), 2);
 
 				n170:
 					fsub(XCOL, ZVAL, YVAL, F);
@@ -2929,8 +2947,10 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				}
 				else {
 					// evaluate former collocation solution
-					APPROX(i, XCOL, ZVAL, Y, ACOL.sub(1, j), COEF, XI, N, Z,
-						DMZ, K, NCOMP, NY, MMAX, MT, MSTAR, 4, DUMMY, 0);
+					APPROX(i, XCOL, ZVAL.contiguous(), Y.contiguous(), ACOL.sub(1, j).contiguous(),
+						COEF.contiguous(), XI.contiguous(), N, Z.contiguous(),
+						DMZ.contiguous(), K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 
+						4, nullptr, 0);
 					if (MODE == 3)
 						goto n210;
 
@@ -2992,24 +3012,30 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					}
 					else {
 						if (MODE == 1) {
-							APPROX(IOLD, XI1, ZVAL, YVAL, AT, COEF, // here IOLD gets changed! simon
-								XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-								MT, MSTAR, 2, DUMMY, 1);
+							APPROX(IOLD, XI1, ZVAL.contiguous(), YVAL.contiguous(), AT.contiguous(),
+								COEF.contiguous(), // here IOLD gets changed! simon
+								XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
+								K, NCOMP, NY, MMAX,
+								MT.contiguous(), MSTAR, 2, nullptr, 1);
 							if (i == N) {
 								auto temp = NOLD + 1;
-								APPROX(temp, XI1, ZVAL, YVAL, AT, COEF,
-									XIOLD, NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-									MT, MSTAR, 1, DUMMY, 0);
+								APPROX(temp, XI1, ZVAL.contiguous(), YVAL.contiguous(), 
+									AT.contiguous(), COEF.contiguous(),
+									XIOLD.contiguous(), NOLD, Z.contiguous(), 
+									DMZ.contiguous(), K, NCOMP, NY, MMAX,
+									MT.contiguous(), MSTAR, 1, nullptr, 0);
 							}
 						}
 						else {
-							APPROX(i, XI1, ZVAL, YVAL, AT, COEF,
-								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-								MT, MSTAR, 3, DUMMY, 1);
+							APPROX(i, XI1, ZVAL.contiguous(), YVAL.contiguous(), AT.contiguous(),
+								COEF.contiguous(),
+								XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX,
+								MT.contiguous(), MSTAR, 3, nullptr, 1);
 							auto temp = i + 1;
-							APPROX(temp, XI1, ZVAL, YVAL, AT, COEF,
-								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-								MT, MSTAR, 1, DUMMY, 0);
+							APPROX(temp, XI1, ZVAL.contiguous(), YVAL.contiguous(), AT.contiguous(),
+								COEF.contiguous(),XI.contiguous(), N, Z.contiguous(),
+								DMZ.contiguous(), K, NCOMP, NY, MMAX,
+								MT.contiguous(), MSTAR, 1, nullptr, 0);
 						}
 					}
 				}
@@ -3044,13 +3070,17 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 							// other nonlinear case
 							if (MODE == 1) {
 								auto temp = NOLD + 1;
-								APPROX(temp, ARIGHT, ZVAL, Y, AT, COEF, XIOLD, NOLD, Z, DMZ, K, 
-									NCOMP, NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
+								APPROX(temp, ARIGHT, ZVAL.contiguous(), Y.contiguous(), AT.contiguous(),
+									COEF.contiguous(), XIOLD.contiguous(), NOLD, Z.contiguous(), 
+									DMZ.contiguous(), K,
+									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
 							}
 							else {
 								auto temp = N + 1;
-								APPROX(temp, ARIGHT, ZVAL, Y, AT, COEF, XI, N, Z, DMZ, K, 
-									NCOMP, NY, MMAX, MT, MSTAR, 1, DUMMY, 0);
+								APPROX(temp, ARIGHT, ZVAL.contiguous(), Y.contiguous(), AT.contiguous(),
+									COEF.contiguous(), XI.contiguous(), N, Z.contiguous(), 
+									DMZ.contiguous(), K,
+									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
 								if (MODE == 3)
 									goto n260;
 							}
@@ -4026,23 +4056,15 @@ void RKBAS(double const S, int const k, int const M, double* const RKB,
 //   dmval  - the mth derivatives of u(x)
 //
 //**********************************************************************
-void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
-	const int n, dar1 Z, dar1 DMZ, const int k, const int ncomp,
-	const int ny, const int mmax, iar1 M,
-	const int mstar, const int MODE, dar1 DMVAL, const int MODM)
+void APPROX(int& i, double& X, double* const ZVAL, double* const YVAL,
+	double* const A, double const* const coef, double const* const XI,
+	const int n, double const* const Z, double const * const DMZ, const int k, const int ncomp,
+	const int ny, const int mmax, int const * const M,
+	const int mstar, const int MODE, double* const DMVAL, const int MODM)
 {
-	AutoTimer at(g_timer, _FUNC_);
+	//A(7, 1);
 
-	ZVAL.assertDim(1);
-	DMVAL.assertDim(1);
-	XI.assertDim(1);
-	M.assertDim(1);
-	A.reshape(7, 1); 
-	A.assertDim(7, 1);
-	Z.assertDim(1);
-	DMZ.assertDim(1);
-	coef.assertDim(1);
-	YVAL.assertDim(1);
+	AutoTimer at(g_timer, _FUNC_);
 
 	dad1 BM(4), DM(7);
 	int IZ, ILEFT, IRIGHT;
@@ -4050,34 +4072,34 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 	switch (MODE) {
 	case 1:
 		//  mode = 1, retrieve  z(u(x))  directly for x = xi(i).
-		X = XI(i);
+		X = XI[i-1];
 		IZ = (i - 1) * mstar;
-		for (int j = 1; j <= mstar; ++j) {
-			IZ = IZ + 1;
-			ZVAL(j) = Z(IZ);
+		for (int j = 0; j < mstar; ++j) {
+			IZ++;
+			ZVAL[j] = Z[IZ-1];
 		}
 		return;
 
 	case 2:
 		//  mode = 2, locate i so  xi(i).le.x.lt.xi(i + 1)
-		if (X < XI(1) - PRECIS || X > XI(n + 1) + PRECIS)
+		if (X < XI[0] - PRECIS || X > XI[n] + PRECIS)
 		{
 			if (IPRINT < 1)
-				fmt::print("****** DOMAIN ERROR IN APPROX ******\n"
+				fmt::print(fg(fmt::color::red),"****** DOMAIN ERROR IN APPROX ******\n"
 					" X = {}, ALEFT = {}, ARIGHT = {}\n",
-					X, XI(1), XI(n + 1));
-			if (X < XI(1))
-				X = XI(1);
-			if (X > XI(n + 1))
-				X = XI(n + 1);
+					X, XI[0], XI[n]);
+			if (X < XI[0])
+				X = XI[0];
+			if (X > XI[n])
+				X = XI[n];
 		}
 		if (i > n || i < 1)
 			i = (n + 1) / 2;
 		ILEFT = i;
-		if (X >= XI(ILEFT)) {
+		if (X >= XI[ILEFT-1]) {
 			for (int l = ILEFT; l <= n; ++l) {
 				i = l;
-				if (X < XI(l + 1))
+				if (X < XI[l])
 					break;
 			}
 		}
@@ -4085,20 +4107,20 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 			IRIGHT = ILEFT - 1;
 			for (int l = 1; l <= IRIGHT; ++l) {
 				i = IRIGHT + 1 - l;
-				if (X >= XI(i))
+				if (X >= XI[i-1])
 					break;
 			}
 		}
 		[[fallthrough]];
 	case 3:	 {
 		//  mode = 2 or 3, compute mesh independent rk - basis.
-		double S = (X - XI(i)) / (XI(i + 1) - XI(i));
-		RKBAS(S, k, mmax, A.contiguous(), DM.contiguous(), MODM);
+		double S = (X - XI[i-1]) / (XI[i] - XI[i-1]);
+		RKBAS(S, k, mmax, A, DM.contiguous(), MODM);
 		}
 		[[fallthrough]];
 	case 4:
 		//  mode = 2, 3, or 4, compute mesh dependent rk - basis.
-		BM(1) = X - XI(i);
+		BM(1) = X - XI[i-1];
 
 		for (int l = 2; l <= mmax; ++l)
 			BM(l) = BM(1) / double(l);
@@ -4109,21 +4131,21 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 		IZ = (i - 1) * mstar + 1;
 		int IDMZ = (i - 1) * k * NCY;
 		for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
-			int MJ = M(JCOMP);
+			int MJ = M[JCOMP-1];
 			IR = IR + MJ;
 			IZ = IZ + MJ;
 			for (int l = 1; l <= MJ; ++l) {
 				int IND = IDMZ + JCOMP;
 				double ZSUM = 0.0;
 				for (int j = 1; j <= k; ++j) {
-					ZSUM = ZSUM + A(j, l) * DMZ(IND);
+					ZSUM = ZSUM + A[(j - 1) + (l-1)*7] * DMZ[IND - 1];
 					IND = IND + NCY;
 				}
 				for (int LL = 1; LL <= l; ++LL) {
 					int LB = l + 1 - LL;
-					ZSUM = ZSUM * BM(LB) + Z(IZ - LL);
+					ZSUM = ZSUM * BM(LB) + Z[IZ - LL-1];
 				}
-				ZVAL(IR - l) = ZSUM;
+				ZVAL[IR - l-1] = ZSUM;
 			}
 		}
 		if (MODM == 0)
@@ -4131,12 +4153,12 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 
 		//  for modm = 1 evaluate  y(j) = j - th component of y.
 		for (int JCOMP = 1; JCOMP <= ny; ++JCOMP)
-			YVAL(JCOMP) = 0.0;
+			YVAL[JCOMP-1] = 0.0;
 		for (int j = 1; j <= k; ++j) {
 			int IND = IDMZ + (j - 1) * NCY + ncomp + 1;
 			double FACT = DM(j);
 			for (int JCOMP = 1; JCOMP <= ny; ++JCOMP) {
-				YVAL(JCOMP) = YVAL(JCOMP) + FACT * DMZ(IND);
+				YVAL[JCOMP - 1] += FACT * DMZ[IND-1];
 				IND = IND + 1;
 			}
 		}
@@ -4145,12 +4167,12 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 
 		//  for modm = 2 evaluate  dmval(j) = mj - th derivative of uj.
 		for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP)
-			DMVAL(JCOMP) = 0.0;
+			DMVAL[JCOMP - 1] = 0.0;
 		for (int j = 1; j <= k; ++j) {
 			int IND = IDMZ + (j - 1) * NCY + 1;
 			double FACT = DM(j);
 			for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
-				DMVAL(JCOMP) = DMVAL(JCOMP) + FACT * DMZ(IND);
+				DMVAL[JCOMP - 1] += FACT * DMZ[IND-1];
 				IND = IND + 1;
 			}
 		}
