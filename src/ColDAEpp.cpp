@@ -1,8 +1,8 @@
 ﻿#pragma warning( disable : 5045 )
 
 // break on nan
-//#include <float.h>
-//unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
+#include <float.h>
+unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 #include "timer.h"
 #include "ColDAEpp.hpp"
@@ -115,19 +115,19 @@ struct sys3 {
 	}
 	static void gsub(int i, dar1 z, double& g) {
 		if (i == 1)
-			g = z(1) + z(2) + 0.15;   // g_1 = 0 = z(0)-1   left
+			g = z(1) + z(2) + 0.15;  // g_1 = 0 = z(0)-1   left
 		else if (i == 2)
-			g = z(1) - 6.5; // g_2 = 0 = z(0)-1   left
+			g = z(1) - 6.5;          // g_2 = 0 = z(0)-1   right
 		else assert(false);
 	}
 	static void dgsub(int i, dar1 z, dar1 dg) {
 		if (i == 1) {
 			dg(1) = 1; // dg_1 / df1
-			dg(2) = 1; // dg_1 / df1' 
+			dg(2) = 1; // dg_1 / df1'
 		}
 		else if (i == 2) {
-			dg(1) = 1;  // dg_2/df1  
-			dg(2) = 0;  // dg_2/df1' 
+			dg(1) = 1;  // dg_2/df1
+			dg(2) = 0;  // dg_2/df1'
 		}
 		else assert(false);
 	}
@@ -146,7 +146,7 @@ int main()
 		opts.fdim = 1000000;
 		opts.idim = 100000;
 
-		opts.printLevel = printMode::full;
+		opts.printLevel = printMode::none;
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		
@@ -162,7 +162,7 @@ int main()
 
 	cda solver;
 	output_t iflag;
-	for (int i = 0; i < 1; ++i) 
+	for (int i = 0; i < 100; ++i) 
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	

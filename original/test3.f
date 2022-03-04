@@ -65,7 +65,7 @@
             ipar(4)=2 ! number of tolerances
             ipar(5)=1000000 ! dim of fspace
             ipar(6)=100000 ! dim of ispace
-            ipar(7)=-1 ! -1 for full printout 
+            ipar(7)=1 ! -1 for full printout 
             ipar(8)=0 ! generate new mesh
             ipar(9)=0 ! no guess provided
             ipar(10)=0 ! problem is regular
@@ -75,7 +75,7 @@
            
             call cpu_time(start)
                          
-            do i=1,1
+            do i=1,100
             call coldae(ncomp,ny,orders,left,right,sides,
      .                 ipar,ltol,tol,fixpnt,ispace,fspace,iflag,
      .                 fsub,dfsub,gsub,dgsub,0)

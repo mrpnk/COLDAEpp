@@ -397,11 +397,11 @@ public:
 		assertm(size == dim0, "Dimension 1 does not match!");
 	}
 
-	const T& operator()(int idx) const {
+	inline const T& operator()(int idx) const {
 		assertm(idx >= 1 && idx <= size, "Dimension 1 index out of range!");
 		return data[idx - 1];
 	}
-	T& operator()(int idx) {
+	inline T& operator()(int idx) {
 		assertm(idx>=1 && idx <= size,"Dimension 1 index out of range!");
 		return data[idx - 1];
 	}
@@ -412,7 +412,7 @@ public:
 		return s;
 	}
 
-	arrRef1(arrRef2<T> const& ar2) {
+	inline arrRef1(arrRef2<T> const& ar2) {
 		data = ar2.data;
 		size = ar2.size1 * ar2.size2;
 	}
@@ -497,12 +497,12 @@ public:
 		//	assertm(size2 == s2, "Dimension 2 does not match!");
 		//}
 	}
-	arrRef2(arrRef1<T> const& ar1) {
+	inline arrRef2(arrRef1<T> const& ar1) {
 		data = ar1.data;
 		size1 = 0; size2 = 1; // set the matrix size to 0,0. It will be specified later (hopefully)
 		cap = ar1.size;
 	}
-	T& operator()(int idx1, int idx2) {
+	inline T& operator()(int idx1, int idx2) {
 		assertm(idx1 >= 1 && idx1 <= size1, "Dimension 1 index out of range!");
 		if(size2 != 1)
 			assertm(idx2 >= 1 && idx2 <= size2, "Dimension 2 index out of range!");
