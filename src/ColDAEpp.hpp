@@ -3093,7 +3093,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		}
 		//  solve the linear system.
 		//  matrix decomposition
-		FCBLOK(G, INTEGS, N, IPVTG, DF, MSING);
+		FCBLOK(G.contiguous(), INTEGS.contiguous(), N, IPVTG.contiguous(), 
+			DF.contiguous(), MSING);
 
 		//  check for singular matrix
 		MSING = -MSING;
@@ -4283,6 +4284,79 @@ void DMZSOL(dar2 V, dar1 Z, dar2 DMZ)
 ----------------------------------------------------------------------*/
 
 
+
+
+//calls subroutines  factrband shiftb .
+//	
+//	     fcblok  supervises the plu factorization with pivoting of
+//	     scaled rows of the almost block diagonal matrix stored in the
+//	     arrays  bloks and integs .
+//	
+//	     factrb = subprogram which carries out steps 1, ..., last of gauss
+//	            elimination(with pivoting) for an individual block.
+//	     shiftb = subprogram which shifts the remaining rows to the top of
+//	            the next block
+//	
+//	     parameters
+//	      bloks   an array that initially contains the almost block diago -
+//	            nal matrix  a  to be factored, and on return contains the
+//	            computed factorization of  a .
+//	      integs  an integer array describing the block structure of  a .
+//	      nbloks  the number of blocks in  a .
+//	      ipivot  an integer array of dimension   sum(integs(3, n); n = 1,
+//		            ..., nbloks) which, on return, contains the pivoting stra -
+//	            tegy used.
+//	      scrtch  work area required, of length  max(integs(1, n); n = 1,
+//		            ..., nbloks).
+//	      info    output parameter;
+// = 0  in case matrix was found to be nonsingular.
+//            otherwise,
+// = n if the pivot element in the nth gauss step is zero.
+//
+//**********************************************************************
+void FCBLOK(double* const BLOKS, int const * const INTEGS, 
+	int const NBLOKS, int* const IPIVOT, double* const SCRTCH, int& INFO)
+{
+	AutoTimer at(g_timer, _FUNC_);
+	//INTEGS.assertDim(3, NBLOKS);
+	/*IPIVOT.assertDim(1);
+	BLOKS.assertDim(1);
+	SCRTCH.assertDim(1);*/
+
+	INFO = 0;
+	int INDEXX = 1;
+	int INDEXN = 1;
+	
+	//  loop over the blocks. i is loop index
+	int i = 1;
+	while (true) {
+		int INDEX = INDEXN;  // soll ausblenden
+		int NROW = INTEGS[0 + 3 * (i - 1)];
+		int NCOL = INTEGS[1 + 3 * (i - 1)];
+		int LAST = INTEGS[2 + 3 * (i - 1)];
+
+		// carry out elimination on the i - th block until next block
+		// enters, i.e., for columns 1, ..., last  of i - th block.
+		FACTRB(BLOKS+(INDEX-1), IPIVOT+(INDEXX-1), SCRTCH, NROW, NCOL, LAST, INFO);
+
+		// check for having reached a singular block or the last block
+		if (INFO != 0)
+			break;
+		if (i == NBLOKS)
+			return;
+
+		i = i + 1;
+		INDEXN = NROW * NCOL + INDEX;
+		INDEXX = INDEXX + LAST;
+
+		// put the rest of the i - th block onto the next block
+		SHIFTB(BLOKS + (INDEX - 1), NROW, NCOL, LAST, BLOKS + (INDEXN - 1),
+			INTEGS[0 + (i - 1) * 3], INTEGS[1 + (i - 1) * 3]);
+	}
+	INFO = INFO + INDEXX - 1;
+}
+
+
 //
 //********************************************************************
 //
@@ -4309,102 +4383,102 @@ void DMZSOL(dar2 V, dar1 Z, dar2 DMZ)
 //
 // * *********************************************************************
 //
-void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, const int NROW, const int NCOL, const int LAST, int& INFO)
+void FACTRB(double* const W, int* const IPIVOT, double* const D,
+            const int NROW, const int NCOL, const int LAST, int& INFO)
 {
+	//IPIVOT(NROW);
+	//W(NROW, NCOL);
+	//D(NROW);
+	
 	AutoTimer at(g_timer, _FUNC_);
-	IPIVOT.assertDim(NROW);
-	W.reshape(NROW, NCOL); 
-	W.assertDim(NROW, NCOL);
-	D.assertDim(NROW);
-
+	
 	double COLMAX, T, S;
 	int k, l, KP1;
 
 
 	//  initialize  d
-	for (int i = 1; i <= NROW; ++i)
-		D(i) = 0.0;
+	for (int i = 0; i < NROW; ++i)
+		D[i] = 0.0;
 
-	for (int j = 1; j <= NCOL; ++j)
-		for (int i = 1; i <= NROW; ++i)
-			D(i) = std::max(D(i), abs(W(i, j)));
+	for (int j = 0; j < NCOL; ++j)
+		for (int i = 0; i < NROW; ++i)
+			D[i] = std::max(D[i], abs(W[i + j*NROW]));
 
 	//  gauss elimination with pivoting of scaled rows, loop over
 	//  k = 1, ., last
-
-	k = 1;
 	//  as pivot row for k - th step, pick among the rows not yet used,
 	//  i.e., from rows  k, ..., nrow, the one whose k - th entry
 	//  (compared to the row size) is largest.then, if this row
 	//  does not turn out to be row k, interchange row k with this
 	//  particular rowand redefine ipivot(k).
 
-n30:
+	k = 1;
+	while (true) {
 
-	if (D(k) == 0.0) {
-		INFO = k;
-		return;
-	}
-	if (k == NROW) {
-		////  if  last.eq.nrow, check now that pivot element in last row
-		////  is nonzero.
-		if (abs(W(NROW, NROW)) + D(NROW) <= D(NROW))
+		if (D[k-1] == 0.0) {
 			INFO = k;
-	}
-
-	l = k;
-	KP1 = k + 1;
-	COLMAX = abs(W(k, k)) / D(k);
-	// find the(relatively) largest pivot
-	for (int i = KP1; i <= NROW; ++i) {
-		if (abs(W(i, k)) <= COLMAX * D(i))
-			continue;
-		COLMAX = abs(W(i, k)) / D(i);
-		l = i;
-	}
-
-	IPIVOT(k) = l;
-	T = W(l, k);
-	S = D(l);
-	if (l != k) {
-		W(l, k) = W(k, k);
-		W(k, k) = T;
-		D(l) = D(k);
-		D(k) = S;
-	}
-
-	//       if pivot element is too small in absolute value, declare
-	//       matrix to be noninvertible and quit.
-	if (abs(T) + D(k) <= D(k))
-	{
-		INFO = k; //  singularity flag set
-		return;
-	}
-
-	// otherwise, subtract the appropriate multiple of the pivot
-	// row from remaining rows, i.e., the rows(k + 1), ..., (nrow)
-	// to make k - th entry zero.save the multiplier in its place.
-	// for high performance do this operations column oriented.
-	T = -1.00 / T;
-	for (int i = KP1; i <= NROW; ++i)
-		W(i, k) = W(i, k) * T;
-
-	for (int j = KP1; j <= NCOL; ++j) {
-		T = W(l, j);
-		if (l != k){
-			W(l, j) = W(k, j);
-			W(k, j) = T;
+			return;
 		}
-		if (T == 0.0)
-			continue;
-		for (int i = KP1; i <= NROW; ++i)
-			W(i, j) = W(i, j) + W(i, k) * T;
-	}
-	k = KP1;
+		if (k == NROW) {
+			// if  last.eq.nrow, check now that pivot element in last row is nonzero.
+			if (abs(W[NROW-1 + (NROW-1)* NROW]) <= 0)
+				INFO = k;
+		}
 
-	// check for having reached the next block.
-	if (k <= LAST)
-		goto n30;
+		l = k;
+		KP1 = k + 1;
+		COLMAX = abs(W[(k-1)+(k-1)*NROW]) / D[k-1];
+		// find the (relatively) largest pivot
+		for (int i = KP1; i <= NROW; ++i) {
+			if (abs(W[(i - 1) + (k - 1) * NROW]) <= COLMAX * D[i - 1])
+				continue;
+			COLMAX = abs(W[(i - 1) + (k - 1) * NROW]) / D[i - 1];
+			l = i;
+		}
+
+		IPIVOT[k - 1] = l;
+		T = W[(l - 1) + (k - 1) * NROW];
+		S = D[l-1];
+		if (l != k) {
+			W[(l - 1) + (k - 1) * NROW] = W[(k - 1) + (k - 1) * NROW];
+			W[(k - 1) + (k - 1) * NROW] = T;
+			D[l - 1] = D[k - 1];
+			D[k - 1] = S;
+		}
+
+		// if pivot element is too small in absolute value, declare
+		// matrix to be noninvertible and quit.
+		if (abs(T) <= 0)
+		{
+			INFO = k; //  singularity flag set
+			return;
+		}
+
+		// otherwise, subtract the appropriate multiple of the pivot
+		// row from remaining rows, i.e., the rows(k + 1), ..., (nrow)
+		// to make k - th entry zero. save the multiplier in its place.
+		// for high performance do this operations column oriented.
+		T = -1.0 / T;
+		for (int i = KP1; i <= NROW; ++i)
+			W[(i - 1) + (k - 1) * NROW] *= T;
+
+		for (int j = KP1; j <= NCOL; ++j) {
+			T = W[(l - 1) + (j - 1) * NROW];
+			if (l != k) {
+				W[(l - 1) + (j - 1) * NROW] = W[(k - 1) + (j - 1) * NROW];
+				W[(k - 1) + (j - 1) * NROW] = T;
+			}
+			if (T == 0.0)
+				continue;
+			for (int i = KP1; i <= NROW; ++i)
+				W[(i - 1) + (j - 1) * NROW] += W[(i - 1) + (k - 1) * NROW] * T;
+		}
+		k = KP1;
+
+		// check for having reached the next block.
+		if (k > LAST)
+			break;
+	}
 }
 
 
@@ -4443,102 +4517,31 @@ n30:
 //
 // * ********************************************************************
 //
-void SHIFTB(dar2 AI, const int NROWI, const int NCOLI, const int LAST, dar2 AI1, const int NROWI1, const int NCOLI1)
+void SHIFTB(double* const AI, const int NROWI, const int NCOLI, const int LAST,
+            double* const AI1, const int NROWI1, const int NCOLI1)
 {
+	//AI(NROWI, NCOLI);
+	//AI1(NROWI1, NCOLI1)
+	
 	AutoTimer at(g_timer, _FUNC_);
-	AI.reshape(NROWI, NCOLI);
-	AI.assertDim(NROWI, NCOLI);
-	AI1.reshape(NROWI1, NCOLI1);
-	AI1.assertDim(NROWI1, NCOLI1);
-
+	
 	int MMAX = NROWI - LAST; // soll ausblenden
 	int JMAX = NCOLI - LAST;
 	if (MMAX < 1 || JMAX < 1)
 		return;
 
 	// put the remainder of block i into ai1
-	for (int j = 1; j <= JMAX; ++j)
-		for (int m = 1; m <= MMAX; ++m)
-			AI1(m, j) = AI(LAST + m, LAST + j);
+	for (int j = 0; j < JMAX; ++j)
+		for (int m = 0; m < MMAX; ++m)
+			AI1[m + j * NROWI1] = AI[(LAST + m) + (LAST + j) * NROWI];
 
 	if (JMAX == NCOLI1)
 		return;
 
 	// zero out the upper right corner of ai1
-	int JMAXP1 = JMAX + 1;
-	for (int j = JMAXP1; j <= NCOLI1; ++j)
-		for (int m = 1; m<= MMAX; ++m)
-			AI1(m, j) = 0.0;
-}
-
-
-
-//calls subroutines  factrband shiftb .
-//	
-//	     fcblok  supervises the plu factorization with pivoting of
-//	     scaled rows of the almost block diagonal matrix stored in the
-//	     arrays  bloks and integs .
-//	
-//	     factrb = subprogram which carries out steps 1, ..., last of gauss
-//	            elimination(with pivoting) for an individual block.
-//	     shiftb = subprogram which shifts the remaining rows to the top of
-//	            the next block
-//	
-//	     parameters
-//	      bloks   an array that initially contains the almost block diago -
-//	            nal matrix  a  to be factored, and on return contains the
-//	            computed factorization of  a .
-//	      integs  an integer array describing the block structure of  a .
-//	      nbloks  the number of blocks in  a .
-//	      ipivot  an integer array of dimension   sum(integs(3, n); n = 1,
-//		            ..., nbloks) which, on return, contains the pivoting stra -
-//	            tegy used.
-//	      scrtch  work area required, of length  max(integs(1, n); n = 1,
-//		            ..., nbloks).
-//	      info    output parameter;
-// = 0  in case matrix was found to be nonsingular.
-//            otherwise,
-// = n if the pivot element in the nth gauss step is zero.
-//
-//**********************************************************************
-void FCBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int& INFO)
-{
-	AutoTimer at(g_timer, _FUNC_);
-	INTEGS.assertDim(3, NBLOKS);
-	IPIVOT.assertDim(1);
-	BLOKS.assertDim(1);
-	SCRTCH.assertDim(1);
-
-	INFO = 0;
-	int INDEXX = 1;
-	int INDEXN = 1;
-	
-	//  loop over the blocks. i is loop index
-	int i = 1;
-	while (true) {
-		int INDEX = INDEXN;  // soll ausblenden
-		int NROW = INTEGS(1, i);
-		int NCOL = INTEGS(2, i);
-		int LAST = INTEGS(3, i);
-
-		// carry out elimination on the i - th block until next block
-		// enters, i.e., for columns 1, ..., last  of i - th block.
-		FACTRB(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), SCRTCH, NROW, NCOL, LAST, INFO);
-
-		// check for having reached a singular block or the last block
-		if (INFO != 0)
-			break;
-		if (i == NBLOKS)
-			return;
-
-		i = i + 1;
-		INDEXN = NROW * NCOL + INDEX;
-		INDEXX = INDEXX + LAST;
-
-		// put the rest of the i - th block onto the next block
-		SHIFTB(BLOKS.sub(INDEX), NROW, NCOL, LAST, BLOKS.sub(INDEXN), INTEGS(1, i), INTEGS(2, i));
-	}
-	INFO = INFO + INDEXX - 1;
+	for (int j = JMAX; j < NCOLI1; ++j)
+		for (int m = 0; m < MMAX; ++m)
+			AI1[m + j * NROWI1] = 0.0;
 }
 
 
@@ -4578,9 +4581,9 @@ void SBBLOK(double* const BLOKS, int const * const INTEGS,
 	int INDEX = 1;  // soll ausblenden
 	int INDEXX = 1;
 	for (int i = 1; i <= NBLOKS; ++i) {
-		NROW = INTEGS[3 * (i - 1)];
-		NCOL = INTEGS[3 * (i - 1) + 1];
-		LAST = INTEGS[3 * (i - 1) + 2];
+		NROW = INTEGS[0 + 3 * (i - 1)];
+		NCOL = INTEGS[1 + 3 * (i - 1)];
+		LAST = INTEGS[2 + 3 * (i - 1)];
 		SUBFOR(BLOKS+(INDEX-1), IPIVOT+(INDEXX-1), NROW, LAST, X+(INDEXX-1));
 		INDEX += NROW * NCOL;
 		INDEXX += LAST;
@@ -4590,9 +4593,9 @@ void SBBLOK(double* const BLOKS, int const * const INTEGS,
 	int NBP1 = NBLOKS + 1;
 	for (int j = 1; j <= NBLOKS; ++j) {
 		int i = NBP1 - j;
-		NROW = INTEGS[3 * (i - 1)];
-		NCOL = INTEGS[3 * (i - 1)+1];
-		LAST = INTEGS[3 * (i - 1)+2];
+		NROW = INTEGS[0 + 3 * (i - 1)];
+		NCOL = INTEGS[1 + 3 * (i - 1)];
+		LAST = INTEGS[2 + 3 * (i - 1)];
 		INDEX -= NROW * NCOL;
 		INDEXX -= LAST;
 		SUBBAK(BLOKS+(INDEX-1), NROW, NCOL, LAST, X+(INDEXX-1));
