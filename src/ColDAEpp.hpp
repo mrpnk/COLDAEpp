@@ -2226,10 +2226,10 @@ n100:
 			//  intervals will be used to approximate the needed derivative, but
 			//  here the 1st and second intervals are used.)
 			double HIOLD = XIOLD(2) - XIOLD(1);
-			HORDER(1, D1, HIOLD, DMV);
+			HORDER(1, D1.contiguous(), HIOLD, DMV.contiguous());
 			IDMZ = IDMZ + (NCOMP + NY) * K;
 			HIOLD = XIOLD(3) - XIOLD(2);
-			HORDER(2, D2, HIOLD, DMV);
+			HORDER(2, D2.contiguous(), HIOLD, DMV.contiguous());
 			ACCUM(1) = 0.0;
 			SLOPE(1) = 0.0;
 			double ONEOVH = 2.0 / (XIOLD(3) - XIOLD(1));
@@ -2249,9 +2249,9 @@ n100:
 			for (int i = 2; i <= NOLD; ++i) {
 				HIOLD = XIOLD(i + 1) - XIOLD(i);
 				if (IFLIP == -1)
-					HORDER(i, D1, HIOLD, DMV);
+					HORDER(i, D1.contiguous(), HIOLD, DMV.contiguous());
 				if (IFLIP == 1)
-					HORDER(i, D2, HIOLD, DMV);
+					HORDER(i, D2.contiguous(), HIOLD, DMV.contiguous());
 				ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1));
 				SLOPE(i) = 0.0;
 
@@ -2539,7 +2539,7 @@ void CONSTS()
 		for (int i = 1; i <= K; ++i)
 			COEF(i, j) = 0.0;
 		COEF(j, j) = 1.0;
-		VMONDE(COEF.sub(1, j), K);
+		VMONDE(COEF.sub(1, j).contiguous(), K);
 	}
 	RKBAS(1.0, K, MMAX, B, DUMMY, 0);
 	for (int i = 1; i <= K; ++i)
@@ -3170,7 +3170,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		SBBLOK(G.contiguous(), INTEGS.contiguous(), N, IPVTG.contiguous(), DELZ.contiguous());
 
 		//  finally find deldmz
-		DMZSOL(V, DELZ, DELDMZ);
+		DMZSOL(V.contiguous(), DELZ.contiguous(), DELDMZ.contiguous());
 
 		if (MODE != 1) {
 			//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
@@ -3228,7 +3228,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		SBBLOK(G.contiguous(), INTEGS.contiguous(), N, IPVTG.contiguous(), Z.contiguous());
 
 		//  finally find dmz
-		DMZSOL(V, Z, DMZ);
+		DMZSOL(V.contiguous(), Z.contiguous(), DMZ.contiguous());
 	}
 	}
 	//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
@@ -4170,33 +4170,32 @@ purpose
 		with  v(i, j) = rho(j) * *(i - 1) / (i - 1)!.
 
 * **********************************************************************/
-void VMONDE(dar1 coef, int k)
+void VMONDE(double* const coef, int const k)
 {
-	AutoTimer at(g_timer, _FUNC_);
-
-	int IFAC, KM1, KMI;
 	RHO.assertDim(k);
-	coef.assertDim(k);
+	//coef(k);
+	
+	AutoTimer at(g_timer, _FUNC_);
 
 	if (k == 1)
 		return;
-	KM1 = k - 1;
+	int KM1 = k - 1;
 	for (int i = 1; i <= KM1; ++i) {
-		KMI = k - i;
+		int KMI = k - i;
 		for (int j = 1; j <= KMI; ++j) {
-			coef(j) = (coef(j + 1) - coef(j)) / (RHO(j + i) - RHO(j));
+			coef[j-1] = (coef[j] - coef[j-1]) / (RHO(j + i) - RHO(j));
 		}
 	}
 
-	IFAC = 1;
+	int IFAC = 1;
 	for (int i = 1; i <= KM1; ++i) {
-		KMI = k + 1 - i;
+		int KMI = k + 1 - i;
 		for (int j = 2; j <= KMI; ++j)
-			coef(j) = coef(j) - RHO(j + i - 1) * coef(j - 1);
-		coef(KMI) = double(IFAC) * coef(KMI);
-		IFAC = IFAC * i;
+			coef[j-1] -= RHO(j + i - 1) * coef[j - 2];
+		coef[KMI-1] *= double(IFAC);
+		IFAC *= i;
 	}
-	coef(1) = double(IFAC) * coef(1);
+	coef[0] *= double(IFAC);
 }
 
 
@@ -4218,27 +4217,25 @@ variables
 						j
 
 * **********************************************************************/
-void HORDER(const int i, dar1 UHIGH, const double HI, dar1 DMZ)
+void HORDER(int const i, double* const UHIGH, double const HI, double const * const DMZ)
 {
 	AutoTimer at(g_timer, _FUNC_);
-	UHIGH.assertDim(1);
-	DMZ.assertDim(1);
-
+	
 	double DN = 1.0 / pow(HI, (K - 1));
 
 	//  loop over the ncomp solution components
-	for (int ID = 1; ID <= NCOMP; ++ID)
-		UHIGH(ID) = 0.0;
+	for (int ID = 0; ID < NCOMP; ++ID)
+		UHIGH[ID] = 0.0;
 
 	int KIN = 1;
-	int IDMZ = (i - 1) * K * NCY + 1;
+	int IDMZ = (i - 1) * K * NCY;
 	for (int j = 1; j <= K;++j) {
 		double FACT = DN * COEF.contiguous()[KIN-1];
-		for (int ID = 1; ID <= NCOMP;++ID) {
-			UHIGH(ID) = UHIGH(ID) + FACT * DMZ(IDMZ);
-			IDMZ = IDMZ + 1;
+		for (int ID = 0; ID < NCOMP;++ID) {
+			UHIGH[ID] += FACT * DMZ[IDMZ];
+			IDMZ++;
 		}
-		KIN = KIN + K;
+		KIN += K;
 	}
 }
 
@@ -4251,23 +4248,21 @@ purpose
 		dmz(i) = dmz(i) + v(i) * z(i), i = 1, ..., n
 
 * **********************************************************************/
-void DMZSOL(dar2 V, dar1 Z, dar2 DMZ)
+void DMZSOL(double* V, double* Z, double* DMZ)
 {
+	//V(KDY, 1);
+	//DMZ(KDY, 1);
+	
 	AutoTimer at(g_timer, _FUNC_);
-	V.reshape(KDY, 1);
-	V.assertDim(KDY, 1);
-	DMZ.reshape(KDY, 1);
-	DMZ.assertDim(KDY, 1);
-	Z.assertDim(1);
-
-	int JZ = 1;
-	for (int i = 1; i <= N; ++i) {
-		for (int j = 1; j <= MSTAR; ++j) {
-			double FACT = Z(JZ);
-			for (int l = 1; l <= KDY; ++l) {
-				DMZ(l, i) = DMZ(l, i) + FACT * V(l, JZ);
+	
+	int JZ = 0;
+	for (int i = 0; i < N; ++i) {
+		for (int j = 0; j < MSTAR; ++j) {
+			double FACT = Z[JZ];
+			for (int l = 0; l < KDY; ++l) {
+				DMZ[l + i*KDY] += FACT * V[l + JZ*KDY];
 			}
-			JZ = JZ + 1;
+			JZ++;
 		}
 	}
 }
