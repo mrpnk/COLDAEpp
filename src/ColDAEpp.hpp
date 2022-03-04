@@ -3655,7 +3655,8 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 	const int MODL, const double XI1, dar1 ZVAL, dar1 YVAL, 
 	dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB, dar2 FC, dfsub_t dfsub, int& ISING, const int NYCB)
 {	
-	
+	AutoTimer at(g_timer, _FUNC_);
+
 	GI.reshape(NROW, 1); 
 	GI.assertDim(NROW, 1);
 	WI.assertDim(1);
@@ -3950,6 +3951,8 @@ variables
 * **********************************************************************/
 void RKBAS(const double S, const int k, const int M, dar2 RKB, dar1 DM, const int MODE)
 {
+	AutoTimer at(g_timer, _FUNC_);
+
 	COEF.reshape(k, k); // simon
 	COEF.assertDim(k, k);
 	RKB.reshape(7, 1); // simon
@@ -4030,6 +4033,8 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 	const int n, dar1 Z, dar1 DMZ, const int k, const int ncomp, const int ny, const int mmax, iar1 M,
 	const int mstar, const int MODE, dar1 DMVAL, const int MODM)
 {
+	AutoTimer at(g_timer, _FUNC_);
+
 	ZVAL.assertDim(1);
 	DMVAL.assertDim(1);
 	XI.assertDim(1);
@@ -4040,8 +4045,6 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 	DMZ.assertDim(1);
 	coef.assertDim(1);
 	YVAL.assertDim(1);
-	
-//	using namespace COLOUT; // double PRECIS; int IOUT, IPRINT;
 
 	dad1 BM(4), DM(7);
 	int IZ, ILEFT, IRIGHT;
@@ -4168,6 +4171,8 @@ purpose
 * **********************************************************************/
 void VMONDE(dar1 coef, int k)
 {
+	AutoTimer at(g_timer, _FUNC_);
+
 	int IFAC, KM1, KMI;
 	RHO.assertDim(k);
 	coef.assertDim(k);
@@ -4214,11 +4219,10 @@ variables
 * **********************************************************************/
 void HORDER(const int i, dar1 UHIGH, const double HI, dar1 DMZ)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	UHIGH.assertDim(1);
 	DMZ.assertDim(1);
 
-//	using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	
 	double DN = 1.0 / pow(HI, (K - 1));
 
 	//  loop over the ncomp solution components
@@ -4248,6 +4252,7 @@ purpose
 * **********************************************************************/
 void DMZSOL(dar2 V, dar1 Z, dar2 DMZ)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	V.reshape(KDY, 1);
 	V.assertDim(KDY, 1);
 	DMZ.reshape(KDY, 1);
@@ -4306,6 +4311,7 @@ void DMZSOL(dar2 V, dar1 Z, dar2 DMZ)
 //
 void FACTRB(dar2 W, iar1 IPIVOT, dar1 D, const int NROW, const int NCOL, const int LAST, int& INFO)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	IPIVOT.assertDim(NROW);
 	W.reshape(NROW, NCOL); 
 	W.assertDim(NROW, NCOL);
@@ -4439,6 +4445,7 @@ n30:
 //
 void SHIFTB(dar2 AI, const int NROWI, const int NCOLI, const int LAST, dar2 AI1, const int NROWI1, const int NCOLI1)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	AI.reshape(NROWI, NCOLI);
 	AI.assertDim(NROWI, NCOLI);
 	AI1.reshape(NROWI1, NCOLI1);
@@ -4496,6 +4503,7 @@ void SHIFTB(dar2 AI, const int NROWI, const int NCOLI, const int LAST, dar2 AI1,
 //**********************************************************************
 void FCBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 SCRTCH, int& INFO)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	INTEGS.assertDim(3, NBLOKS);
 	IPIVOT.assertDim(1);
 	BLOKS.assertDim(1);
@@ -4557,6 +4565,7 @@ void FCBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 SCRTCH,
 // W(NROW, NCOL), X(NCOL)
 void SUBBAK(dar2 W, const int NROW, const int NCOL, const int LAST, dar1 X)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	W.reshape(NROW, NCOL);
 	W.assertDim(NROW, NCOL);
 	X.assertDim(NCOL);
@@ -4587,53 +4596,6 @@ void SUBBAK(dar2 W, const int NROW, const int NCOL, const int LAST, dar1 X)
 	X(1) = X(1) / W(1, 1);
 }
 
-
-
-//
-//**********************************************************************
-//
-//     carries out the forward pass of substitution for the current
-//     block, i.e., the action on the right side corresponding to the
-//     elimination carried out in  factrb  for this block.
-//
-//    parameters
-//       w, ipivot, nrow, last  are as on return from factrb.
-//       x(j)  is expected to contain, on input, the right side of j - th
-//             equation for this block, j = 1, ..., nrow.
-//       x(j)  contains, on output, the appropriately modified right
-//             side of equation(j) in this block, j = 1, ..., lastand
-//             for j = last + 1, ..., nrow.
-//
-//*********************************************************************
-//
-//int IPIVOT(LAST), W(NROW, LAST), X(NROW),
-void SUBFOR(dar2 W, iar1 IPIVOT, const int NROW, const int LAST, dar1 X)
-{
-	IPIVOT.assertDim(LAST);
-	W.reshape(NROW, LAST); 
-	W.assertDim(NROW, LAST);
-	X.assertDim(NROW);
-	int IP, k, KP1, LSTEP;
-
-	if (NROW == 1)
-		return;
-	LSTEP = std::min(NROW - 1, LAST);
-	for (k = 1; k <= LSTEP; ++k)
-	{
-		KP1 = k + 1;
-		IP = IPIVOT(k);
-		double T = X(IP);
-		X(IP) = X(k);
-		X(k) = T;
-		if (T == 0.0)
-			continue;
-		for (int i = KP1; i <= NROW; ++i)
-			X(i) = X(i) + W(i, k) * T;
-	}
-}
-
-
-
 //
 //**********************************************************************
 //
@@ -4653,6 +4615,7 @@ void SUBFOR(dar2 W, iar1 IPIVOT, const int NROW, const int LAST, dar1 X)
 //
 void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
 {
+	AutoTimer at(g_timer, _FUNC_);
 	INTEGS.assertDim(3, NBLOKS);
 	IPIVOT.assertDim(1);
 	BLOKS.assertDim(1);
@@ -4665,7 +4628,8 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
 	for (int i = 1; i <= NBLOKS; ++i) {
 		NROW = INTEGS(1, i);
 		LAST = INTEGS(3, i);
-		SUBFOR(BLOKS.sub(INDEX), IPIVOT.sub(INDEXX), NROW, LAST, X.sub(INDEXX));
+		SUBFOR(BLOKS.sub(INDEX).contiguous(), IPIVOT.sub(INDEXX).contiguous(),
+			NROW, LAST, X.sub(INDEXX).contiguous());
 		INDEX = NROW * INTEGS(2, i) + INDEX;
 		INDEXX = INDEXX + LAST;
 	}
@@ -4680,6 +4644,50 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
 		INDEX = INDEX - NROW * NCOL;
 		INDEXX = INDEXX - LAST;
 		SUBBAK(BLOKS.sub(INDEX), NROW, NCOL, LAST, X.sub(INDEXX));
+	}
+}
+
+
+
+//
+//**********************************************************************
+//
+//     carries out the forward pass of substitution for the current
+//     block, i.e., the action on the right side corresponding to the
+//     elimination carried out in  factrb  for this block.
+//
+//    parameters
+//       w, ipivot, nrow, last  are as on return from factrb.
+//       x(j)  is expected to contain, on input, the right side of j - th
+//             equation for this block, j = 1, ..., nrow.
+//       x(j)  contains, on output, the appropriately modified right
+//             side of equation(j) in this block, j = 1, ..., lastand
+//             for j = last + 1, ..., nrow.
+//
+//*********************************************************************
+//
+void SUBFOR(double* W, int* IPIVOT, const int NROW, const int LAST, double* X)
+{
+	// double W[NROW, LAST]
+	// double X[NROW]
+	// int IPIVOT[LAST]
+
+	AutoTimer at(g_timer, _FUNC_);
+
+	if (NROW == 1)
+		return;
+
+	int LSTEP = std::min(NROW - 1, LAST);
+	for (int k = 1; k <= LSTEP; ++k)
+	{
+		int IP = IPIVOT[k - 1];
+		double T = X[IP - 1];
+		X[IP - 1] = X[k - 1];
+		X[k - 1] = T;
+		if (T == 0.0)
+			continue;
+		for (int i = k + 1; i <= NROW; ++i)
+			X[i - 1] = X[i - 1] + W[(i - 1) + (k - 1) * NROW] * T;
 	}
 }
 

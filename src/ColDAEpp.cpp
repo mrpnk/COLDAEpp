@@ -162,7 +162,7 @@ int main()
 
 	cda solver;
 	output_t iflag;
-	for (int i = 0; i < 100; ++i) 
+	for (int i = 0; i < 1; ++i) 
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	
@@ -182,6 +182,19 @@ int main()
 			file << x << " " << z(1) << " " << y(1) << std::endl;
 		}
 		file.close();
+
+
+
+		// Compare result with FORTRAN version
+		std::ifstream infile("../../original/result_f77.txt");
+		double maxError = 0, x, z1, y1;
+		while (infile >> x >> z1 >> y1) {
+			dad1 z(2), y(1);
+			solver.APPSLN(x, z, y, fspace, ispace);
+			maxError = std::max({ maxError,z1 - z(1),y1 - y(1) });
+		}
+		fmt::print(fg(fmt::color::cornflower_blue), "Max deviation from FORTRAN is {}.\n", maxError);
+		infile.close();
 	}
 	else
 		fmt::print(fg(fmt::color::red), "Error return!\n");
