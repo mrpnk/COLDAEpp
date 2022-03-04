@@ -3166,7 +3166,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 		}
 
 		//  perform forward and backward substitution for mode=0,2, or 3.
-		SBBLOK(G, INTEGS, N, IPVTG, DELZ);
+		SBBLOK(G.contiguous(), INTEGS.contiguous(), N, IPVTG.contiguous(), DELZ.contiguous());
 
 		//  finally find deldmz
 		DMZSOL(V, DELZ, DELDMZ);
@@ -3224,7 +3224,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				IZET = IZET + 1;
 			}
 		}
-		SBBLOK(G, INTEGS, N, IPVTG, Z);
+		SBBLOK(G.contiguous(), INTEGS.contiguous(), N, IPVTG.contiguous(), Z.contiguous());
 
 		//  finally find dmz
 		DMZSOL(V, Z, DMZ);
@@ -4543,58 +4543,6 @@ void FCBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 SCRTCH,
 
 
 
-//
-//*********************************************************************
-//
-//     carries out backsubstitution for current block.
-//
-//    parameters
-//       w, ipivot, nrow, ncol, last  are as on return from factrb.
-//       x(1), ..., x(ncol)  contains, on input, the right side for the
-//               equations in this block after backsubstitution has been
-//               carried up to but not including equation(last).
-//               means that x(j) contains the right side of equation(j)
-//               as modified during elimination, j = 1, ..., last, while
-//               for j.gt.last, x(j) is already a component of the
-//               solution vector.
-//       x(1), ..., x(ncol) contains, on output, the components of the
-//               solution corresponding to the present block.
-//
-//*********************************************************************
-//
-// W(NROW, NCOL), X(NCOL)
-void SUBBAK(dar2 W, const int NROW, const int NCOL, const int LAST, dar1 X)
-{
-	AutoTimer at(g_timer, _FUNC_);
-	W.reshape(NROW, NCOL);
-	W.assertDim(NROW, NCOL);
-	X.assertDim(NCOL);
-	
-	int LP1 = LAST + 1;
-	if (LP1 <= NCOL)
-		for (int j = LP1; j <= NCOL; ++j) {
-			double T = -X(j);
-			if (T == 0.0)
-				continue;
-			for (int i = 1; i <= LAST; ++i)
-				X(i) = X(i) + W(i, j) * T;
-		}
-
-	if (LAST != 1) {
-		int LM1 = LAST - 1;
-		for (int KB = 1; KB <= LM1; ++KB) {
-			int KM1 = LAST - KB;
-			int k = KM1 + 1;
-			X(k) = X(k) / W(k, k);
-			double T = -X(k);
-			if (T == 0.0)
-				continue;
-			for (int i = 1; i <= KM1; ++i)
-				X(i) = X(i) + W(i, k) * T;
-		}
-	}
-	X(1) = X(1) / W(1, 1);
-}
 
 //
 //**********************************************************************
@@ -4613,37 +4561,41 @@ void SUBBAK(dar2 W, const int NROW, const int NCOL, const int LAST, dar1 X)
 //
 //*********************************************************************
 //
-void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
+void SBBLOK(double* const BLOKS, int const * const INTEGS, 
+	int const NBLOKS, int const * const IPIVOT, double* const X)
 {
+	// double BLOKS[?]
+	// int INTEGS[3][NBLOKS]
+	// int IPIVOT[?]
+	// double X[?]
+
 	AutoTimer at(g_timer, _FUNC_);
-	INTEGS.assertDim(3, NBLOKS);
-	IPIVOT.assertDim(1);
-	BLOKS.assertDim(1);
-	X.assertDim(1);
+	
+	
 	int NCOL, NROW, LAST;
 
 	//  forward substitution pass
 	int INDEX = 1;  // soll ausblenden
 	int INDEXX = 1;
 	for (int i = 1; i <= NBLOKS; ++i) {
-		NROW = INTEGS(1, i);
-		LAST = INTEGS(3, i);
-		SUBFOR(BLOKS.sub(INDEX).contiguous(), IPIVOT.sub(INDEXX).contiguous(),
-			NROW, LAST, X.sub(INDEXX).contiguous());
-		INDEX = NROW * INTEGS(2, i) + INDEX;
-		INDEXX = INDEXX + LAST;
+		NROW = INTEGS[3 * (i - 1)];
+		NCOL = INTEGS[3 * (i - 1) + 1];
+		LAST = INTEGS[3 * (i - 1) + 2];
+		SUBFOR(BLOKS+(INDEX-1), IPIVOT+(INDEXX-1), NROW, LAST, X+(INDEXX-1));
+		INDEX += NROW * NCOL;
+		INDEXX += LAST;
 	}
 
 	//  back substitution pass
 	int NBP1 = NBLOKS + 1;
 	for (int j = 1; j <= NBLOKS; ++j) {
 		int i = NBP1 - j;
-		NROW = INTEGS(1, i);
-		NCOL = INTEGS(2, i);
-		LAST = INTEGS(3, i);
-		INDEX = INDEX - NROW * NCOL;
-		INDEXX = INDEXX - LAST;
-		SUBBAK(BLOKS.sub(INDEX), NROW, NCOL, LAST, X.sub(INDEXX));
+		NROW = INTEGS[3 * (i - 1)];
+		NCOL = INTEGS[3 * (i - 1)+1];
+		LAST = INTEGS[3 * (i - 1)+2];
+		INDEX -= NROW * NCOL;
+		INDEXX -= LAST;
+		SUBBAK(BLOKS+(INDEX-1), NROW, NCOL, LAST, X+(INDEXX-1));
 	}
 }
 
@@ -4666,7 +4618,8 @@ void SBBLOK(dar1 BLOKS, iar2 INTEGS, const int NBLOKS, iar1 IPIVOT, dar1 X)
 //
 //*********************************************************************
 //
-void SUBFOR(double* W, int* IPIVOT, const int NROW, const int LAST, double* X)
+void SUBFOR(double const * const W, int const * const IPIVOT, int const NROW,
+	int const LAST, double* const X)
 {
 	// double W[NROW, LAST]
 	// double X[NROW]
@@ -4691,6 +4644,59 @@ void SUBFOR(double* W, int* IPIVOT, const int NROW, const int LAST, double* X)
 	}
 }
 
+
+
+//
+//*********************************************************************
+//
+//     carries out backsubstitution for current block.
+//
+//    parameters
+//       w, ipivot, nrow, ncol, last  are as on return from factrb.
+//       x(1), ..., x(ncol)  contains, on input, the right side for the
+//               equations in this block after backsubstitution has been
+//               carried up to but not including equation(last).
+//               means that x(j) contains the right side of equation(j)
+//               as modified during elimination, j = 1, ..., last, while
+//               for j.gt.last, x(j) is already a component of the
+//               solution vector.
+//       x(1), ..., x(ncol) contains, on output, the components of the
+//               solution corresponding to the present block.
+//
+//*********************************************************************
+//
+
+void SUBBAK(double* const W, int const NROW, int const NCOL, int const LAST, double* const X)
+{
+	// W(NROW, NCOL), X(NCOL)
+	AutoTimer at(g_timer, _FUNC_);
+	
+	int LP1 = LAST + 1;
+	if (LP1 <= NCOL) {
+		for (int j = LP1; j <= NCOL; ++j) {
+			double T = -X[j - 1];
+			if (T == 0.0)
+				continue;
+			for (int i = 1; i <= LAST; ++i)
+				X[i - 1] += W[(i - 1) + (j - 1) * NROW] * T;
+		}
+	}
+
+	if (LAST != 1) {
+		int LM1 = LAST - 1;
+		for (int KB = 1; KB <= LM1; ++KB) {
+			int KM1 = LAST - KB;
+			int k = KM1 + 1;
+			X[k - 1] /= W[(k - 1) + (k - 1) * NROW];
+			double T = -X[k - 1];
+			if (T == 0.0)
+				continue;
+			for (int i = 1; i <= KM1; ++i)
+				X[i-1] += W[(i - 1) + (k - 1) * NROW] * T;
+		}
+	}
+	X[0] /= W[0];
+}
 
 };
 
