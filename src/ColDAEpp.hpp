@@ -2435,7 +2435,7 @@ void CONSTS()
 	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
 	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
-	dad1 CNSTS1(28), CNSTS2(28), DUMMY(1);
+	dad1 CNSTS1(28), CNSTS2(28);
 
 	CNSTS1 = { 0.25e0, 0.625e-1,  7.2169e-2, 1.8342e-2,
 	      1.9065e-2, 5.8190e-2, 5.4658e-3, 5.3370e-3, 1.8890e-2,
@@ -2541,16 +2541,15 @@ void CONSTS()
 		COEF(j, j) = 1.0;
 		VMONDE(COEF.sub(1, j).contiguous(), K);
 	}
-	RKBAS(1.0, K, MMAX, B, DUMMY, 0);
+	RKBAS(1.0, K, MMAX, B.contiguous(), nullptr, 0);
 	for (int i = 1; i <= K; ++i)
-		RKBAS(RHO(i), K, MMAX, ACOL.sub(1, i), DUMMY, 0);
+		RKBAS(RHO(i), K, MMAX, ACOL.sub(1, i).contiguous(), nullptr, 0);
 
-	RKBAS(1.0 / 6.0, K, MMAX, ASAVE.sub(1, 1), DUMMY, 0);
-	RKBAS(1.0 / 3.0, K, MMAX, ASAVE.sub(1, 2), DUMMY, 0);
-	RKBAS(2.0 / 3.0, K, MMAX, ASAVE.sub(1, 3), DUMMY, 0);
-	RKBAS(5.0 / 6.0, K, MMAX, ASAVE.sub(1, 4), DUMMY, 0);
+	RKBAS(1.0 / 6.0, K, MMAX, ASAVE.sub(1, 1).contiguous(), nullptr, 0);
+	RKBAS(1.0 / 3.0, K, MMAX, ASAVE.sub(1, 2).contiguous(), nullptr, 0);
+	RKBAS(2.0 / 3.0, K, MMAX, ASAVE.sub(1, 3).contiguous(), nullptr, 0);
+	RKBAS(5.0 / 6.0, K, MMAX, ASAVE.sub(1, 4).contiguous(), nullptr, 0);
 
-	//ASAVE.print(); // simon
 }
 
 
@@ -3950,88 +3949,86 @@ variables
 			these are evaluated if mode > 0.
 
 * **********************************************************************/
-void RKBAS(const double S, const int k, const int M, dar2 RKB, dar1 DM, const int MODE)
+void RKBAS(double const S, int const k, int const M, double* const RKB,
+	double* const DM, int const MODE)
 {
+	//COEF(k, k);
+	//RKB(7, 1);
+
 	AutoTimer at(g_timer, _FUNC_);
 
-	COEF.reshape(k, k); // simon
-	COEF.assertDim(k, k);
-	RKB.reshape(7, 1); // simon
-	RKB.assertDim(7, 1);
-	DM.assertDim(1);
-	dad1 T(10);
-
 	if (k != 1) {
-		int KPM1 = k + M - 1;
-		for (int i = 1; i <= KPM1; ++i)
-			T(i) = S / double(i);
-		for (int l = 1; l <= M; ++l) {
-			int LB = k + l + 1;
-			for (int i = 1; i <= k; ++i) {
-				double P = COEF(1, i);
+		double T[10];
+		for (int i = 0; i < k + M - 1; ++i)
+			T[i] = S / double(i + 1);
+		for (int l = 0; l < M; ++l) {
+			int LB = k + l + 2;
+			for (int i = 0; i < k; ++i) {
+				double P = COEF(1, i+1);
 				for (int j = 2; j <= k; ++j)
-					P = P * T(LB - j) + COEF(j, i);
-				RKB(i, l) = P;
+					P = P * T[LB - j - 1] + COEF(j, i+1);
+				RKB[i + l*7] = P;
 			}
 		}
 		if (MODE == 0)
 			return;
-		for (int i = 1; i <= k; ++i) {
-			double P = COEF(1, i);
+		for (int i = 0; i < k; ++i) {
+			double P = COEF(1, i+1);
 			for (int j = 2; j <= k; ++j)
-				P = P * T(k + 1 - j) + COEF(j, i);
-			DM(i) = P;
+				P = P * T[k - j] + COEF(j, i + 1);
+			DM[i] = P;
 		}
 		return;
 	}
-	RKB(1, 1) = 1.00;
-	DM(1) = 1.00;
+	RKB[0] = 1.0;
+	DM[0] = 1.0;
 }
 
 
 
 
-// * *********************************************************************
+//**********************************************************************
 //
-//   purpose
-//(1)       (m1 - 1)     (mncomp - 1)
-//           evaluate z(u(x)) = (u(x), u(x), ..., u(x), ..., u(x))
-//                              1     1         1          mncomp
-//           as well as optionally y(x) and dmval(x) at one point x.
+// purpose
+//                                  (1)       (m1-1)     (mncomp-1)
+//         evaluate z(u(x))=(u (x),u (x),...,u  (x),...,u  (x)      )
+//                            1     1         1          mncomp
+//         as well as optionally y(x) and dmval(x) at one point x.
 //
-//   variables
-//     a - array of mesh independent rk - basis coefficients
-//     xi - the current mesh(having n subintervals)
-//     z - the current solution vector(differential components).
-//              it is convenient to imagine z as a two - dimensional
-//              array with dimensions mstar x(n + 1).then
-//              z(j, i) = the jth component of z at the ith mesh point
-//     dmz - the array of mj - th derivatives of the current solution
-//              plus algebraic solution components at collocation points
-//              it is convenient to imagine dmz as a 3 - dimensional
-//              array with dimensions ncy x k x n.then
-//              dmz(l, j, i) = a solution value at the jth collocation
-//              point in the ith mesh subinterval : if l <= ncomp then
-//              dmz(l, j, i) is the ml - th derivative of ul, while if
-//              l > ncomp then dmz(l, j, i) is the value of the current
-//(l - ncomp)th component of y at this collocation point
-//     mode - determines the amount of initialization needed
-// = 4  forms z(u(x)) using z, dmzand ha
-// = 3  as in = 4, but computes local rk - basis
-// = 2  as in = 3, but determines i such that
-//                       xi(i).le.x.lt.xi(i + 1) (unless x = xi(n + 1))
-// = 1  retrieve  z = z(u(x(i)))  directly
-//     modm = 0  evaluate only zval
-// = 1  evaluate also yval
-// = 2  evaluate in addition dmval
-//   output
-//     zval - the solution vector z(u(x)) (differential components)
-//     yval - the solution vector y(x)  (algebraic components)
-//     dmval - the mth derivatives of u(x)
+// variables
+//   a      - array of mesh independent rk-basis coefficients
+//   xi     - the current mesh (having n subintervals)
+//   z      - the current solution vector (differential components).
+//            it is convenient to imagine z as a two-dimensional
+//            array with dimensions mstar x (n+1). then
+//            z(j,i) = the jth component of z at the ith mesh point
+//   dmz    - the array of mj-th derivatives of the current solution
+//            plus algebraic solution components at collocation points
+//            it is convenient to imagine dmz as a 3-dimensional
+//            array with dimensions ncy x k x n. then
+//            dmz(l,j,i) = a solution value at the jth collocation
+//            point in the ith mesh subinterval: if l <= ncomp then
+//            dmz(l,j,i) is the ml-th derivative of ul, while if
+//            l > ncomp then dmz(l,j,i) is the value of the current
+//            (l-ncomp)th component of y at this collocation point
+//   mode   - determines the amount of initialization needed
+//          = 4  forms z(u(x)) using z, dmz and ha
+//          = 3  as in =4, but computes local rk-basis
+//          = 2  as in =3, but determines i such that
+//                     xi(i) .le. x .lt. xi(i+1) (unless x=xi(n+1))
+//          = 1  retrieve  z=z(u(x(i)))  directly
+//   modm   = 0  evaluate only zval
+//          = 1  evaluate also yval
+//          = 2  evaluate in addition dmval
+// output
+//   zval   - the solution vector z(u(x)) (differential components)
+//   yval   - the solution vector y(x)  (algebraic components)
+//   dmval  - the mth derivatives of u(x)
 //
-// * *********************************************************************
+//**********************************************************************
 void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
-	const int n, dar1 Z, dar1 DMZ, const int k, const int ncomp, const int ny, const int mmax, iar1 M,
+	const int n, dar1 Z, dar1 DMZ, const int k, const int ncomp,
+	const int ny, const int mmax, iar1 M,
 	const int mstar, const int MODE, dar1 DMVAL, const int MODM)
 {
 	AutoTimer at(g_timer, _FUNC_);
@@ -4096,7 +4093,7 @@ void APPROX(int& i, double& X, dar1 ZVAL, dar1 YVAL, dar2 A, dar1 coef, dar1 XI,
 	case 3:	 {
 		//  mode = 2 or 3, compute mesh independent rk - basis.
 		double S = (X - XI(i)) / (XI(i + 1) - XI(i));
-		RKBAS(S, k, mmax, A, DM, MODM);
+		RKBAS(S, k, mmax, A.contiguous(), DM.contiguous(), MODM);
 		}
 		[[fallthrough]];
 	case 4:
