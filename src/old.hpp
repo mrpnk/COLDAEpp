@@ -2901,7 +2901,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				if (MODE != 2) {
 				n120:
 					// build a row of  a  corresponding to a boundary point
-					GDERIV(G.sub(IG), NROW, IZETA, ZVAL, DGZ, 1, dgsub);
+					GDERIV(G.sub(IG).contiguous(), NROW, IZETA, ZVAL.contiguous(),
+						DGZ.contiguous(), 1, dgsub);
 				}
 				IZETA = IZETA + 1;
 			}
@@ -2989,8 +2990,10 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 			*/
 
 				// fill in ncy rows of  w and v
-				VWBLOK(XCOL, HRHO, j, W.sub(IW), V.sub(IV), IPVTW.sub(IDMZ),
-					ZVAL, YVAL, DF, ACOL.sub(1, j), DMZO.sub(IDMZO), dfsub, MSING);
+				VWBLOK(XCOL, HRHO, j, W.sub(IW).contiguous(), V.sub(IV).contiguous(),
+					IPVTW.sub(IDMZ).contiguous(),
+					ZVAL.contiguous(), YVAL.contiguous(), DF.contiguous(), 
+					ACOL.sub(1, j).contiguous(), DMZO.sub(IDMZO).contiguous(), dfsub, MSING);
 
 				//logall = false;
 
@@ -3090,9 +3093,10 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					RHS(NDMZ + IZETA) = -GVAL;
 					RNORM = RNORM + GVAL * GVAL;
 					if (MODE != 2) {
-						// build a row of  a  corresponding to a boundary point
 					n260:
-						GDERIV(G.sub(IG), NROW, IZETA + MSTAR, ZVAL, DGZ, 2, dgsub);
+						// build a row of  a  corresponding to a boundary point
+						GDERIV(G.sub(IG).contiguous(), NROW, IZETA + MSTAR, ZVAL.contiguous(),
+							DGZ.contiguous(), 2, dgsub);
 					}
 					IZETA = IZETA + 1;
 				}
@@ -3275,33 +3279,26 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 //      dg     - the derivatives of the side condition.
 //
 //**********************************************************************
-void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const int MODE, dgsub_t dgsub)
+void GDERIV(double* const GI, const int NROW, const int IROW,
+	double const* ZVAL, double* DGZ, const int MODE, dgsub_t dgsub)
 {
-	GI.reshape(NROW, 1);
-	GI.assertDim(NROW, 1);
-	ZVAL.assertDim(1);
-	DGZ.assertDim(1);
-	
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	
-	dad1 DG(40);
+	//GI(NROW, 1);
+
+	double DG[40];
 
 	//  zero jacobian dg
-	for (int j = 1; j <= MSTAR; ++j)
-		DG(j) = 0.0;
+	for (int j = 0; j < MSTAR; ++j)
+		DG[j] = 0.0;
 
 	//  evaluate jacobian dg
-	dgsub(IZETA, ZVAL.contiguous(), DG.contiguous());
+	dgsub(IZETA, ZVAL, DG);
 
 	//  evaluate  dgz = dg * zval  once for a new mesh
 	if (NONLIN != 0 && ITER <= 0) {
 		double DOT = 0.0;
-		for (int j = 1; j <= MSTAR; ++j)
-			DOT = DOT + DG(j) * ZVAL(j);
-
-		DGZ(IZETA) = DOT;
+		for (int j = 0; j < MSTAR; ++j)
+			DOT += DG[j] * ZVAL[j];
+		DGZ[IZETA-1] = DOT;
 	}
 
 	//  branch according to  m o d e
@@ -3310,18 +3307,18 @@ void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const 
 		//  specifically, at x=zeta(j) the j-th side condition reads
 		//  dg(1)*z(1) + ... +dg(mstar)*z(mstar) + g = 0
 
-
 		//  handle an initial condition
-		for (int j = 1; j <= MSTAR; ++j) {
-			GI(IROW, j) = DG(j);
-			GI(IROW, MSTAR + j) = 0.0;
+		for (int j = 0; j < MSTAR; ++j) {
+			GI[IROW - 1 + j * NROW] = DG[j];
+			GI[IROW - 1 + (MSTAR + j) * NROW] = 0.0;
 		}
-		return;
 	}
-	//  handle a final condition
-	for (int j = 1; j <= MSTAR; ++j) {
-		GI(IROW, j) = 0.0;
-		GI(IROW, MSTAR + j) = DG(j);
+	else {
+		//  handle a final condition
+		for (int j = 0; j < MSTAR; ++j) {
+			GI[IROW - 1 + j * NROW] = 0.0;
+			GI[IROW - 1 + (MSTAR + j) * NROW] = DG[j];
+		}
 	}
 }
 
@@ -3349,52 +3346,39 @@ void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const 
 //      jcomp  - counter for the component being dealt with.
 //
 //**********************************************************************
-void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI, iar1 IPVTW,
-	dar1 ZVAL, dar1 YVAL, dar2 DF, dar2 acol, dar1 DMZO, dfsub_t dfsub, int& MSING)
+void VWBLOK(const double XCOL, const double HRHO, const int JJ, 
+	double* const WI, double* const VI, int* const IPVTW,
+	double const * const ZVAL, double const* const YVAL, 
+	double* const DF, double const* const acol, double* const DMZO,
+	dfsub_t dfsub, int& MSING)
 {
-	WI.reshape(KDY, 1);
-	WI.assertDim(KDY, 1);
-	VI.reshape(KDY, 1);
-	VI.assertDim(KDY, 1);
-	ZVAL.assertDim(1);
-	DMZO.assertDim(1);
-	DF.reshape(NCY, 1);
-	DF.assertDim(NCY, 1);
-	IPVTW.assertDim(1);
-	acol.reshape(7, 4); // !simon
-	acol.assertDim(7, 4);
-	YVAL.assertDim(1);
+	//WI(KDY, 1);
+	//VI(KDY, 1);
+	//DF(NCY, 1);
+	//acol(7, 4);
 	
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	
-	dad1 BASM(5);
+	double BASM[5];
 	dad2 HA(7, 4);
 	
-	auto& test1 = WI.contiguous()[16-1];
-
 	// initialize  wi
 	int I1 = (JJ - 1) * NCY;
-	for (int ID = 1 + I1; ID <= NCOMP + I1; ++ID)
-		WI(ID, ID) = 1.0;
+	for (int ID = I1; ID < NCOMP + I1; ++ID)
+		WI[ID + ID*KDY] = 1.0;
 
 	//  calculate local basis
 	double FACT = 1.0;
-	for (int l = 1; l <= MMAX; ++l) {
-		FACT = FACT * HRHO / double(l);
-		BASM(l) = FACT;
-		for (int j = 1; j <= K; ++j) {
-			/*if (j==1&&l==1) {
-				fmt::print(fg(logall?fmt::color::orange : fmt::color::blue), "FACT = {}, acol(j, l) = {}\n", FACT, acol(j, l));
-			}*/
-			HA(j, l) = FACT * acol(j, l);
+	for (int l = 0; l < MMAX; ++l) {
+		FACT = FACT * HRHO / double(l+1);
+		BASM[l] = FACT;
+		for (int j = 0; j < K; ++j) {
+			HA(j+1, l+1) = FACT * acol[j + l*7];
 		}
 	}
 
 	// zero jacobian
-	for (int JCOL = 1; JCOL <= MSTAR + NY; ++JCOL) {
-		for (int IR = 1; IR <= NCY; ++IR) {
-			DF(IR, JCOL) = 0.0;
+	for (int JCOL = 0; JCOL < MSTAR + NY; ++JCOL) {
+		for (int IR = 0; IR < NCY; ++IR) {
+			DF[IR+ JCOL*NCY] = 0.0;
 		}
 	}
 	
@@ -3405,30 +3389,30 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 	//   id
 	//        -  df(id,mstar+1)*u(1) - ... - df(id,mstar+ny)*y(ny)
 	//  for id = 1 to ncy  (m(id)=0 for id > ncomp).
-	dfsub(XCOL, ZVAL.contiguous(), YVAL.contiguous(), DF.contiguous());
+	dfsub(XCOL, ZVAL, YVAL, DF);
 	int I0 = (JJ - 1) * NCY;
 	I1 = I0 + 1;
 	int I2 = I0 + NCY;
 
 	// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh
-	if (NONLIN != 0 && ITER <= 0){
-		for (int j = 1; j <= MSTAR + NY; ++j) {
-			if (j <= MSTAR)
-				FACT = -ZVAL(j);
+	if (NONLIN != 0 && ITER <= 0) {
+		for (int j = 0; j < MSTAR + NY; ++j) {
+			if (j + 1 <= MSTAR)
+				FACT = -ZVAL[j];
 			else
-				FACT = -YVAL(j - MSTAR);
+				FACT = -YVAL[j - MSTAR];
 
-			for (int ID = 1; ID <= NCY; ++ID) {
-				DMZO(I0 + ID) = DMZO(I0 + ID) + FACT * DF(ID, j);
+			for (int ID = 0; ID < NCY; ++ID) {
+				DMZO[I0 + ID] += FACT * DF[ID + j * NCY];
 			}
 		}
 	}
 
 	//  loop over the  ncomp  expressions to be set up for the
 	//  current collocation point.
-	for (int j = 1; j <= MSTAR; ++j) {
-		for (int ID = 1; ID <= NCY; ++ID) {
-			VI(I0 + ID, j) = DF(ID, j);
+	for (int j = 0; j < MSTAR; ++j) {
+		for (int ID = 0; ID < NCY; ++ID) {
+			VI[I0 + ID + j * KDY] = DF[ID + j * NCY];
 		}
 	}
 	int JN = 1;
@@ -3436,20 +3420,12 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 		int MJ = MT(JCOMP);
 		JN = JN + MJ;
 		for (int l = 1; l <= MJ; ++l) {
-			int JV = JN - l;
-			int JW = JCOMP;
+			int JV = JN - l - 1;
+			int JW = JCOMP - 1;
 			for (int j = 1; j <= K; ++j) {
 				double AJL = -HA(j, l);
-				for (int IW = I1; IW <= I2; ++IW) {
-					/*if (logall && IW == 8 && JW == 2) {
-						fmt::print(fg(fmt::color::orange), "j = {}, l = {}\n",j,l); 
-						fmt::print(fg(fmt::color::red), "WI(IW, JW) = {}, AJL = {}, VI(IW, JV) = {}\n",
-							WI(IW, JW), AJL, VI(IW, JV));
-					}*/
-					WI(IW, JW) = WI(IW, JW) + AJL * VI(IW, JV);
-					/*if (logall && IW == 8 && JW == 2)
-						fmt::print(fg(fmt::color::red), "neu WI(IW, JW) = {}\n",
-							WI(IW, JW));*/
+				for (int IW = I1 - 1; IW < I2; ++IW) {
+					WI[IW + JW * KDY] += AJL * VI[IW + JV * KDY];
 				}
 				JW = JW + NCY;
 			}
@@ -3457,18 +3433,18 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 			if (l == MJ)
 				continue;
 			for (int LL = LP1; LL <= MJ; ++LL) {
-				int JDF = JN - LL;
-				double BL = BASM(LL - l);
-				for (int IW = I1; IW <= I2; ++IW)
-					VI(IW, JV) = VI(IW, JV) + BL * VI(IW, JDF);
+				int JDF = JN - LL - 1;
+				double BL = BASM[LL - l - 1];
+				for (int IW = I1 - 1; IW < I2; ++IW)
+					VI[IW + JV * KDY] += BL * VI[IW + JDF * KDY];
 			}
 		}
 	}
 	//  loop for the algebraic solution components
-	for (int JCOMP = 1; JCOMP <= NY; ++JCOMP) {
+	for (int JCOMP = 0; JCOMP < NY; ++JCOMP) {
 		int JD = NCOMP + JCOMP;
-		for (int ID = 1; ID<=NCY; ++ID)
-			WI(I0 + ID, I0 + JD) = -DF(ID, MSTAR + JCOMP);
+		for (int ID = 0; ID<NCY; ++ID)
+			WI[(I0 + ID) + (I0 + JD) * KDY] = -DF[ID + (MSTAR + JCOMP) * NCY];
 	}
 
 	if (JJ < K)
@@ -3478,14 +3454,13 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 
 
 	//  do parameter condensation
-	MSING = 0;
-	DGEFA(WI, KDY, KDY, IPVTW, MSING);
+	MSING = dgefa(WI, KDY, KDY, IPVTW);
 
 	//   check for singularity
 	if (MSING != 0)
 		return;
 	for (int j = 1; j <= MSTAR; ++j)
-		DGESL(WI, KDY, KDY, IPVTW, VI.sub(1, j), 0);
+		dgesl(WI, KDY, KDY, IPVTW, VI+(j*KDY), 0);
 }
 
 
