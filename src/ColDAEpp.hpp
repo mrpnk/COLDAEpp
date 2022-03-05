@@ -1752,7 +1752,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			}
 			else {
 				if (IPRINT < 1) {
-					fmt::print("NO CONVERGENCE. RELAXATION FACTOR = {} IS TOO SMALL (LESS THAN {})\n", RELAX, RELMIN);
+					fmt::print(fg(fmt::color::orange),
+						"NO CONVERGENCE. RELAXATION FACTOR = {} IS TOO SMALL (LESS THAN {})\n", RELAX, RELMIN);
 				}
 			}
 
@@ -3459,7 +3460,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ,
 	//   check for singularity
 	if (MSING != 0)
 		return;
-	for (int j = 1; j <= MSTAR; ++j)
+	for (int j = 0; j < MSTAR; ++j)
 		dgesl(WI, KDY, KDY, IPVTW, VI+(j*KDY), 0);
 }
 
