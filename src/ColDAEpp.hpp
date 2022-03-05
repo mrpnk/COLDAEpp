@@ -575,7 +575,6 @@ void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
 }
 
 
-
 //------------------------------------------------------------------------------------------------------
 
 /* Define callback function types */
@@ -2170,7 +2169,8 @@ n100:
 					// if index=2, form projection matrices directly
 					// otherwise use svd to define appropriate projection
 					if (INDEX == 0) {
-						PRJSVD(FC, DF, CB, U, V, IPVTCB, ISING, 2);
+						PRJSVD(FC.contiguous(), DF.contiguous(), CB.contiguous(),
+							U.contiguous(), V.contiguous(), IPVTCB.contiguous(), ISING, 2);
 					}
 					else {
 						// form cb
@@ -3515,21 +3515,17 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 //                 (then fc consists of only ncomp columns)
 //
 //**********************************************************************
-void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
-	iar1 IPVTCB, int& ISING, const int MODE)
+void PRJSVD(double* const FC, double const* const DF, double* const D, 
+	double* const U, double* const V,
+	int* const IPVTCB, int& ISING, const int MODE)
 {
-	FC.assertDim(NCOMP, 1);
-	DF.assertDim(NCY, 1);
-	D.assertDim(NY, NY);
-	U.assertDim(NY, NY);
-	V.assertDim(NY, NY);
-	IPVTCB.assertDim(1);
-
-	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
+	//FC(NCOMP, 1);
+	//DF(NCY, 1);
+	//D(NY, NY);
+	//U(NY, NY);
+	//V(NY, NY);
 	
-	dad1 WORK(20), S(21), E(20);
+	double WORK[20], S[21], E[20];
 
 
 	//  compute the maximum tolerance
@@ -3538,109 +3534,105 @@ void PRJSVD(dar2 FC, dar2 DF, dar2 D, dar2 U, dar2 V,
 		CHECK = std::max(TOLIN(i), CHECK);
 
 	//  construct d and find its svd
-	for (int i = 1; i <= NY; ++i)
-		for (int j = 1; j <= NY; ++j)
-			D(i, j) = DF(i + NCOMP, j + MSTAR);
+	for (int i = 0; i < NY; ++i)
+		for (int j = 0; j < NY; ++j)
+			D[i + j*NY] = DF[i + NCOMP + (j + MSTAR)*NCY];
 
 	int JOB = 11;
-	int INFO = 0;
-	DSVDC(D, NY, NY, NY, S, E, U, NY, V, NY, WORK, JOB, INFO);
+	int INFO = dsvdc(D, NY, NY, NY, S, E, U, NY, V, NY, WORK, JOB);
 
 	//  determine rank of d
-	S(NY + 1) = 0;
+	S[NY] = 0;
 	int IRANK = 0;
 
-	while (S(IRANK + 1) >= CHECK)
-	{
-		IRANK = IRANK + 1;
+	while (S[IRANK] >= CHECK){
+		IRANK++;
 	}
 
 	//  if d has full rank then no projection is needed
 	if (IRANK == NY) {
-		for (int i = 1; i <= NCOMP; ++i)
-			for (int j = 1; j <= MSTAR + NY; ++j)
-				FC(i, j) = 0.0;
+		for (int i = 0; i < NCOMP; ++i)
+			for (int j = 0; j < MSTAR + NY; ++j)
+				FC[i + j*NCY] = 0.0;
 		return;
 	}
 	else{
 		//  form projected cb
 		int IR = NY - IRANK;
-		for (int i = 1; i <= NY; ++i) {
-			for (int j = 1; j <= NY; ++j) {
+		for (int i = 0; i < NY; ++i) {
+			for (int j = 0; j < NY; ++j) {
 				double FACT = 0;
 				int ML = 0;
-				for (int l = 1; l <= NCOMP; ++l) {
-					ML = ML + MT(l);
-					FACT = FACT + DF(i + NCOMP, ML) * DF(l, MSTAR + j);
+				for (int l = 0; l < NCOMP; ++l) {
+					ML += MT(l + 1);
+					FACT += DF[i + NCOMP + (ML - 1) * NCY] * DF[l + (MSTAR + j) * NCY];
 				}
-				D(i, j) = FACT;
+				D[i + j * NY] = FACT;
 			}
 		}
-		for (int i = 1; i <= NY; ++i) {
-			for (int j = 1; j <= IR; ++j) {
-				WORK(j) = 0;
-				for (int l = 1; l <= NY; ++l) {
-					WORK(j) = WORK(j) + D(i, l) * V(l, j + IRANK);
+		for (int i = 0; i < NY; ++i) {
+			for (int j = 0; j < IR; ++j) {
+				WORK[j] = 0;
+				for (int l = 0; l < NY; ++l) {
+					WORK[j] += D[i + l * NY] * V[l + (j + IRANK) * NY];
 				}
 			}
-			for (int j = 1; j <= NCOMP; ++j) {
-				D(i, j) = WORK(j);
+			for (int j = 0; j < NCOMP; ++j) {
+				D[i + j * NY] = WORK[j];
 			}
 		}
-		for (int i = 1; i <= IR; ++i) {
-			for (int j = 1; j <= IR; ++j) {
-				WORK(j) = 0;
-				for (int l = 1; l <= NY; ++l) {
-					WORK(j) = WORK(j) + U(l, i + IRANK) * D(l, j);
+		for (int i = 0; i < IR; ++i) {
+			for (int j = 0; j < IR; ++j) {
+				WORK[j] = 0;
+				for (int l = 0; l < NY; ++l) {
+					WORK[j] += U[l + (i + IRANK) * NY] * D[l + j * NY];
 				}
 			}
-			for (int j = 1; j <= IR; ++j) {
-				D(i, j) = WORK(j);
+			for (int j = 0; j < IR; ++j) {
+				D[i + j * NY] = WORK[j];
 			}
 		}
 		//  decompose projected cb
-		DGEFA(D, NY, IR, IPVTCB, ISING);
+		ISING = dgefa(D, NY, IR, IPVTCB);
 		if (ISING != 0)
 			return;
 
 		//  form columns of fc
-		for (int j = MSTAR + 1; j <= MSTAR + NY; ++j) {
-			for (int i = 1; i <= IR; ++i)
-				WORK(i) = U(j - MSTAR, i + IRANK);
-			DGESL(D, NY, IR, IPVTCB, WORK, 0);
-			for (int i = 1; i <= NY; ++i) {
-				U(j - MSTAR, i) = 0;
-				for (int l = 1; l <= IR; ++l)
-					U(j - MSTAR, i) = U(j - MSTAR, i) + V(i, l + IRANK) * WORK(l);
+		for (int j = MSTAR; j < MSTAR + NY; ++j) {
+			for (int i = 0; i < IR; ++i)
+				WORK[i] = U[(j - MSTAR) + (i + IRANK)*NY];
+			dgesl(D, NY, IR, IPVTCB, WORK, 0);
+			for (int i = 0; i < NY; ++i) {
+				U[(j - MSTAR) + i*NY] = 0;
+				for (int l = 0; l < IR; ++l)
+					U[(j - MSTAR) + i * NY] += V[i + (l + IRANK) * NY] * WORK[l];
 			}
-			for (int i = 1; i <= NCOMP; ++i) {
+			for (int i = 0; i < NCOMP; ++i) {
 				double FACT = 0;
-				for (int l = 1; l <= NY; ++l)
-					FACT = FACT + DF(i, MSTAR + l) * U(j - MSTAR, l);
-				FC(i, j) = FACT;
+				for (int l = 0; l < NY; ++l)
+					FACT += DF[i + (MSTAR + l) * NCY] * U[j - MSTAR + l * NY];
+				FC[i + j * NCOMP] = FACT;
 			}
 		}
 		if (MODE == 1) {
-			for (int i = 1; i <= NCOMP; ++i) {
-				for (int j = 1; j <= MSTAR; ++j) {
+			for (int i = 0; i < NCOMP; ++i) {
+				for (int j = 0; j < MSTAR; ++j) {
 					double FACT = 0;
-					for (int l = 1; l <= NY; ++l)
-						FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, j);
-					FC(i, j) = FACT;
+					for (int l = 0; l < NY; ++l)
+						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + j * NY];
+					FC[i + j * NCOMP] = FACT;
 				}
 			}
 		}
 		else {
-			for (int i = 1; i <= NCOMP; ++i)
-			{
+			for (int i = 0; i < NCOMP; ++i){
 				int MJ = 0;
-				for (int j = 1; j <= NCOMP; ++j) {
-					MJ = MJ + MT(j);
+				for (int j = 0; j < NCOMP; ++j) {
+					MJ += MT(j+1);
 					double FACT = 0;
-					for (int l = 1; l <= NY; ++l)
-						FACT = FACT + FC(i, l + MSTAR) * DF(l + NCOMP, MJ);
-
-					FC(i, j) = FACT;
+					for (int l = 0; l < NY; ++l)
+						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + (MJ-1) * NY];
+					FC[i + j * NCOMP] = FACT;
 				}
 			}
 		}
@@ -3688,48 +3680,27 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 	AutoTimer at(g_timer, _FUNC_);
 
 	GI.reshape(NROW, 1); 
-	GI.assertDim(NROW, 1);
-	WI.assertDim(1);
-	VI.reshape(KDY, 1); 
-	VI.assertDim(KDY, 1);
-	RHSZ.assertDim(1);
-	RHSDMZ.assertDim(1);
-	IPVTW.assertDim(1);
-	ZVAL.assertDim(1);
-	YVAL.assertDim(1);
-	F.assertDim(1);
-	DF.reshape(NCY, 1);
-	DF.assertDim(NCY, 1);
+	VI.reshape(KDY, 1);
+	DF.reshape(NCY, 1); 
 	CB.reshape(NYCB, NYCB);
-	CB.assertDim(NYCB, NYCB);
-	IPVTCB.assertDim(1);
 	FC.reshape(NCOMP, 1);
-	FC.assertDim(NCOMP, 1);
-
 	
-
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
-
 	dad2 HB(7, 4);
-	dad1 BASM(5), BCOL(40), U(400), V(400);
+	double BASM[5], BCOL[40], U[400], V[400];
 
 	//  compute local basis
 	double FACT = 1.0;
-	BASM(1) = 1.0;
+	BASM[0] = 1.0;
 	for (int l = 1; l <= MMAX; ++l) {
 		FACT = FACT * H / double(l);
-		BASM(l + 1) = FACT;
+		BASM[l] = FACT;
 		for (int j = 1; j <= K; ++j)
 			HB(j, l) = FACT * B(j, l);
 	}
 
 	//  branch according to  m o d e
 	switch (MODE) {
-
 	case 1:
-
 		//  set right gi-block to identity
 		if (MODL != 2)
 		{
@@ -3758,7 +3729,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 					}
 					int JD = ID - IROW;
 					for (int LL = 1; LL <= l; ++LL)
-						GI(ID, JD + LL) = GI(ID, JD + LL) - BASM(LL);
+						GI(ID, JD + LL) = GI(ID, JD + LL) - BASM[LL-1];
 
 				}
 			}
@@ -3773,7 +3744,8 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			//  if index=2 then form projection matrices directly
 			//  otherwise use svd to define appropriate projection
 			if (INDEX == 0) {
-				PRJSVD(FC, DF, CB, U, V, IPVTCB, ISING, 1);
+				PRJSVD(FC.contiguous(), DF.contiguous(), CB.contiguous(),
+					U, V, IPVTCB.contiguous(), ISING, 1); // TODO warum haben wir U,V?
 				if (ISING != 0)
 					return;
 			}
@@ -3801,22 +3773,22 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 
 					if (j <= MSTAR)
 						for (int i = 1; i<= NY;++i)
-							BCOL(i) = DF(i + NCOMP, j);
+							BCOL[i-1] = DF(i + NCOMP, j);
 					else {
-						for (int i = 1; i <= NY; ++i)
-							BCOL(i) = 0.0;
-							BCOL(j - MSTAR) = 1.0;
+						for (int i = 0; i < NY; ++i)
+							BCOL[i] = 0.0;
+						BCOL[j - MSTAR - 1] = 1.0;
 					}
 
-					DGESL(CB, NY, NY, IPVTCB, BCOL, 0);
+					dgesl(CB.contiguous(), NY, NY, IPVTCB.contiguous(), BCOL, 0);
+					
+					for (int i = 1; i <= NCOMP; ++i) {
+						FACT = 0.0;
+						for (int l = 1; l <= NY; ++l)
+							FACT = FACT + DF(i, l + MSTAR) * BCOL[l-1];
 
-						for (int i = 1; i <= NCOMP; ++i) {
-							FACT = 0.0;
-							for (int l = 1; l <= NY; ++l)
-								FACT = FACT + DF(i, l + MSTAR) * BCOL(l);
-
-							FC(i, j) = FACT;
-						}
+						FC(i, j) = FACT;
+					}
 				}
 			}
 
@@ -3827,12 +3799,12 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 					for (int l = 1; l <= MSTAR; ++l)
 						FACT = FACT + FC(i, l) * GI(IROW - 1 + l, j);
 
-					BCOL(i) = FACT;
+					BCOL[i-1] = FACT;
 				}
 				int ML = 0;
 				for (int i = 1; i <= NCOMP; ++i) {
 					ML = ML + MT(i);
-					GI(IROW - 1 + ML, j) = GI(IROW - 1 + ML, j) - BCOL(i);
+					GI(IROW - 1 + ML, j) = GI(IROW - 1 + ML, j) - BCOL[i-1];
 				}
 			}
 		}
@@ -3858,52 +3830,12 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 					F(i) = F(i) + DF(i, j) * FACT;
 			}
 		}
-
 		return;
 
-
 	case 2:
-		//if (logall) {
-		//	for (int i = 1; i <= NZ; ++i) {
-		//		//	fmt::print("#- RHSZ(i)={:10.6f}\n", RHSZ(i));
-		//	}
-		//	
-		//}
-		auto check = RHSDMZ(1);
-
-		static int niters = 0;
-		niters++;
-
 		//  compute the appropriate piece of  rhsz
-		/*if (logall||true) {
-			std::ofstream file("dgesl_in"+std::to_string(niters)+".txt");
-			for (int i = 0; i < KDY * KDY; ++i)
-				file << WI.contiguous()[i] << std::endl;
-			for (int i = 0; i < KDY; ++i)
-				file << IPVTW.contiguous()[i] << std::endl;
-			for (int i = 0; i < KDY; ++i)
-				file << RHSDMZ.contiguous()[i] << std::endl;
-			file.close();
-		}*/
 		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
-	/*	if (logall || true) {
-			std::ofstream file("dgesl_out.txt");
-			for (int i = 0; i < KDY * KDY; ++i)
-				file << WI.contiguous()[i] << std::endl;
-			for (int i = 0; i < KDY; ++i)
-				file << IPVTW.contiguous()[i] << std::endl;
-			for (int i = 0; i < KDY; ++i)
-				file << RHSDMZ.contiguous()[i] << std::endl;
-			file.close();
-		}*/
-		auto nachcheck = RHSDMZ(1);
-
-		//if (logall) {
-		//	for (int i = 1; i <= NZ; ++i) {
-		//		//	fmt::print("#= RHSZ(i)={:10.6f}\n", RHSZ(i));
-		//	}
-		//}
-
+	
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
 			int MJ = MT(JCOMP);
@@ -3912,25 +3844,12 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 				int	IND = JCOMP;
 				double RSUM = 0.0;
 				for (int j = 1; j <= K; ++j) {
-					RSUM = RSUM + HB(j, l) * RHSDMZ(IND);
-					/*if (logall) {
-						auto test1 = HB(j, l);
-						auto test2 = RHSDMZ(IND);
-						auto test3 = test1 * test2;
-					}*/
-					IND = IND + NCY;
+					RSUM += HB(j, l) * RHSDMZ(IND);				
+					IND += NCY;
 				}
-				/*if (logall)
-					int skdjhf = 2345;*/
 				RHSZ(IR - l) = RSUM;
 			}
 		}
-
-		//if (logall) {
-		//	for (int i = 1; i <= NZ; ++i) {
-		//		//fmt::print("#+ RHSZ(i)={:10.6f}\n", RHSZ(i));
-		//	}
-		//}
 
 		if (INDEX == 1 || NY == 0)
 			return;
@@ -3941,15 +3860,13 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
 			FACT = 0;
 			for (int l = 1; l <= MSTAR; ++l)
 				FACT = FACT + FC(i, l) * RHSZ(l + IROW - 1);
-			BCOL(i) = FACT;
+			BCOL[i-1] = FACT;
 		}
 		int ML = 0;
 		for (int i = 1; i <= NCOMP; ++i) {
 			ML = ML + MT(i);
-			RHSZ(IROW - 1 + ML) = RHSZ(IROW - 1 + ML) - BCOL(i) - F(i);
-		}
-
-		
+			RHSZ(IROW - 1 + ML) = RHSZ(IROW - 1 + ML) - BCOL[i-1] - F(i);
+		}	
 
 	}
 }
