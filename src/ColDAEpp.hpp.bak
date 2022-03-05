@@ -3662,9 +3662,8 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 //fc - projection matrices
 //
 //**********************************************************************
-// double const * WI (dgesl)
 void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
-	double* const  WI, dar2 VI,
+	double const * const  WI, dar2 VI,
 	double* const RHSZ, double* const RHSDMZ,
 	iar1 IPVTW, const int MODE,
 	const int MODL, const double XI1, double const* const  ZVAL,
@@ -3829,7 +3828,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 
 	case 2:
 		//  compute the appropriate piece of  rhsz
-		dgesl(WI, KDY, KDY, IPVTW.contiguous(), RHSDMZ, 0);
+		dgesl(const_cast<double*>(WI), KDY, KDY, IPVTW.contiguous(), RHSDMZ, 0);
 	
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
@@ -3860,7 +3859,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 		int ML = 0;
 		for (int i = 1; i <= NCOMP; ++i) {
 			ML += MT(i);
-			RHSZ[IROW - 1 + ML-1] -= BCOL[i-1] + F[i-1];
+			RHSZ[IROW - 1 + ML-1] -= BCOL[i-1] - F[i-1];
 		}	
 
 	}

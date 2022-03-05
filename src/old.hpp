@@ -578,11 +578,11 @@ void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
 //------------------------------------------------------------------------------------------------------
 
 /* Define callback function types */
-using fsub_t  = void (*)(double x, double const z[], double const y[], double f[]);
-using dfsub_t = void (*)(double x, double const z[], double const y[], double df[]);
-using gsub_t  = void (*)(int i,    double const z[], double& g);
-using dgsub_t = void (*)(int i,    double const z[], double dg[]);
-using guess_t = void (*)(double x, double const z[], double const y[], double dmval[]);
+using fsub_t  = void (*)(double x, dar1 z, dar1 y, dar1 f);
+using dfsub_t = void (*)(double x, dar1 z, dar1 y, dar2 df);
+using gsub_t  = void (*)(int i, dar1 z, double& g);
+using dgsub_t = void (*)(int i, dar1 z, dar1 dg);
+using guess_t = void (*)(double x, dar1 z, dar1 y, dar1 dmval);
 
 
 enum class printMode {
@@ -2164,7 +2164,7 @@ n100:
 					APPROX(i, XI1, ZVAL.contiguous(), YVAL.contiguous(), A.contiguous(),
 						COEF.contiguous(), XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
 						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 3, nullptr, 1);
-					dfsub(XI1, ZVAL.contiguous(), YVAL.contiguous(), DF.contiguous());
+					dfsub(XI1, ZVAL, YVAL, DF);
 
 					// if index=2, form projection matrices directly
 					// otherwise use svd to define appropriate projection
@@ -2874,7 +2874,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				if (MODE != 0) {
 					if (IGUESS == 1) {
 						// case where user provided current approximation
-						guess(XII, ZVAL.contiguous(), YVAL.contiguous(), DMVAL.contiguous());
+						guess(XII, ZVAL, YVAL, DMVAL);
 					}
 					else {
 						// other nonlinear case
@@ -2895,7 +2895,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				}
 				// find  rhs  boundary value.
 				double GVAL;
-				gsub(IZETA, ZVAL.contiguous(), GVAL);
+				gsub(IZETA, ZVAL, GVAL); // TODO problem: ZVAL ist immer 0,0
+				//fmt::print(bg(fmt::color::blue),"Called gsub and got = {}\n", GVAL);
 				RHS(NDMZ + IZETA) = -GVAL;
 				RNORM = RNORM + GVAL * GVAL;
 				if (MODE != 2) {
@@ -2919,7 +2920,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					goto n160;
 
 				// use initial approximation provided by the user.
-				guess(XCOL, ZVAL.contiguous(), YVAL.contiguous(), DMZO.sub(IRHS).contiguous());
+				guess(XCOL, ZVAL, YVAL, DMZO.sub(IRHS));
 				goto n170;
 
 
@@ -2933,7 +2934,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 						DMZO.sub(IRHS).contiguous(), 2);
 
 				n170:
-					fsub(XCOL, ZVAL.contiguous(), YVAL.contiguous(), F.contiguous());
+					fsub(XCOL, ZVAL, YVAL, F);
 					for (int JJ = NCOMP + 1; JJ <= NCY; ++JJ)
 						DMZO(IRHS + JJ - 1) = 0.0;
 
@@ -2954,7 +2955,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 						goto n210;
 
 					// fill in  rhs  values (and accumulate its norm).
-					fsub(XCOL, ZVAL.contiguous(), DMZ.sub(IRHS + NCOMP).contiguous(), F.contiguous());
+					fsub(XCOL, ZVAL, DMZ.sub(IRHS + NCOMP), F);
 					for (int JJ = 1; JJ <= NCY; ++JJ) {
 						double VALUE = F(JJ);
 						if (JJ <= NCOMP)
@@ -2967,7 +2968,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 
 					// the linear case
 				n200:
-					fsub(XCOL, ZVAL.contiguous(), YVAL.contiguous(), RHS.sub(IRHS).contiguous());
+					fsub(XCOL, ZVAL, YVAL, RHS.sub(IRHS));
 					IRHS = IRHS + NCY;
 				}
 			n210:
@@ -3007,7 +3008,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				XI1 = XI(i + 1);
 				if (MODE != 0) {
 					if (IGUESS == 1) {
-						guess(XI1, ZVAL.contiguous(), YVAL.contiguous(), DMVAL.contiguous());
+						guess(XI1, ZVAL, YVAL, DMVAL);
 					}
 					else {
 						if (MODE == 1) {
@@ -3040,15 +3041,17 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				}
 
 				// find rhs at next mesh point (also for linear case)
-				fsub(XI1, ZVAL.contiguous(), YVAL.contiguous(), F.contiguous());
+				fsub(XI1, ZVAL, YVAL, F);
 			}
 
-			GBLOCK(H, G.sub(IG), NROW, IZETA, W.sub(IW).contiguous(), V.sub(IV),
-				nullptr, DELDMZ.sub(IDMZ).contiguous(),
-				IPVTW.sub(IDMZ), 1, MODE, XI1, ZVAL.contiguous(), YVAL.contiguous(),
-				F.contiguous(), DF,
+			//fmt::print(fg(fmt::color::yellow_green), "W(9) = {}\n",W(9));
+
+			if (W(9) == 0)
+				int sdfk = 3254;
+
+			GBLOCK(H, G.sub(IG), NROW, IZETA, W.sub(IW), V.sub(IV), DUMMY, DELDMZ.sub(IDMZ),
+				IPVTW.sub(IDMZ), 1, MODE, XI1, ZVAL, YVAL, F, DF,
 				CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NYCB);
-			
 			if (ISING != 0)
 				return;
 			if (i >= N) {
@@ -3061,7 +3064,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 					if (MODE != 0) {
 						if (IGUESS == 1) {
 							// case where user provided current approximation
-							guess(ARIGHT, ZVAL.contiguous(), YVAL.contiguous(), DMVAL.contiguous());
+							guess(ARIGHT, ZVAL, YVAL, DMVAL);
 						}
 						else {
 							// other nonlinear case
@@ -3086,7 +3089,7 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 
 					// find  rhs  boundary value.
 					double GVAL;
-					gsub(IZETA, ZVAL.contiguous(), GVAL);
+					gsub(IZETA, ZVAL, GVAL);
 					RHS(NDMZ + IZETA) = -GVAL;
 					RNORM = RNORM + GVAL * GVAL;
 					if (MODE != 2) {
@@ -3163,10 +3166,8 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				fmt::print(fg(fmt::color::gold), "{}  ", DELZ(ii));
 			std::cout << std::endl;*/
 
-			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW).contiguous(), V.sub(1), DELZ.sub(IZ).contiguous(),
-				DELDMZ.sub(IDMZ).contiguous(),
-				IPVTW.sub(IDMZ), 2, MODE, XI1, ZVAL.contiguous(), YVAL.contiguous(),
-				FC.sub(IFC + INFC).contiguous(),
+			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW), V.sub(1), DELZ.sub(IZ), DELDMZ.sub(IDMZ),
+				IPVTW.sub(IDMZ), 2, MODE, XI1, ZVAL, YVAL, FC.sub(IFC + INFC),
 				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NYCB);
 			
 		/*	fmt::print(fg(fmt::color::golden_rod), "nachher DELZ = \n");
@@ -3225,12 +3226,20 @@ void LSYSLV(int& MSING, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DELZ, dar1 D
 				IZET = IZET + 1;
 			}
 			double H = XI(i + 1) - XI(i);
-			GBLOCK(H, G.sub(1), NROW, IZETA, W.sub(IW).contiguous(),
-				DF, Z.sub(IZ).contiguous(), DMZ.sub(IDMZ).contiguous(),
-				IPVTW.sub(IDMZ), 2, MODE, XI1,
-				ZVAL.contiguous(), YVAL.contiguous(),
-				FC.sub(IFC + INFC + NCOMP).contiguous(),
-				DF, CB, IPVTCB, FC.sub(IFC), dfsub, ISING, NYCB);
+			GBLOCK(H, G.sub(1), NROW, IZETA,
+ W.sub(IW),
+				DF,
+ Z.sub(IZ),
+				DMZ.sub(IDMZ),
+ IPVTW.sub(IDMZ),
+
+				2, MODE, XI1,
+				ZVAL, YVAL,
+ FC.sub(IFC + INFC + NCOMP),
+				DF,
+				CB, IPVTCB,
+
+				FC.sub(IFC), dfsub, ISING, NYCB);
 			IZ = IZ + MSTAR;
 			IDMZ = IDMZ + KDY;
 			IW = IW + KDY * KDY;
@@ -3293,7 +3302,7 @@ void GDERIV(dar2 GI, const int NROW, const int IROW, dar1 ZVAL, dar1 DGZ, const 
 		DG(j) = 0.0;
 
 	//  evaluate jacobian dg
-	dgsub(IZETA, ZVAL.contiguous(), DG.contiguous());
+	dgsub(IZETA, ZVAL, DG);
 
 	//  evaluate  dgz = dg * zval  once for a new mesh
 	if (NONLIN != 0 && ITER <= 0) {
@@ -3405,7 +3414,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ, dar2 WI, dar2 VI
 	//   id
 	//        -  df(id,mstar+1)*u(1) - ... - df(id,mstar+ny)*y(ny)
 	//  for id = 1 to ncy  (m(id)=0 for id > ncomp).
-	dfsub(XCOL, ZVAL.contiguous(), YVAL.contiguous(), DF.contiguous());
+	dfsub(XCOL, ZVAL, YVAL, DF);
 	int I0 = (JJ - 1) * NCY;
 	I1 = I0 + 1;
 	int I2 = I0 + NCY;
@@ -3610,7 +3619,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 				for (int j = 0; j < MSTAR; ++j) {
 					double FACT = 0;
 					for (int l = 0; l < NY; ++l)
-						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + j * NCY];
+						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + j * NY];
 					FC[i + j * NCOMP] = FACT;
 				}
 			}
@@ -3622,7 +3631,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 					MJ += MT(j+1);
 					double FACT = 0;
 					for (int l = 0; l < NY; ++l)
-						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + (MJ-1) * NCY];
+						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + (MJ-1) * NY];
 					FC[i + j * NCOMP] = FACT;
 				}
 			}
@@ -3631,6 +3640,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 	}
 }
 
+//bool logall = false;
 
 //**********************************************************************
 //
@@ -3661,16 +3671,11 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 //zval, yval - current solution at xi1
 //fc - projection matrices
 //
-//**********************************************************************
-// double const * WI (dgesl)
-void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
-	double* const  WI, dar2 VI,
-	double* const RHSZ, double* const RHSDMZ,
-	iar1 IPVTW, const int MODE,
-	const int MODL, const double XI1, double const* const  ZVAL,
-	double const* const  YVAL, double* const  F,
-	dar2 DF, dar2 CB, iar1 IPVTCB, dar2 FC, dfsub_t dfsub,
-	int& ISING, const int NYCB)
+//* *********************************************************************
+void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW, dar1 WI,
+	dar2 VI, dar1 RHSZ, dar1 RHSDMZ, iar1 IPVTW, const int MODE,
+	const int MODL, const double XI1, dar1 ZVAL, dar1 YVAL, 
+	dar1 F, dar2 DF, dar2 CB, iar1 IPVTCB, dar2 FC, dfsub_t dfsub, int& ISING, const int NYCB)
 {	
 	AutoTimer at(g_timer, _FUNC_);
 
@@ -3734,7 +3739,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 
 			//  projected collocation
 			//  set up projection matrix and update gi-block
-			dfsub(XI1, ZVAL, YVAL, DF.contiguous());
+			dfsub(XI1, ZVAL, YVAL, DF);
 
 			//  if index=2 then form projection matrices directly
 			//  otherwise use svd to define appropriate projection
@@ -3811,25 +3816,25 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 			for (int i = 1; i <= NCOMP; ++i) {
 				FACT = 0;
 				for (int l = 1; l <= NY; ++l)
-					FACT = FACT + FC(i, l + MSTAR) * F[l + NCOMP-1];
+					FACT = FACT + FC(i, l + MSTAR) * F(l + NCOMP);
 				FC(i, JCOL + MSTAR + NY) = FACT;
 			}
 
 			if (MODL != 1 || JCOL == 2)
 				return;
 			for (int i = 1 + NCOMP; i <= NY + NCOMP; ++i)
-				F[i - 1] = 0;
+				F(i) = 0;
 			for (int j = 1; j <= MSTAR;++j) {
-				FACT = -ZVAL[j-1];
+				FACT = -ZVAL(j);
 				for (int i = 1 + NCOMP; i <= NY + NCOMP; ++i)
-					F[i - 1] += DF(i, j) * FACT;
+					F(i) = F(i) + DF(i, j) * FACT;
 			}
 		}
 		return;
 
 	case 2:
 		//  compute the appropriate piece of  rhsz
-		dgesl(WI, KDY, KDY, IPVTW.contiguous(), RHSDMZ, 0);
+		DGESL(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
 	
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
@@ -3839,10 +3844,10 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 				int	IND = JCOMP;
 				double RSUM = 0.0;
 				for (int j = 1; j <= K; ++j) {
-					RSUM += HB(j, l) * RHSDMZ[IND-1];				
+					RSUM += HB(j, l) * RHSDMZ(IND);				
 					IND += NCY;
 				}
-				RHSZ[IR - l-1] = RSUM;
+				RHSZ(IR - l) = RSUM;
 			}
 		}
 
@@ -3854,13 +3859,13 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 		for (int i = 1; i <= NCOMP; ++i) {
 			FACT = 0;
 			for (int l = 1; l <= MSTAR; ++l)
-				FACT += FC(i, l) * RHSZ[l + IROW - 2];
+				FACT = FACT + FC(i, l) * RHSZ(l + IROW - 1);
 			BCOL[i-1] = FACT;
 		}
 		int ML = 0;
 		for (int i = 1; i <= NCOMP; ++i) {
-			ML += MT(i);
-			RHSZ[IROW - 1 + ML-1] -= BCOL[i-1] + F[i-1];
+			ML = ML + MT(i);
+			RHSZ(IROW - 1 + ML) = RHSZ(IROW - 1 + ML) - BCOL[i-1] - F(i);
 		}	
 
 	}
@@ -3875,7 +3880,7 @@ void GBLOCK(const double H, dar2 GI, const int NROW, const int IROW,
 //----------------------------------------------------------------------
 
 
-/***********************************************************************
+/* * *********************************************************************
 
 purpose
 		evaluate mesh independent runge - kutta basis for given s

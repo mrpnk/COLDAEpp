@@ -105,13 +105,13 @@ struct sys3 {
 		f[1] = y[0] + z[0] * z[1] - x; // f_2 = 0 = algebraic
 	}
 	static void dfsub(double x, double const z[2], double const y[1], double df[6]) {
-		const int ms = 3;
+		const int ms = 2;
 		df[0 + 0 * ms] = 0; // df_1 / df1
 		df[0 + 1 * ms] = 1; // df_1 / df1'
 		df[0 + 2 * ms] = 1; // df_1 / df2
 
-		df[1 + 0 * ms] = z[0]; // df_2 / df1
-		df[1 + 1 * ms] = z[1]; // df_2 / df1'
+		df[1 + 0 * ms] = z[1]; // df_2 / df1
+		df[1 + 1 * ms] = z[0]; // df_2 / df1'
 		df[1 + 2 * ms] = 1;    // df_2 / df2
 	}
 	static void gsub(int i, double const z[2], double& g) {
@@ -147,7 +147,7 @@ int main()
 		opts.fdim = 1000000;
 		opts.idim = 100000;
 
-		opts.printLevel = printMode::none;
+		opts.printLevel = printMode::selected;
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		
