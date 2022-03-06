@@ -5,6 +5,7 @@
 unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 #include "timer.h"
+//#include "old.hpp"
 #include "ColDAEpp.hpp"
 
 
@@ -147,7 +148,7 @@ int main()
 		opts.fdim = 1000000;
 		opts.idim = 100000;
 
-		opts.printLevel = printMode::selected;
+		opts.printLevel = printMode::full;
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		

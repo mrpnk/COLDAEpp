@@ -2820,7 +2820,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 			//  build integs (describing block structure of matrix)
 			for (int i = 0; i < N; ++i) {
 				INTEGS[1 + i * 3] = NCOL;
-				if (i >= N) {
+				if (i+1 >= N) {
 					INTEGS[2 + (N-1) * 3] = NCOL;
 					LSIDE = MSTAR;
 				}
