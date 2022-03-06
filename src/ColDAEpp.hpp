@@ -2800,8 +2800,8 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 
 		[[fallthrough]];
 	}
-	case 2:
-	case 3:
+	case 2: [[fallthrough]];
+	case 3: [[fallthrough]];
 	case 4: {
 		//  initialization
 		int IDMZ = 1;
@@ -2821,7 +2821,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 			for (int i = 0; i < N; ++i) {
 				INTEGS[1 + i * 3] = NCOL;
 				if (i >= N) {
-					INTEGS[2 + N * 3] = NCOL;
+					INTEGS[2 + (N-1) * 3] = NCOL;
 					LSIDE = MSTAR;
 				}
 				else {
@@ -2888,7 +2888,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 				double GVAL;
 				gsub(IZETA, ZVAL, GVAL);
 				RHS[NDMZ + IZETA - 1] = -GVAL;
-				RNORM = RNORM + GVAL * GVAL;
+				RNORM += GVAL * GVAL;
 				if (MODE != 2) {
 				n120:
 					// build a row of  a  corresponding to a boundary point
@@ -2962,7 +2962,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 				n200:
 					// the linear case
 					fsub(XCOL, ZVAL, YVAL, RHS + (IRHS - 1));
-					IRHS = IRHS + NCY;
+					IRHS += NCY;
 				}
 			n210:
 
@@ -3452,7 +3452,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 			D[i + j*NY] = DF[i + NCOMP + (j + MSTAR)*NCY];
 
 	int JOB = 11;
-	int INFO = dsvdc(D, NY, NY, NY, S, E, U, NY, V, NY, WORK, JOB);
+	dsvdc(D, NY, NY, NY, S, E, U, NY, V, NY, WORK, JOB);
 
 	//  determine rank of d
 	S[NY] = 0;
@@ -3662,7 +3662,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 			//  if index=2 then form projection matrices directly
 			//  otherwise use svd to define appropriate projection
 			if (INDEX == 0) {
-				PRJSVD(FC, DF, CB,
+				PRJSVD(FC, DF, CB, // TODO wieso ändert sich die erste Dimension von CB hier?
 					U, V, IPVTCB, ISING, 1); // TODO warum haben wir U,V?
 				if (ISING != 0)
 					return;
@@ -3677,7 +3677,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 							ML += MT(l+1);
 							FACT += DF[i + NCOMP + ML*NCY] * DF[l + (MSTAR + j) * NCY];
 						}
-						CB[i + j * NCY] = FACT;
+						CB[i + j * NYCB] = FACT;
 					}
 				}
 
@@ -3896,7 +3896,7 @@ void APPROX(int& i, double& X, double* const ZVAL, double* const YVAL,
 	const int n, double const* const Z, double const * const DMZ, const int k, const int ncomp,
 	const int ny, const int mmax, int const * const M,
 	const int mstar, const int MODE, double* const DMVAL, const int MODM)
-{
+{ // TODO check the use of coef inside this function
 	//A(7, 1);
 
 	AutoTimer at(g_timer, _FUNC_);
