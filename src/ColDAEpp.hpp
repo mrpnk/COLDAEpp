@@ -382,12 +382,12 @@
 
 template<typename T>
 class arrRef1 {
-	template<typename TT> friend class arrRef2;
-	template<typename TT> friend class arrData1;
+	template<typename> friend class arrRef2;
+	template<typename> friend class arrData1;
 protected:
-	T* data;
-	int size;
-	arrRef1(){}
+	T* data{};
+	int size{};
+	arrRef1() = default;
 public:
 	void assertDim(int dim0) {
 		if (dim0 == 1) return; // we assume that DIMENSION(1) does not give the actual dimension and only makes sure it is an array
@@ -406,20 +406,19 @@ public:
 		return data[idx - 1];
 	}
 	arrRef1 sub(int idx) {
-		arrRef1 s;
+		arrRef1 s{};
 		s.data = data + (idx - 1);
 		s.size = size - (idx - 1);
 		return s;
 	}
 
-	arrRef1(arrRef2<T> const& ar2) {
-		data = ar2.data;
-		size = ar2.size1 * ar2.size2;
-	}
+	//arrRef1(const arrRef2<T> &ar2) {
+    //    data = ar2.data;
+    //    size = ar2.size1 * ar2.size2;
+    //}
 
-
-	T* begin() const { return data; }
-	T* end() const { return data + size; }
+	[[nodiscard]] T* begin() const { return data; }
+	[[nodiscard]] T* end() const { return data + size; }
 
 	T* contiguous() {
 		return data;
@@ -431,7 +430,7 @@ template<typename T>
 class arrData1 : public arrRef1<T> {
 	std::vector<T> mydata;
 public:
-	arrData1(int s = 0) {
+	explicit arrData1(int s = 0) {
 		mydata.resize(s);
 		this->data = mydata.data();
 		this->size = mydata.size();
@@ -442,7 +441,7 @@ public:
 		this->data = mydata.data();
 		this->size = mydata.size();
 	}
-	arrData1(arrRef1<T> const& ar1) {
+	explicit arrData1(arrRef1<T> const& ar1) {
 		// copy from another existing data
 		mydata.resize(ar1.size);
 		std::copy(ar1.begin(), ar1.end(), mydata.begin());
@@ -462,7 +461,7 @@ public:
 
 template<typename T>
 class arrRef2 {
-	template<typename T> friend class arrRef1;
+	template<typename> friend class arrRef1;
 protected:
 	T* data=nullptr;
 	int size1=0, size2=0;
@@ -1752,7 +1751,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					// check for error tolerance satisfaction
 					int IFIN = 1;
 					if (IMESH == 2)
-						ERRCHK(XI, Z, DMZ, VALSTR, IFIN);
+						ERRCHK(XI.contiguous(), Z.contiguous(), DMZ.contiguous(), 
+							VALSTR.contiguous(), IFIN);
 					if (IMESH == 1 || IFIN == 0 && ICARE != 2)
 						goto n460;
 					iflag = output_t::normal;
@@ -2603,30 +2603,19 @@ void CONSTS()
 //                 the array valstr. (0 for no, 1 for yes)
 //
 //**********************************************************************
-void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
+void ERRCHK(double const * const XI, double const * const Z, double const * const DMZ,
+            double* const VALSTR, int& IFIN)
 {
-	XI.assertDim(1);
-	Z.assertDim(1);
-	DMZ.assertDim(1);
-	VALSTR.assertDim(1);
-
-	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
-
 	MSHFLG = 1;
 
-	dad1 ERR(40), ERREST(40), DUMMY(1);
+	double ERR[40], ERREST[40];
 
 
 	//  error estimates are to be generated and tested
 	//  to see if the tolerance requirements are satisfied.
 	IFIN = 1;
-	for (int j = 1; j <= MSTAR; ++j)
-		ERREST(j) = 0.0;
+	for (int j = 0; j < MSTAR; ++j)
+		ERREST[j] = 0.0;
 	for (int IBACK = 1; IBACK <= N; ++IBACK) {
 		int i = N + 1 - IBACK;
 
@@ -2639,30 +2628,30 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 		// The routine  newmsh filled in the needed values of the old solution in valstr.
 		int KNEW = (4 * (i - 1) + 2) * MSTAR + 1;
 		int KSTORE = (2 * (i - 1) + 1) * MSTAR + 1;
-		double X = XI(i) + (XI(i + 1) - XI(i)) * 2.0 / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW).contiguous(), nullptr, ASAVE.sub(1, 3).contiguous(),
-			nullptr, XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, 
+		double X = XI[i-1] + (XI[i ] - XI[i-1]) * 2.0 / 3.0;
+		APPROX(i, X, VALSTR+(KNEW-1), nullptr, ASAVE.sub(1, 3).contiguous(),
+			nullptr, XI, N, Z, DMZ, K, NCOMP, NY, 
 			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
-		for (int l = 1; l <= MSTAR; ++l) {
-			ERR(l) = WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
-			KNEW = KNEW + 1;
-			KSTORE = KSTORE + 1;
+		for (int l = 0; l < MSTAR; ++l) {
+			ERR[l] = WGTERR(l+1) * abs(VALSTR[KNEW-1] - VALSTR[KSTORE-1]);
+			KNEW++;
+			KSTORE++;
 		}
 		KNEW = (4 * (i - 1) + 1) * MSTAR + 1;
 		KSTORE = 2 * (i - 1) * MSTAR + 1;
-		X = XI(i) + (XI(i + 1) - XI(i)) / 3.0;
-		APPROX(i, X, VALSTR.sub(KNEW).contiguous(), nullptr, ASAVE.sub(1, 2).contiguous(), 
-			nullptr, XI.contiguous(), N, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY,
+		X = XI[i-1] + (XI[i] - XI[i - 1]) / 3.0;
+        APPROX(i, X, VALSTR+(KNEW-1), nullptr, ASAVE.sub(1, 2).contiguous(),
+			nullptr, XI, N, Z, DMZ, K, NCOMP, NY,
 			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
-		for (int l = 1; l <= MSTAR; ++l) {
-			ERR(l) = ERR(l) + WGTERR(l) * abs(VALSTR(KNEW) - VALSTR(KSTORE));
-			KNEW = KNEW + 1;
-			KSTORE = KSTORE + 1;
+        for (int l = 0; l < MSTAR; ++l) {
+			ERR[l] += WGTERR(l+1) * abs(VALSTR[KNEW - 1] - VALSTR[KSTORE-1]);
+			KNEW++;
+			KSTORE++;
 		}
 
 		// find component-wise maximum error estimate
-		for (int l = 1; l <= MSTAR; ++l)
-			ERREST(l) = std::max(ERREST(l), ERR(l));
+		for (int l = 0; l < MSTAR; ++l)
+			ERREST[l] = std::max(ERREST[l], ERR[l]);
 
 		// test whether the tolerance requirements are satisfied
 		// in the i-th interval.
@@ -2671,7 +2660,7 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 		for (int j = 1; j <= NTOL; ++j) {
 			int LTOLJ = LTOL(j);
 			int LTJZ = LTOLJ + (i - 1) * MSTAR;
-			if (ERR(LTOLJ) > TOLIN(j) * (abs(Z(LTJZ)) + 1.0))
+			if (ERR[LTOLJ-1] > TOLIN(j) * (abs(Z[LTJZ-1]) + 1.0))
 				IFIN = 0;
 		}
 	}
@@ -2684,7 +2673,7 @@ void ERRCHK(dar1 XI, dar1 Z, dar1 DMZ, dar1 VALSTR, int& IFIN)
 		int MJ = LJ - 1 + MT(j);
 		fmt::print("{}:  ", j);
 		for (int l = LJ; l <= MJ; ++l)
-			fmt::print("{}, ", ERREST(l));
+			fmt::print("{}, ", ERREST[l-1]);
 		LJ = MJ + 1;
 	}
 	fmt::print("\n");
@@ -4403,7 +4392,7 @@ void SHIFTB(double* const AI, const int NROWI, const int NCOLI, const int LAST,
 //
 //     supervises the solution(by forward and backward substitution) of
 //     the linear system  a* x = b  for x, with the plu factorization of
-//     a  already generated in  fcblok.individual blocks of
+//     an  already generated in  fcblok. individual blocks of
 //     equations are solved via  subforand subbak .
 //
 //    parameters
