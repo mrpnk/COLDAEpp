@@ -2831,7 +2831,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 							break;
 						if (TZETA(LSIDE + 1) >= XI[i] + PRECIS)
 							break;
-						LSIDE = LSIDE + 1;
+						LSIDE++;
 					}
 				}
 				int NROW = MSTAR + LSIDE;
@@ -2937,10 +2937,13 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 				}
 				else {
 					// evaluate former collocation solution
-					APPROX(i, XCOL, ZVAL, nullptr, ACOL.sub(1, j).contiguous(),
+					{auto temp = i + 1;
+					APPROX(temp, XCOL, ZVAL, nullptr, ACOL.sub(1, j).contiguous(),
 						COEF.contiguous(), XI, N, Z,
 						DMZ, K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR,
 						4, nullptr, 0);
+					i = temp - 1;
+					}
 					if (MODE == 3)
 						goto n210;
 
@@ -2993,6 +2996,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 									XIOLD, NOLD, Z,
 									DMZ, K, NCOMP, NY, MMAX,
 									MT.contiguous(), MSTAR, 1, nullptr, 0);
+								NOLD = temp - 1; // TODO propably useless
 							}
 						}
 						else {
@@ -3119,7 +3123,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 				if (IZET == IZETA)
 					break;
 				DELZ[IZ - 1 + IZET - 1] = RHS[NDMZ + IZET - 1];
-				IZET = IZET + 1;
+				IZET++;
 			}
 
 			double H = XI[i + 1] - XI[i];
@@ -3643,7 +3647,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 					}
 					int JD = ID - IROW;
 					for (int LL = 1; LL <= l+1; ++LL)
-						GI[ID - 1 + (JD + LL) * NROW] -= BASM[LL - 1];
+						GI[ID - 1 + (JD + LL-1) * NROW] -= BASM[LL - 1];
 
 				}
 			}
@@ -3670,7 +3674,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 						FACT = 0;
 						int ML = -1;
 						for (int l = 0; l < NCOMP; ++l) {
-							ML += MT(l);
+							ML += MT(l+1);
 							FACT += DF[i + NCOMP + ML*NCY] * DF[l + (MSTAR + j) * NCY];
 						}
 						CB[i + j * NCY] = FACT;
@@ -3684,9 +3688,9 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 
 				//  form columns of fc
 				for (int j = 0; j < MSTAR + NY; ++j) {
-					if (j <= MSTAR) {
+					if (j+1 <= MSTAR) {
 						for (int i = 0; i < NY; ++i)
-							BCOL[i] = DF[i + NCOMP + (j+1)*NCY];
+							BCOL[i] = DF[i + NCOMP + j*NCY];
 					}
 					else {
 						for (int i = 0; i < NY; ++i)
@@ -3698,8 +3702,8 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 					
 					for (int i = 0; i < NCOMP; ++i) {
 						FACT = 0.0;
-						for (int l = 1; l <= NY; ++l)
-							FACT += DF[i + (l + MSTAR)* NCY] * BCOL[l-1];
+						for (int l = 0; l < NY; ++l)
+							FACT += DF[i + (l + MSTAR)* NCY] * BCOL[l];
 
 						FC[i + j * NCOMP] = FACT;
 					}
@@ -3708,29 +3712,29 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 
 			//  update gi
 			for (int j = 0; j < MSTAR; ++j) {
-				for (int i = 1; i < NCOMP; ++i) {
+				for (int i = 0; i < NCOMP; ++i) {
 					FACT = 0;
 					for (int l = 0; l < MSTAR; ++l)
-						FACT += FC[i + j * NCOMP] * GI[IROW - 1 + l + j*NCY];
+						FACT += FC[i + l * NCOMP] * GI[IROW - 1 + l + j*NCY];
 
 					BCOL[i] = FACT;
 				}
 				int ML = -1;
 				for (int i = 0; i < NCOMP; ++i) {
 					ML += MT(i+1);
-					GI[IROW - 1 + ML + j * NCY] -= BCOL[i-1];
+					GI[IROW - 1 + ML + j * NCY] -= BCOL[i];
 				}
 			}
 		}
 
-		//  prepare extra rhs piece; two if new mesh
+		//  prepare extra rhs piece; two if new mesh TODO carefully check indices here
 		if (INDEX == 1 || NY == 0)
 			return;
 		for (int JCOL = 1; JCOL <= 2; ++JCOL) {
 			for (int i = 0; i < NCOMP; ++i) {
 				FACT = 0;
 				for (int l = 1; l <= NY; ++l)
-					FACT = FACT + FC[i + (l + MSTAR-1)*NCOMP] * F[l + NCOMP-1];
+					FACT += FC[i + (l + MSTAR-1)*NCOMP] * F[l + NCOMP-1];
 				FC[i + (JCOL + MSTAR + NY-1)* NCOMP] = FACT;
 			}
 
@@ -3758,7 +3762,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 				int	IND = JCOMP;
 				double RSUM = 0.0;
 				for (int j = 1; j <= K; ++j) {
-					RSUM += HB[j + l * 7] * RHSDMZ[IND-1];
+					RSUM += HB[(j-1) + (l-1) * 7] * RHSDMZ[IND-1];
 					IND += NCY;
 				}
 				RHSZ[IR - l-1] = RSUM;
