@@ -382,8 +382,8 @@
 
 template<typename T>
 class arrRef1 {
-	template<typename T> friend class arrRef2;
-	template<typename T> friend class arrData1;
+	template<typename TT> friend class arrRef2;
+	template<typename TT> friend class arrData1;
 protected:
 	T* data;
 	int size;
@@ -412,7 +412,7 @@ public:
 		return s;
 	}
 
-	inline arrRef1(arrRef2<T> const& ar2) {
+	arrRef1(arrRef2<T> const& ar2) {
 		data = ar2.data;
 		size = ar2.size1 * ar2.size2;
 	}
