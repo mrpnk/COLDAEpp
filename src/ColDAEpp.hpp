@@ -423,6 +423,9 @@ public:
 	T* contiguous() {
 		return data;
 	}
+	const T* contiguous() const {
+		return data;
+	}
 	int getSize() { return size; }
 };
 
@@ -947,7 +950,8 @@ void COLDAE(systemParams const& params, options const& opts,
 				NFXPNT, opts.fixpnt);
 		}
 		fmt::print("NUMBER OF COLLOC PTS PER INTERVAL IS {}\n", K);	
-		fmt::print("COMPONENTS OF Z REQUIRING TOLERANCES: {}\n", LTOL);
+		fmt::print("COMPONENTS OF Z REQUIRING TOLERANCES: {}\n", 
+			std::vector<int>(LTOL.contiguous(), LTOL.contiguous() + NTOL));
 		fmt::print("CORRESPONDING ERROR TOLERANCES: {}\n", TOL);
 
 		if (IGUESS >= 2) {
@@ -1085,9 +1089,9 @@ void COLDAE(systemParams const& params, options const& opts,
 		NYCB = NY;
 
 	int meshmode = 3 + IREAD;
-	NEWMSH(meshmode, fspace.sub(LXI), fspace.sub(LXIOLD),
-		DUMMY, DUMMY, DUMMY, DUMMY, DUMMY, DUMMY,
-		NFXPNT, opts.fixpnt, DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
+	NEWMSH(meshmode, fspace.sub(LXI).contiguous(), fspace.sub(LXIOLD).contiguous(),
+		nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+		NFXPNT, opts.fixpnt.contiguous(), DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
 
 	//  determine first approximation, if the problem is nonlinear.
 	if (IGUESS < 2) {
@@ -1803,10 +1807,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				NYCB = NY;
 
 
-			NEWMSH(IMESH, XI, XIOLD, Z, DMZ,
-				DMV, VALSTR,
-				SLOPE, ACCUM, NFXPNT,
-				FIXPNT, DF, dfsub,
+			NEWMSH(IMESH, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
+				DMV.contiguous(), VALSTR.contiguous(),
+				SLOPE.contiguous(), ACCUM.contiguous(), NFXPNT,
+				FIXPNT.contiguous(), DF, dfsub,
 				FCSP, CBSP, NYCB);
 
 			// exit if expected n is too large (but may try n=nmax once)
@@ -1857,29 +1861,23 @@ void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 	DSCALE.assertDim(KDY, N);
 	XI.assertDim(1);
 	
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
+	double BASM[5];
 
-	//N = N;
-	//MSTAR = MSTAR;
-	//KDY = KDY;
-
-	dad1 BASM(5);
-
-	BASM(1) = 1.0;
+	BASM[0] = 1.0;
 	for (int j = 1; j <= N; ++j) {
 		int IZ = 1;
 		double H = XI(j + 1) - XI(j);
 		for (int l = 1; l <= MMAX; ++l)
-			BASM(l + 1) = BASM(l) * H / double(l);
+			BASM[l] = BASM[l-1] * H / double(l);
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
 			double SCAL = (abs(Z(IZ, j)) + abs(Z(IZ, j + 1))) * .5 + 1.0;
 			int MJ = MT(ICOMP);
 			for (int l = 1; l <= MJ; ++l) {
-				SCALE(IZ, j) = BASM(l) / SCAL;
+				SCALE(IZ, j) = BASM[l-1] / SCAL;
 				IZ = IZ + 1;
 			}
-			SCAL = BASM(MJ + 1) / SCAL;
+			SCAL = BASM[MJ] / SCAL;
 			for (int IDMZ = ICOMP; IDMZ <= KDY; IDMZ += NCY)
 				DSCALE(IDMZ, j) = SCAL;
 
@@ -1904,8 +1902,6 @@ void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 //          mesh selection, error estimation, (and related
 //          constant assignment) routines -- see [5], [6]
 //----------------------------------------------------------------------
-
-
 
 
 //**********************************************************************
@@ -1978,40 +1974,24 @@ void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
- dar1 VALSTR, dar1 SLOPE, dar1 ACCUM, const int NFXPNT, dar1 FIXPNT,
+void NEWMSH(int& MODE, double* const XI, double const* const  XIOLD, 
+	double const* const  Z, double const* const DMZ, double* const DMV,
+	double* const VALSTR, double* const SLOPE, double* const ACCUM, 
+	const int NFXPNT, double const* const FIXPNT,
  dar2 DF, dfsub_t dfsub, dar2 FC, dar2 CB, const int NYCB)
 {
-	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	//using namespace COLLOC; // dad1 RHO(7), COEF(49);
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
-
-	SLOPE.assertDim(1);
-	ACCUM.assertDim(1);
-	XI.assertDim(1);
-	XIOLD.assertDim(NOLD + 1); // simon
-	Z.assertDim(1);
-	DMZ.assertDim(1);
-	DMV.assertDim(1);
-	FIXPNT.assertDim(1);
-	VALSTR.assertDim(1);
+	//XIOLD(NOLD + 1);
 	FC.assertDim(NCOMP, 60);
 	DF.assertDim(NCY, 1);
 	CB.assertDim(NYCB, NYCB);
 
 	
-	dad1 D1(40), D2(40), DUMMY(1), ZVAL(40), YVAL(40), A(28), BCOL(40), U(400), V(400);
-	iad1 IPVTCB(40);
+	double D1[40], D2[40], ZVAL[40], YVAL[40], A[28], BCOL[40], U[400], V[400];
+	int IPVTCB[40];
 
 	int ISING = 0;
-
 	int NFXP1 = NFXPNT + 1;
+
 	switch (MODE) {
 	case 5:
 		// mode=5   set mshlmt=1 so that no mesh selection is performed
@@ -2021,22 +2001,22 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 	case 4: {
 		//  mode=4   the user-specified initial mesh is already in place.
 		if (IGUESS >= 2) {
-			//  iguess=2, 3 or 4.	
+			//  iguess=2, 3 or 4.
 			if (IPRINT < 1)
-				fmt::print("THE FORMER MESH (OF {} SUBINTERVALS): {}\n", NOLD, XIOLD);
+				fmt::print("THE FORMER MESH (OF {} SUBINTERVALS): {}\n",
+					NOLD, std::vector<double>(XIOLD, XIOLD + NOLD));
 			if (IGUESS == 3) {
 				//  if iread ( ipar(8) ) .ge. 1 and iguess ( ipar(9) ) .eq. 3
-				//  then the first mesh is every second point of the
-				//  mesh in  xiold .
+				//  then the first mesh is every second point of the mesh in  xiold .
 				N = NOLD / 2;
 				for (int j = 1, i = 0; j <= NOLD; j += 2) {
+					XI[i] = XIOLD[j];
 					i = i + 1;
-					XI(i) = XIOLD(j);
 				}
 			}
 		}
-		XI(1) = TLEFT;
-		XI(N + 1) = TRIGHT;
+		XI[0] = TLEFT;
+		XI[N] = TRIGHT;
 		break;
 	}
 	case 3: {
@@ -2045,7 +2025,7 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 		if (N < NFXP1)
 			N = NFXP1;
 		int NP1 = N + 1;
-		XI(1) = TLEFT;
+		XI[0] = TLEFT;
 		int ILEFT = 1;
 		double XLEFT = TLEFT;
 
@@ -2054,7 +2034,7 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 			double XRIGHT = TRIGHT;
 			int IRIGHT = NP1;
 			if (j != NFXP1) {
-				XRIGHT = FIXPNT(j);
+				XRIGHT = FIXPNT[j-1];
 
 				// determine where the j-th fixed point should fall in the
 				// new mesh - this is xi(iright) and the (j-1)st fixed
@@ -2064,7 +2044,7 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 					NMIN = N - NFXPNT + j;
 				IRIGHT = std::max(ILEFT + 1, NMIN);
 			}
-			XI(IRIGHT) = XRIGHT;
+			XI[IRIGHT-1] = XRIGHT;
 
 			// generate equally spaced points between the j-1st and the
 			// j-th fixed points.
@@ -2072,7 +2052,7 @@ void NEWMSH(int& MODE, dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV,
 			if (NREGN != 0) {
 				double DX = (XRIGHT - XLEFT) / double(NREGN + 1);
 				for (int i = 1; i <= NREGN; ++i)
-					XI(ILEFT + i) = XLEFT + double(i) * DX;
+					XI[ILEFT + i-1] = XLEFT + double(i) * DX;
 				ILEFT = IRIGHT;
 			}
 			XLEFT = XRIGHT;
@@ -2106,17 +2086,17 @@ n100:
 			//  at the relative positions 1/6 and 5/6 in each subinterval.
 			int KSTORE = 1;
 			for (int i = 1; i <= NOLD; ++i) {
-				double HD6 = (XIOLD(i + 1) - XIOLD(i)) / 6.0;
-				double X = XIOLD(i) + HD6;
-				APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr,
-					ASAVE.sub(1, 1).contiguous(), nullptr, XIOLD.contiguous(),
-					NOLD, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX,
+				double HD6 = (XIOLD[i ] - XIOLD[i-1]) / 6.0;
+				double X = XIOLD[i-1] + HD6;
+				APPROX(i, X, VALSTR+(KSTORE-1), nullptr,
+					ASAVE.sub(1, 1).contiguous(), nullptr, XIOLD,
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
 					MT.contiguous(), MSTAR, 4, nullptr, 0);
 				X = X + 4.0 * HD6;
 				KSTORE = KSTORE + 3 * MSTAR;
-				APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr,
-					ASAVE.sub(1, 4).contiguous(), nullptr, XIOLD.contiguous(),
-					NOLD, Z.contiguous(), DMZ.contiguous(), K, NCOMP, NY, MMAX, 
+				APPROX(i, X, VALSTR+(KSTORE-1), nullptr,
+					ASAVE.sub(1, 4).contiguous(), nullptr, XIOLD,
+					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, 
 					MT.contiguous(), MSTAR, 4, nullptr, 0);
 				KSTORE += MSTAR;
 			}
@@ -2127,15 +2107,15 @@ n100:
 		else {
 			int KSTORE = 1;
 			for (int i = 1; i <= N; ++i) {
-				double X = XI(i);
-				double HD6 = (XI(i + 1) - XI(i)) / 6.0;
+				double X = XI[i-1];
+				double HD6 = (XI[i] - XI[i - 1]) / 6.0;
 				for (int j = 1; j <= 4; ++j) {
 					X = X + HD6;
 					if (j == 3)
 						X = X + HD6;
-					APPROX(i, X, VALSTR.sub(KSTORE).contiguous(), nullptr, 
+					APPROX(i, X, VALSTR+(KSTORE-1), nullptr, 
 						ASAVE.sub(1, j).contiguous(), nullptr,
-						XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
+						XIOLD, NOLD, Z, DMZ,
 						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
 					KSTORE = KSTORE + MSTAR;
 				}
@@ -2147,8 +2127,8 @@ n100:
 
 		//  generate the halved mesh.
 		for (int i = 1, j = 2; i <= N; ++i) {
-			XI(j) = (XIOLD(i) + XIOLD(i + 1)) / 2.0;
-			XI(j + 1) = XIOLD(i + 1);
+			XI[j-1] = (XIOLD[i - 1] + XIOLD[i]) / 2.0;
+			XI[j] = XIOLD[i];
 			j = j + 2;
 		}
 		N = N2;
@@ -2169,7 +2149,7 @@ n100:
 			for (int i = 1; i <= NOLD; ++i) {
 				for (int KK = 1; KK <= K; ++KK) {
 					for (int j = 1; j <= NCY; ++j) {
-						DMV(IDMZ) = DMZ(IDMZ);
+						DMV[IDMZ-1] = DMZ[IDMZ-1];
 						IDMZ = IDMZ + 1;
 					}
 				}
@@ -2177,17 +2157,17 @@ n100:
 			if (INDEX != 1 && NY > 0) {
 				IDMZ = 1;
 				for (int i = 1; i <= NOLD; ++i) {
-					double XI1 = XIOLD(i + 1);
-					APPROX(i, XI1, ZVAL.contiguous(), YVAL.contiguous(), A.contiguous(),
-						COEF.contiguous(), XIOLD.contiguous(), NOLD, Z.contiguous(), DMZ.contiguous(),
+					double XI1 = XIOLD[i];
+					APPROX(i, XI1, ZVAL, YVAL, A,
+						COEF.contiguous(), XIOLD, NOLD, Z, DMZ,
 						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 3, nullptr, 1);
-					dfsub(XI1, ZVAL.contiguous(), YVAL.contiguous(), DF.contiguous());
+					dfsub(XI1, ZVAL, YVAL, DF.contiguous());
 
 					// if index=2, form projection matrices directly
 					// otherwise use svd to define appropriate projection
 					if (INDEX == 0) {
 						PRJSVD(FC.contiguous(), DF.contiguous(), CB.contiguous(),
-							U.contiguous(), V.contiguous(), IPVTCB.contiguous(), ISING, 2);
+							U, V, IPVTCB, ISING, 2);
 					}
 					else {
 						// form cb
@@ -2203,7 +2183,7 @@ n100:
 						}
 
 						// decompose cb
-						DGEFA(CB, NY, NY, IPVTCB, ISING);
+						ISING = dgefa(CB.contiguous(), NY, NY, IPVTCB);
 						if (ISING != 0)
 							return;
 
@@ -2212,14 +2192,14 @@ n100:
 						for (int l = 1; l <= NCOMP; ++l) {
 							ML += MT(l);
 							for (int J1 = 1; J1 <= NY; ++J1)
-								BCOL(J1) = DF(J1 + NCOMP, ML);
+								BCOL[J1-1] = DF(J1 + NCOMP, ML);
 
-							DGESL(CB, NY, NY, IPVTCB, BCOL, 0);
+							dgesl(CB.contiguous(), NY, NY, IPVTCB, BCOL, 0);
 
 							for (int J1 = 1; J1 <= NCOMP; ++J1) {
 								double FACT = 0.0;
 								for (int j = 1; j <= NY; ++j)
-									FACT += DF(J1, j + MSTAR) * BCOL(j);
+									FACT += DF(J1, j + MSTAR) * BCOL[j-1];
 								FC(J1, l) = FACT;
 							}
 						}
@@ -2230,7 +2210,7 @@ n100:
 						for (int l = 1; l <= NCOMP; ++l) {
 							FC(j, l) = -FC(j, l);
 							if (j == l)
-								FC(j, l) = FC(j, l) + 1.0;
+								FC(j, l) += 1.0;
 						}
 					}
 
@@ -2239,10 +2219,10 @@ n100:
 						for (int j = 1; j <= NCOMP; ++j) {
 							double FACT = 0.0;
 							for (int l = 1; l <= NCOMP; ++l)
-								FACT = FACT + FC(j, l) * DMZ(IDMZ + l - 1);
-							DMV(IDMZ + j - 1) = FACT;
+								FACT += FC(j, l) * DMZ[IDMZ + l - 1-1];
+							DMV[IDMZ + j - 1-1] = FACT;
 						}
-						IDMZ = IDMZ + NCY;
+						IDMZ += NCY;
 					}
 				}
 			}
@@ -2251,71 +2231,58 @@ n100:
 			//  other intervals (generally the solution on the (i-1)st and ith
 			//  intervals will be used to approximate the needed derivative, but
 			//  here the 1st and second intervals are used.)
-			double HIOLD = XIOLD(2) - XIOLD(1);
-			HORDER(1, D1.contiguous(), HIOLD, DMV.contiguous());
+			double HIOLD = XIOLD[1] - XIOLD[0];
+			HORDER(1, D1, HIOLD, DMV);
 			IDMZ = IDMZ + (NCOMP + NY) * K;
-			HIOLD = XIOLD(3) - XIOLD(2);
-			HORDER(2, D2.contiguous(), HIOLD, DMV.contiguous());
-			ACCUM(1) = 0.0;
-			SLOPE(1) = 0.0;
-			double ONEOVH = 2.0 / (XIOLD(3) - XIOLD(1));
+			HIOLD = XIOLD[2] - XIOLD[1];
+			HORDER(2, D2, HIOLD, DMV);
+			ACCUM[0] = 0.0;
+			SLOPE[0] = 0.0;
+			double ONEOVH = 2.0 / (XIOLD[2] - XIOLD[0]);
 			for (int j = 1; j <= NTOL; ++j) {
 				int JJ = JTOL(j);
 				int JZ = LTOL(j);
-				SLOPE(1) = std::max(SLOPE(1),
-					pow(abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ))),
+				SLOPE[0] = std::max(SLOPE[0],
+					pow(abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z[JZ-1])),
 						ROOT(j)));
 			}
-			double SLPHMX = SLOPE(1) * (XIOLD(2) - XIOLD(1));
-			ACCUM(2) = SLPHMX;
+			double SLPHMX = SLOPE[0] * (XIOLD[1] - XIOLD[0]);
+			ACCUM[1] = SLPHMX;
 			int IFLIP = 1;
 			
 			//  go through the remaining intervals generating  slope
 			//  and  accum .
 			for (int i = 2; i <= NOLD; ++i) {
-				HIOLD = XIOLD(i + 1) - XIOLD(i);
+				HIOLD = XIOLD[i] - XIOLD[0];
 				if (IFLIP == -1)
-					HORDER(i, D1.contiguous(), HIOLD, DMV.contiguous());
+					HORDER(i, D1, HIOLD, DMV);
 				if (IFLIP == 1)
-					HORDER(i, D2.contiguous(), HIOLD, DMV.contiguous());
-				ONEOVH = 2.0 / (XIOLD(i + 1) - XIOLD(i - 1));
-				SLOPE(i) = 0.0;
+					HORDER(i, D2, HIOLD, DMV);
+				ONEOVH = 2.0 / (XIOLD[i] - XIOLD[i - 1-1]);
+				SLOPE[i-1] = 0.0;
 
 
 				// evaluate function to be equidistributed
 				for (int j = 1; j <= NTOL; ++j) {
 					int JJ = JTOL(j);
 					int JZ = LTOL(j) + (i - 1) * MSTAR;
-					auto temp = abs(D2(JJ) - D1(JJ)) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z(JZ)));
-					SLOPE(i) = std::max(SLOPE(i), pow(temp, ROOT(j)));
-					/*	fmt::print(fg(fmt::color::orange), "abs(D2(JJ) - D1(JJ))  = {}\n", abs(D2(JJ) - D1(JJ)));
-						fmt::print(fg(fmt::color::orange), "WGTMSH(j)  = {}\n", WGTMSH(j));
-						fmt::print(fg(fmt::color::orange), "ONEOVH  = {}\n", ONEOVH);
-						fmt::print(fg(fmt::color::orange), "1/ (1.0 + abs(Z(JZ)))  = {}\n", 1. / (1.0 + abs(Z(JZ))));
-						fmt::print(fg(fmt::color::orange), "temp  = {}\n", temp);
-						fmt::print(fg(fmt::color::orange), "ROOT(j)  = {}\n", ROOT(j));
-						fmt::print(fg(fmt::color::orange_red), "SLOPE(i)  = {}\n", SLOPE(i));*/
+					auto temp = abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z[JZ-1]));
+					SLOPE[i-1] = std::max(SLOPE[i-1], pow(temp, ROOT(j)));
 				}
 
 				// accumulate approximate integral of function to be equidistributed
-				double TEMP = SLOPE(i) * (XIOLD(i + 1) - XIOLD(i));
+				double TEMP = SLOPE[i-1] * (XIOLD[i ] - XIOLD[i - 1]);
 				SLPHMX = std::max(SLPHMX, TEMP);
-				ACCUM(i + 1) = ACCUM(i) + TEMP;
+				ACCUM[i ] = ACCUM[i - 1] + TEMP;
 				IFLIP = -IFLIP;
-				/*fmt::print(fg(fmt::color::green), "SLOPE({}) = {}\n", i, SLOPE(i)); 
-				fmt::print(fg(fmt::color::green), "ACCUM({} + 1) = {}\n", i, ACCUM(i + 1));*/
-
-				/*fmt::print(fg(fmt::color::green), "SLOPE = {}\n", SLOPE(i));
-				fmt::print(fg(fmt::color::green), "diff  = {}\n", (XIOLD(i + 1) - XIOLD(i)));
-				fmt::print(fg(fmt::color::green), "TEMP  = {}\n", TEMP);*/
 			}
 
 			
-			double AVRG = ACCUM(NOLD + 1) / double(NOLD);
+			double AVRG = ACCUM[NOLD] / double(NOLD);
 			double DEGEQU = AVRG / std::max(SLPHMX, PRECIS);
 
 			//  naccum=expected n to achieve .1x user requested tolerances
-			int NACCUM = int(ACCUM(NOLD + 1) + 1.0);
+			int NACCUM = int(ACCUM[NOLD] + 1.0);
 			if (IPRINT < 0)  
 				fmt::print("MESH SELECTION INFO: DEGREE OF EQUIDISTRIBUTION = {}, "
 							"PREDICTION FOR REQUIRED N = {}\n", DEGEQU, NACCUM);
@@ -2361,23 +2328,23 @@ n100:
 			int IN = 1;
 			double ACCL = 0.0;
 			int LOLD = 2;
-			XI(1) = TLEFT;
-			XI(N + 1) = TRIGHT;
+			XI[0] = TLEFT;
+			XI[N] = TRIGHT;
 			for (int i = 1; i <= NFXP1; ++i) {
 				double ACCR; int LNEW, NREGN;
 				if (i != NFXP1) {
 					for (int j = LOLD; j <= NOLDP1; ++j) {
 						LNEW = j;
-						if (FIXPNT(i) <= XIOLD(j))
+						if (FIXPNT[i - 1] <= XIOLD[j - 1])
 							break;
 					}
-					ACCR = ACCUM(LNEW) + (FIXPNT(i) - XIOLD(LNEW)) * SLOPE(LNEW - 1);
-					NREGN = int((ACCR - ACCL) / ACCUM(NOLDP1) * double(N) - .5);
+					ACCR = ACCUM[LNEW-1] + (FIXPNT[i - 1] - XIOLD[LNEW - 1]) * SLOPE[LNEW - 1 - 1];
+					NREGN = int((ACCR - ACCL) / ACCUM[NOLDP1 - 1] * double(N) - .5);
 					NREGN = std::min(NREGN, N - IN - NFXP1 + i);
-					XI(IN + NREGN + 1) = FIXPNT(i);
+					XI[IN + NREGN + 1 - 1] = FIXPNT[i - 1];
 				}
 				else {
-					ACCR = ACCUM(NOLDP1);
+					ACCR = ACCUM[NOLDP1 - 1];
 					LNEW = NOLDP1;
 					NREGN = N - IN;
 				}
@@ -2390,11 +2357,11 @@ n100:
 						int LCARRY;
 						for (int l = LOLD; l <= LNEW; ++l) {
 							LCARRY = l;
-							if (TEMP <= ACCUM(l))
+							if (TEMP <= ACCUM[l - 1])
 								break;
 						}
 						LOLD = LCARRY;
-						XI(IN) = XIOLD(LOLD - 1) + (TEMP - ACCUM(LOLD - 1)) / SLOPE(LOLD - 1);
+						XI[IN - 1] = XIOLD[LOLD - 1 - 1] + (TEMP - ACCUM[LOLD - 1 - 1]) / SLOPE[LOLD - 1 - 1];
 					}
 				}
 				IN = IN + 1;;
@@ -2412,7 +2379,7 @@ n100:
 		//assert(XI.getSize() == N + 1);
 		fmt::print("THE NEW MESH (OF {} SUBINTERVALS): ", N);
 		for (int i = 1;i<=N+1;++i)
-			fmt::print("{:.2}, ", XI(i));
+			fmt::print("{:.2}, ", XI[i - 1]);
 		fmt::print("\n");
 	}
 	NZ = MSTAR * (N + 1);
@@ -2456,25 +2423,19 @@ void CONSTS()
 	RHO.assertDim(7);
 	COEF.reshape(K, K);
 	COEF.assertDim(K, K);
-	
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	//using namespace COLBAS; // dad2 B(7, 4), ACOL(28, 7), ASAVE(28, 4);
 
-	dad1 CNSTS1(28), CNSTS2(28);
-
-	CNSTS1 = { 0.25e0, 0.625e-1,  7.2169e-2, 1.8342e-2,
+	double CNSTS1[28] = {0.25e0, 0.625e-1, 7.2169e-2, 1.8342e-2,
 	      1.9065e-2, 5.8190e-2, 5.4658e-3, 5.3370e-3, 1.8890e-2,
 	      2.7792e-2, 1.6095e-3, 1.4964e-3, 7.5938e-3, 5.7573e-3,
 	      1.8342e-2, 4.673e-3,  4.150e-4,  1.919e-3,  1.468e-3,
 	      6.371e-3,  4.610e-3,  1.342e-4,  1.138e-4,  4.889e-4,
 	      4.177e-4,  1.374e-3,  1.654e-3,  2.863e-3 };
-	CNSTS2 = { 1.25e-1,   2.604e-3,  8.019e-3,  2.170e-5,
+	double CNSTS2[28] = {1.25e-1, 2.604e-3,  8.019e-3, 2.170e-5,
 	     7.453e-5,  5.208e-4,  9.689e-8,  3.689e-7,  3.100e-6,
-	    2.451e-5,  2.691e-10, 1.120e-9,  1.076e-8,  9.405e-8,
-	      1.033e-6,  5.097e-13, 2.290e-12, 2.446e-11, 2.331e-10,
-	      2.936e-9,  3.593e-8,  7.001e-16, 3.363e-15, 3.921e-14,
-	      4.028e-13, 5.646e-12, 7.531e-11, 1.129e-9 };
+	     2.451e-5,  2.691e-10, 1.120e-9,  1.076e-8,  9.405e-8,
+	     1.033e-6,  5.097e-13, 2.290e-12, 2.446e-11, 2.331e-10,
+	     2.936e-9,  3.593e-8,  7.001e-16, 3.363e-15, 3.921e-14,
+	     4.028e-13, 5.646e-12, 7.531e-11, 1.129e-9 };
 
 	// assign weights for error estimate
 	int KOFF = K * (K + 1) / 2;
@@ -2482,7 +2443,7 @@ void CONSTS()
 	for (int j = 1; j <= NCOMP; ++j) {
 		int MJ = MT(j);
 		for (int l = 1; l <= MJ; ++l) {
-			WGTERR(IZ) = CNSTS1(KOFF - MJ + l);
+			WGTERR(IZ) = CNSTS1[KOFF - MJ + l-1];
 			IZ = IZ + 1;
 		}
 	}
@@ -2499,7 +2460,7 @@ void CONSTS()
 			MTOT = MTOT + MT(JCOMP);
 		}
 		JTOL(i) = JCOMP;
-		WGTMSH(i) = 1.e1 * CNSTS2(KOFF + LTOLI - MTOT) / TOLIN(i);
+		WGTMSH(i) = 1.e1 * CNSTS2[KOFF + LTOLI - MTOT-1] / TOLIN(i);
 		ROOT(i) = 1.0 / double(K + MTOT - LTOLI + 1);
 	}
 

@@ -152,7 +152,7 @@ int main()
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		
-		opts.numTolerances = 1;
+		opts.numTolerances = 1; // TODO set=2, compare with fortran
 		opts.ltol = { 1, 2 };
 		opts.tol = { 0.0001, 0.0001 };
 
