@@ -559,26 +559,6 @@ using iar2 = arrRef2<int>;
 
 //------------------------------------------------------------------------------------------------------
 
-
-/* The three functions from Linpack */
-void DGEFA(dar2 a, int lda, int n, iar1 ipvt, int info) {
-	AutoTimer at(g_timer, "DGEFA"); 
-	info = dgefa(a.contiguous(), lda, n, ipvt.contiguous());
-}
-void DGESL(dar2 a, int lda, int n, iar1 ipvt, dar1 b, int job) {
-	AutoTimer at(g_timer, "DGESL"); 
-	dgesl(a.contiguous(), lda, n, ipvt.contiguous(),b.contiguous(), job);
-}
-void DSVDC(dar2 x, int lda, int n, int p, dar1 s, dar1 e,
-	dar2 u, int ldu, dar2 v, int ldv, dar1 work, int job, int info) {
-	AutoTimer at(g_timer, "DSVDC"); 
-	info = dsvdc(x.contiguous(), lda, n, p, s.contiguous(), e.contiguous(),u.contiguous(),
-		ldu, v.contiguous(), ldv, work.contiguous(), job);
-}
-
-
-//------------------------------------------------------------------------------------------------------
-
 /* Define callback function types */
 using fsub_t  = void (*)(double x, double const z[], double const y[], double f[]);
 using dfsub_t = void (*)(double x, double const z[], double const y[], double df[]);
@@ -735,9 +715,6 @@ class cda{
 			int IDUM;
 			int IZSAVE;
 		};
-
-		//// aliases
-		//auto& ZETA = TZETA;
 	};
 	struct { // COLNLN 
 		int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
@@ -746,10 +723,6 @@ class cda{
 		dad1 TOL = dad1(40), WGTMSH = dad1(40), WGTERR = dad1(40), TOLIN = dad1(40), ROOT = dad1(40);
 		iad1 JTOL = iad1(40), LTOL = iad1(40);
 		int NTOL;
-
-		// aliases
-		/*auto& LTOL = LTTOL;
-		auto& TOL = TTL;*/
 	};
 	struct { // COLBAS 
 		dad2 B = dad2( 7, 4 ), ACOL = dad2( 28, 7 ), ASAVE = dad2( 28, 4 );
