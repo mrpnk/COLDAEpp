@@ -1983,7 +1983,7 @@ void NEWMSH(int& MODE, double* const XI, double const* const  XIOLD,
 				//  then the first mesh is every second point of the mesh in  xiold .
 				N = NOLD / 2;
 				for (int j = 1, i = 0; j <= NOLD; j += 2) {
-					XI[i] = XIOLD[j];
+					XI[i] = XIOLD[j-1];
 					i = i + 1;
 				}
 			}
@@ -2226,7 +2226,7 @@ n100:
 			//  go through the remaining intervals generating  slope
 			//  and  accum .
 			for (int i = 2; i <= NOLD; ++i) {
-				HIOLD = XIOLD[i] - XIOLD[0];
+				HIOLD = XIOLD[i] - XIOLD[i-1];
 				if (IFLIP == -1)
 					HORDER(i, D1, HIOLD, DMV);
 				if (IFLIP == 1)
@@ -2314,7 +2314,7 @@ n100:
 					ACCR = ACCUM[LNEW-1] + (FIXPNT[i - 1] - XIOLD[LNEW - 1]) * SLOPE[LNEW - 1 - 1];
 					NREGN = int((ACCR - ACCL) / ACCUM[NOLDP1 - 1] * double(N) - .5);
 					NREGN = std::min(NREGN, N - IN - NFXP1 + i);
-					XI[IN + NREGN + 1 - 1] = FIXPNT[i - 1];
+					XI[IN + NREGN] = FIXPNT[i - 1];
 				}
 				else {
 					ACCR = ACCUM[NOLDP1 - 1];
@@ -2433,7 +2433,7 @@ void CONSTS()
 			MTOT = MTOT + MT(JCOMP);
 		}
 		JTOL(i) = JCOMP;
-		WGTMSH(i) = 1.e1 * CNSTS2[KOFF + LTOLI - MTOT-1] / TOLIN(i);
+		WGTMSH(i) = 10 * CNSTS2[KOFF + LTOLI - MTOT-1] / TOLIN(i);
 		ROOT(i) = 1.0 / double(K + MTOT - LTOLI + 1);
 	}
 
