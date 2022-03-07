@@ -811,8 +811,9 @@ void COLDAE(systemParams const& params, options const& opts,
 	this->TOL.copyFrom(opts.tol);
 
 
-	dad1 DUMMY(1), DUMMY2(840);
+	dad1 DUMMY(1);// , DUMMY2(840);
 
+	double* DUMMY2 = nullptr;
 
 	//*********************************************************************
 	//
@@ -1783,8 +1784,8 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			NEWMSH(IMESH, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
 				DMV.contiguous(), VALSTR.contiguous(),
 				SLOPE.contiguous(), ACCUM.contiguous(), NFXPNT,
-				FIXPNT.contiguous(), DF, dfsub,
-				FCSP, CBSP, NYCB);
+				FIXPNT.contiguous(), DF.contiguous(), dfsub,
+				FCSP.contiguous(), CBSP.contiguous(), NYCB);
 
 			// exit if expected n is too large (but may try n=nmax once)
 			if (N > NMAX){
@@ -1947,16 +1948,17 @@ void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int& MODE, double* const XI, double const* const  XIOLD, 
-	double const* const  Z, double const* const DMZ, double* const DMV,
+void NEWMSH(int& MODE, double* const XI, double const* const XIOLD, 
+	double const* const Z, double const* const DMZ, double* const DMV,
 	double* const VALSTR, double* const SLOPE, double* const ACCUM, 
 	const int NFXPNT, double const* const FIXPNT,
- dar2 DF, dfsub_t dfsub, dar2 FC, dar2 CB, const int NYCB)
+	double* const DF, dfsub_t dfsub, double* const FC,
+	double* const CB, const int NYCB)
 {
 	//XIOLD(NOLD + 1);
-	FC.assertDim(NCOMP, 60);
-	DF.assertDim(NCY, 1);
-	CB.assertDim(NYCB, NYCB);
+	//FC(NCOMP, 60);
+	//DF(NCY, 1);
+	//CB(NYCB, NYCB);
 
 	
 	double D1[40], D2[40], ZVAL[40], YVAL[40], A[28], BCOL[40], U[400], V[400];
@@ -2134,12 +2136,12 @@ n100:
 					APPROX(i, XI1, ZVAL, YVAL, A,
 						COEF.contiguous(), XIOLD, NOLD, Z, DMZ,
 						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 3, nullptr, 1);
-					dfsub(XI1, ZVAL, YVAL, DF.contiguous());
+					dfsub(XI1, ZVAL, YVAL, DF);
 
 					// if index=2, form projection matrices directly
 					// otherwise use svd to define appropriate projection
 					if (INDEX == 0) {
-						PRJSVD(FC.contiguous(), DF.contiguous(), CB.contiguous(),
+						PRJSVD(FC, DF, CB,
 							U, V, IPVTCB, ISING, 2);
 					}
 					else {
@@ -2148,15 +2150,15 @@ n100:
 							for (int J1 = 1; J1 <= NY; ++J1) {
 								double FACT = 0.0;
 								for (int l = 1, ML = 0; l <= NCOMP; ++l) {
-									ML = ML + MT(l);
-									FACT = FACT + DF(j + NCOMP, ML) * DF(l, MSTAR + J1);
+									ML += MT(l);
+									FACT += DF[j + NCOMP-1 + (ML-1)*NCY] * DF[l-1+ (MSTAR + J1-1) * NCY];
 								}
-								CB(j, J1) = FACT;
+								CB[j-1+(J1-1)*NYCB] = FACT;
 							}
 						}
 
 						// decompose cb
-						ISING = dgefa(CB.contiguous(), NY, NY, IPVTCB);
+						ISING = dgefa(CB, NY, NY, IPVTCB);
 						if (ISING != 0)
 							return;
 
@@ -2165,15 +2167,15 @@ n100:
 						for (int l = 1; l <= NCOMP; ++l) {
 							ML += MT(l);
 							for (int J1 = 1; J1 <= NY; ++J1)
-								BCOL[J1-1] = DF(J1 + NCOMP, ML);
+								BCOL[J1-1] = DF[J1 + NCOMP-1+ (ML-1) * NCY];
 
-							dgesl(CB.contiguous(), NY, NY, IPVTCB, BCOL, 0);
+							dgesl(CB, NY, NY, IPVTCB, BCOL, 0);
 
 							for (int J1 = 1; J1 <= NCOMP; ++J1) {
 								double FACT = 0.0;
 								for (int j = 1; j <= NY; ++j)
-									FACT += DF(J1, j + MSTAR) * BCOL[j-1];
-								FC(J1, l) = FACT;
+									FACT += DF[J1-1+(j + MSTAR-1) * NCY] * BCOL[j-1];
+								FC[J1-1+ (l-1)*NCOMP] = FACT;
 							}
 						}
 					}
@@ -2181,9 +2183,9 @@ n100:
 					// finally, replace fc with the true projection SR = i - fc
 					for (int j = 1; j <= NCOMP; ++j) {
 						for (int l = 1; l <= NCOMP; ++l) {
-							FC(j, l) = -FC(j, l);
+							FC[j-1+ (l-1)* NCOMP] *= -1;
 							if (j == l)
-								FC(j, l) += 1.0;
+								FC[j - 1 + (l - 1) * NCOMP] += 1.0;
 						}
 					}
 
@@ -2192,7 +2194,7 @@ n100:
 						for (int j = 1; j <= NCOMP; ++j) {
 							double FACT = 0.0;
 							for (int l = 1; l <= NCOMP; ++l)
-								FACT += FC(j, l) * DMZ[IDMZ + l - 1-1];
+								FACT += FC[j - 1 + (l - 1) * NCOMP] * DMZ[IDMZ + l - 1-1];
 							DMV[IDMZ + j - 1-1] = FACT;
 						}
 						IDMZ += NCY;
@@ -2683,9 +2685,6 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 //
 //
 //*********************************************************************
-
-double* observer = nullptr;
-
 void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 	double* const Z,
 	double* const DMZ, double* const DELZ, double* const DELDMZ,
