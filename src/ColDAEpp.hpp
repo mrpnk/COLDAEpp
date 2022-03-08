@@ -1085,12 +1085,12 @@ void COLDAE(systemParams const& params, options const& opts,
 		IGUESS = 0;
 
 	
-	CONTRL(fspace.sub(LXI), fspace.sub(LXIOLD), fspace.sub(LZ), fspace.sub(LDMZ), fspace.sub(LDMV),
-		fspace.sub(LRHS), fspace.sub(LDELZ), fspace.sub(LDELDZ), fspace.sub(LDQZ),
-		fspace.sub(LDQDMZ), fspace.sub(LG), fspace.sub(LW), fspace.sub(LV), fspace.sub(LFC),
-		fspace.sub(LVALST), fspace.sub(LSLOPE), fspace.sub(LSCL), fspace.sub(LDSCL),
-		fspace.sub(LACCUM), ispace.sub(LPVTG), ispace.sub(LINTEG), ispace.sub(LPVTW),
-		NFXPNT, opts.fixpnt, iflag, fsub, dfsub, gsub, dgsub, guess);
+	CONTRL(fspace.sub(LXI).contiguous(), fspace.sub(LXIOLD).contiguous(), fspace.sub(LZ).contiguous(), fspace.sub(LDMZ).contiguous(), fspace.sub(LDMV).contiguous(),
+		fspace.sub(LRHS).contiguous(), fspace.sub(LDELZ).contiguous(), fspace.sub(LDELDZ).contiguous(), fspace.sub(LDQZ).contiguous(),
+		fspace.sub(LDQDMZ).contiguous(), fspace.sub(LG).contiguous(), fspace.sub(LW).contiguous(), fspace.sub(LV).contiguous(), fspace.sub(LFC).contiguous(),
+		fspace.sub(LVALST).contiguous(), fspace.sub(LSLOPE).contiguous(), fspace.sub(LSCL).contiguous(), fspace.sub(LDSCL).contiguous(),
+		fspace.sub(LACCUM).contiguous(), ispace.sub(LPVTG).contiguous(), ispace.sub(LINTEG).contiguous(), ispace.sub(LPVTW).contiguous(),
+		NFXPNT, opts.fixpnt.contiguous(), iflag, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
 	ispace(1) = N;
@@ -1195,50 +1195,17 @@ private:
 //                 previous mesh
 //
 //**********************************************************************
-void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ, dar1 DELDMZ,
-	dar1 DQZ, dar1 DQDMZ, dar1 G, dar1 W, dar1 V, dar1 FC, dar1 VALSTR, dar1 SLOPE, dar1 SCALE, dar1 DSCALE,
-	dar1 ACCUM, iar1 IPVTG, iar1 INTEGS, iar1 IPVTW, const int NFXPNT, dar1 FIXPNT, output_t& iflag,
-	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+void CONTRL(double* const XI, double* const XIOLD, double* const Z,
+	double* const DMZ, double* const DMV, double* const RHS,
+	double* const DELZ, double* const DELDMZ, double* const DQZ,
+	double* const DQDMZ, double* const G, double* const W, 
+	double* const V, double* const FC, double* const VALSTR, 
+	double* const SLOPE, double* const SCALE, double* const DSCALE,
+	double* const ACCUM, int* const IPVTG, int* const INTEGS, 
+	int* const IPVTW, const int NFXPNT, double const* const FIXPNT,
+	output_t& iflag, fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
-	XI.assertDim(1);
-	XIOLD.assertDim(1);
-	Z.assertDim(1);
-	DMZ.assertDim(1);
-	RHS.assertDim(1);
-	DMV.assertDim(1);
-
-	G.assertDim(1);
-	W.assertDim(1);
-	V.assertDim(1);
-	VALSTR.assertDim(1);
-	SLOPE.assertDim(1);
-	ACCUM.assertDim(1);
-
-	DELZ.assertDim(1);
-	DELDMZ.assertDim(1);
-	DQZ.assertDim(1);
-	DQDMZ.assertDim(1);
-	FIXPNT.assertDim(1);
-
-	SCALE.assertDim(1);
-	DSCALE.assertDim(1);
-	FC.assertDim(1);
-	INTEGS.assertDim(1);
-	IPVTG.assertDim(1);
-	IPVTW.assertDim(1);
-	
-	
-	//using namespace COLOUT; // double PRECIS; int IOUT, IPRINT; 
-	//using namespace COLORD; // int K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX; iad1 MT(20);
-	//using namespace COLAPR; // int N, NOLD, NMAX, NZ, NDMZ;
-	//using namespace COLMSH; // int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	//using namespace COLSID; // dad1 TZETA(40);  double TLEFT, TRIGHT;  int IZETA, IDUM;
-	//using namespace COLNLN; // int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	//using namespace COLEST; // dad1 TTL(40), WGTMSH(40), WGTERR(40), TOLIN(40), ROOT(40);  iad1 JTOL(40), LTTOL(40); int NTOL;
-	//
-	//dumpState();
-
-	dad1 DUMMY(1), DF(800);
+	double DF[800];
 	dad2 FCSP(NCOMP, 60), CBSP(20, 20);
 	double RNORM, RNOLD;
 
@@ -1267,11 +1234,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 	double ANORM = 0.0;
 	double ANFIX = 0.0;
 
-	
+
 	//  the main iteration begins here .
 	//  loop 20 is executed until error tolerances are satisfied or
 	//  the code fails (due to a singular matrix or storage limitations)
-
 	while (true) {
 		{
 			//fmt::print(fg(fmt::color::cornflower_blue), "while:\n");
@@ -1282,16 +1248,16 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 				// the linear case.
 				// set up and solve equations
-				LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), nullptr, nullptr, 
-					Z.contiguous(), DMZ.contiguous(), G.contiguous(),
-					W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(),
-					nullptr, INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(),
+				LSYSLV(MSING, XI, XIOLD, nullptr, nullptr,
+					Z, DMZ, G,
+					W, V, FC, RHS,
+					nullptr, INTEGS, IPVTG, IPVTW,
 					RNORM, 0, fsub, dfsub, gsub, dgsub, guess, ISING);
 
 				// check for a singular matrix
 				if (ISING != 0) {
 					if (IPRINT < 1) {
-						fmt::print("SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n"); 
+						fmt::print("SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
 					}
 					iflag = output_t::singular;
 					return;
@@ -1303,7 +1269,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 				if (MSING >= 0) {
 					if (IPRINT < 1) {
-						fmt::print(fg(fmt::color::red), "A LOCAL ELIMINATION MATRIX IS SINGULAR\n"); 
+						fmt::print(fg(fmt::color::red), "A LOCAL ELIMINATION MATRIX IS SINGULAR\n");
 					}
 					goto n460;
 				}
@@ -1334,10 +1300,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 			// evaluate right hand side and its norm  and
 			// find the first newton correction
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DELZ.contiguous(), DELDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(),
-				DQDMZ.contiguous(), INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(),
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DELZ, DELDMZ, G,
+				W, V, FC, RHS,
+				DQDMZ, INTEGS, IPVTG, IPVTW,
 				RNOLD, 1, fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			if (IPRINT < 0) {
@@ -1358,10 +1324,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				fmt::print("ITERATION = {}, NORM(RHS) = {}\n", ITER, RNORM);
 			}
 			RNOLD = RNORM;
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DELZ.contiguous(), DELDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(), nullptr,
-				INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(), RNORM,
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DELZ, DELDMZ, G,
+				W, V, FC, RHS, nullptr,
+				INTEGS, IPVTG, IPVTW, RNORM,
 				3 + IFREEZ, fsub, dfsub, gsub, dgsub, guess, ISING);
 		}
 	n70:
@@ -1386,14 +1352,14 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 			// update   z and dmz , compute new  rhs  and its norm
 			for (int i = 1; i <= NZ; ++i)
-				Z(i) = Z(i) + DELZ(i);
+				Z[i-1] +=  DELZ[i-1];
 			for (int i = 1; i <= NDMZ; ++i)
-				DMZ(i) = DMZ(i) + DELDMZ(i);
+				DMZ[i-1] +=  DELDMZ[i-1];
 
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DELZ.contiguous(), DELDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(),nullptr,
-				INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(), RNORM, 2,
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DELZ, DELDMZ, G,
+				W, V, FC, RHS, nullptr,
+				INTEGS, IPVTG, IPVTW, RNORM, 2,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			//       check monotonicity. if the norm of  rhs  gets smaller,
@@ -1422,13 +1388,13 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			for (int IT = 1; IT <= NTOL; ++IT) {
 				int INZ = LTOL(IT);
 				for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-					if (abs(DELZ(IZ)) > TOLIN(IT) * (abs(Z(IZ)) + 1.0))
+					if (abs(DELZ[IZ-1]) > TOLIN(IT) * (abs(Z[IZ-1]) + 1.0))
 						goto n60;
 				}
 			}
 
 			// convergence obtained
-			if (IPRINT < 1) 
+			if (IPRINT < 1)
 				fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 			goto n400;
 		}
@@ -1437,20 +1403,20 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			//fmt::print(fg(fmt::color::cornflower_blue), "130:\n");
 
 			// convergence of fixed jacobian iteration failed.
-			if (IPRINT < 0) 
+			if (IPRINT < 0)
 				fmt::print("ITERATION = {}, NORM(RHS) = {}\nSWITCH TO DAMPED NEWTON ITERATION\n", ITER, RNORM);
 			ICONV = 0;
-			if (ICARE != 1)  
+			if (ICARE != 1)
 				RELAX = RSTART;
 			for (int i = 1; i <= NZ; ++i)
-				Z(i) = Z(i) - DELZ(i);
+				Z[i-1] -= DELZ[i-1];
 			for (int i = 1; i <= NDMZ; ++i)
-				DMZ(i) = DMZ(i) - DELDMZ(i);
+				DMZ[i-1] -=  DELDMZ[i-1];
 
 
 			// update old mesh
 			for (int i = 1; i <= N + 1; ++i)
-				XIOLD(i) = XI(i);
+				XIOLD[i-1] = XI[i-1];
 			NOLD = N;
 			ITER = 0;
 		}
@@ -1460,13 +1426,13 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			// no previous convergence has been obtained. proceed
 			// with the damped newton method.
 			// evaluate rhs and find the first newton correction.
-			if (IPRINT < 0) 
+			if (IPRINT < 0)
 				fmt::print("FULL DAMPED NEWTON ITERATION\n");
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DELZ.contiguous(), DELDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(),
-				DQDMZ.contiguous(), INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(),
-				RNOLD, 1,fsub, dfsub, gsub, dgsub, guess, ISING);
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DELZ, DELDMZ, G,
+				W, V, FC, RHS,
+				DQDMZ, INTEGS, IPVTG, IPVTW,
+				RNOLD, 1, fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			// check for a singular matrix
 			if (MSING != 0)
@@ -1483,7 +1449,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 			// find initial scaling
 			SKALE(Z, DMZ, XI, SCALE, DSCALE);
-			
+
 			RLXOLD = RELAX;
 			IPRED = 1;
 
@@ -1503,18 +1469,18 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			// compute norm of newton correction with new scaling
 			double ANSCL = 0.0;
 			for (int i = 1; i <= NZ; ++i)
-				ANSCL = ANSCL + pow(DELZ(i) * SCALE(i), 2);
+				ANSCL = ANSCL + pow(DELZ[i-1] * SCALE[i-1], 2);
 
 			for (int i = 1; i <= NDMZ; ++i)
-				ANSCL = ANSCL + pow(DELDMZ(i) * DSCALE(i), 2);
+				ANSCL = ANSCL + pow(DELDMZ[i-1] * DSCALE[i-1], 2);
 
 			ANSCL = sqrt(ANSCL / double(NZ + NDMZ));
 
 			// find a newton direction
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DELZ.contiguous(), DELDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(), nullptr,
-				INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(), RNORM, 3,
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DELZ, DELDMZ, G,
+				W, V, FC, RHS, nullptr,
+				INTEGS, IPVTG, IPVTW, RNORM, 3,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			// check for a singular matrix
@@ -1531,10 +1497,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 			if (ICARE != 1) {
 				double ANDIF = 0.0;
 				for (int i = 1; i <= NZ; ++i)
-					ANDIF = ANDIF + pow((DQZ(i) - DELZ(i)) * SCALE(i), 2);
+					ANDIF = ANDIF + pow((DQZ[i-1] - DELZ[i-1]) * SCALE[i-1], 2);
 
 				for (int i = 1; i <= NDMZ; ++i)
-					ANDIF = ANDIF + pow((DQDMZ(i) - DELDMZ(i)) * DSCALE(i), 2);
+					ANDIF = ANDIF + pow((DQDMZ[i-1] - DELDMZ[i-1]) * DSCALE[i-1], 2);
 
 				ANDIF = sqrt(ANDIF / double(NZ + NDMZ) + PRECIS);
 				RELAX = RELAX * ANSCL / ANDIF;
@@ -1550,60 +1516,60 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 
 			// determine a new  z and dmz  and find new  rhs  and its norm
 			for (int i = 1; i <= NZ; ++i)
-				Z(i) = Z(i) + RELAX * DELZ(i);
+				Z[i-1] += RELAX * DELZ[i-1];
 
 			for (int i = 1; i <= NDMZ; ++i)
-				DMZ(i) = DMZ(i) + RELAX * DELDMZ(i);
+				DMZ[i-1] +=  RELAX * DELDMZ[i-1];
 		}
 	n250:
 		{
 			//fmt::print(fg(fmt::color::cornflower_blue), "250:\n");
 
 			/*for (int i = 1; i <= NZ; ++i) {
-				fmt::print("+ DQZ(i)={:10.6f}\n", DQZ(i));
+				fmt::print("+ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
 			}*/
 
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DQZ.contiguous(), DQDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(),nullptr,
-				INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(), RNORM, 2,
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DQZ, DQDMZ, G,
+				W, V, FC, RHS, nullptr,
+				INTEGS, IPVTG, IPVTW, RNORM, 2,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			/*for (int i = 1; i <= NZ; ++i) {
-				fmt::print("++ DQZ(i)={:10.6f}\n", DQZ(i));
+				fmt::print("++ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
 			}*/
 
 			// compute a fixed jacobian iterate (used to control relax)
-			LSYSLV(MSING, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DQZ.contiguous(), DQDMZ.contiguous(), G.contiguous(),
-				W.contiguous(), V.contiguous(), FC.contiguous(), RHS.contiguous(), nullptr,
-				INTEGS.contiguous(), IPVTG.contiguous(), IPVTW.contiguous(), RNORM, 4,
+			LSYSLV(MSING, XI, XIOLD, Z, DMZ,
+				DQZ, DQDMZ, G,
+				W, V, FC, RHS, nullptr,
+				INTEGS, IPVTG, IPVTW, RNORM, 4,
 				fsub, dfsub, gsub, dgsub, guess, ISING);
 
 			//for (int i = 1; i <= NZ; ++i) {
-			//	fmt::print("+++ DQZ(i)={:10.6f}\n", DQZ(i));
+			//	fmt::print("+++ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
 			//}
 
 			// find scaled norms of various terms used to correct relax
 			ANORM = 0.0;
 			ANFIX = 0.0;
 			for (int i = 1; i <= NZ; ++i) {
-				//fmt::print("---- DQZ(i)={:10.6f}, SCALE(i)={:10.6f}\n", DQZ(i), SCALE(i));
-				ANORM = ANORM + pow(DELZ(i) * SCALE(i), 2);
-				ANFIX = ANFIX + pow(DQZ(i) * SCALE(i), 2);
+				//fmt::print("---- DQZ[i-1]={:10.6f}, SCALE[i-1]={:10.6f}\n", DQZ[i-1], SCALE[i-1]);
+				ANORM = ANORM + pow(DELZ[i-1] * SCALE[i-1], 2);
+				ANFIX = ANFIX + pow(DQZ[i-1] * SCALE[i-1], 2);
 			}
 			for (int i = 1; i <= NDMZ; ++i) {
-				//fmt::print("---- DQDMZ(i)={:10.6f}, DSCALE(i)={:10.6f}\n", DQDMZ(i), DSCALE(i));
-				ANORM = ANORM + pow(DELDMZ(i) * DSCALE(i), 2);
-				ANFIX = ANFIX + pow(DQDMZ(i) * DSCALE(i), 2);
+				//fmt::print("---- DQDMZ[i-1]={:10.6f}, DSCALE[i-1]={:10.6f}\n", DQDMZ[i-1], DSCALE[i-1]);
+				ANORM = ANORM + pow(DELDMZ[i-1] * DSCALE[i-1], 2);
+				ANFIX = ANFIX + pow(DQDMZ[i-1] * DSCALE[i-1], 2);
 			}
 			ANORM = sqrt(ANORM / double(NZ + NDMZ));
 			ANFIX = sqrt(ANFIX / double(NZ + NDMZ));
 			if (ICOR == 1) {
 				if (IPRINT < 0)
-					fmt::print( "RELAXATION FACTOR CORRECTED TO RELAX = {}\n"
-								" NORM OF SCALED RHS CHANGES FROM {} TO {}\n"
-								" NORM OF        RHS CHANGES FROM {} TO {}\n",
+					fmt::print("RELAXATION FACTOR CORRECTED TO RELAX = {}\n"
+						" NORM OF SCALED RHS CHANGES FROM {} TO {}\n"
+						" NORM OF        RHS CHANGES FROM {} TO {}\n",
 						RELAX, ANORM, ANFIX, RNOLD, RNORM);
 			}
 			else {
@@ -1662,42 +1628,42 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				{
 					double FACT = RELAX - RLXOLD;
 					for (int i = 1; i <= NZ; ++i)
-						Z(i) = Z(i) + FACT * DELZ(i);
+						Z[i-1] += FACT * DELZ[i-1];
 
 					for (int i = 1; i <= NDMZ; ++i) {
-						DMZ(i) = DMZ(i) + FACT * DELDMZ(i);
+						DMZ[i-1] += FACT * DELDMZ[i-1];
 					}
 					RLXOLD = RELAX;
 					goto n250;
-				}			
-			n350: 
+				}
+			n350:
 				{
 					//fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
 					// check convergence (iconv = 0).
 					for (int IT = 1; IT <= NTOL; ++IT) {
 						int INZ = LTOL(IT);
 						for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-							if (abs(DQZ(IZ)) > TOLIN(IT) * (abs(Z(IZ)) + 1.0))
+							if (abs(DQZ[IZ-1]) > TOLIN(IT) * (abs(Z[IZ-1]) + 1.0))
 								goto n170;
 						}
 					}
 
 					// convergence obtained
-					if (IPRINT < 1) 
+					if (IPRINT < 1)
 						fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 
 					// since convergence obtained, update  z and dmz  with term
 					// from the fixed jacobian iteration.
 					for (int i = 1; i <= NZ; ++i)
-						Z(i) = Z(i) + DQZ(i);
+						Z[i-1] += DQZ[i-1];
 
 					for (int i = 1; i <= NDMZ; ++i)
-						DMZ(i) = DMZ(i) + DQDMZ(i);
+						DMZ[i-1] += DQDMZ[i-1];
 				}
 			n390:
 				{
 					//fmt::print(fg(fmt::color::cornflower_blue), "390:\n");
-					if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1) 
+					if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1)
 						fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 					ICONV = 1;
 					if (ICARE == -1)  ICARE = 0;
@@ -1711,15 +1677,15 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					if (IPRINT >= 0)
 						goto n420;
 					for (int j = 1; j <= MSTAR; ++j) {
-						fmt::print("MESH VALUES FOR Z({}): ", j);
+						fmt::print("MESH VALUES FOR Z[{}-1]: ", j);
 						for (int LJ = j; LJ <= NZ; LJ += MSTAR)
-							fmt::print("{:.4}, ", Z(LJ));
+							fmt::print("{:.4}, ", Z[LJ-1]);
 						fmt::print("\n");
 					}
-					for (int j = 1; j <= NY; ++j) {	
+					for (int j = 1; j <= NY; ++j) {
 						fmt::print("VALUES AT 1st COLLOCATION POINTS FOR Y({}): ", j);
 						for (int LJ = j + NCOMP; LJ <= NDMZ; LJ += KDY)
-							fmt::print("{:.4}, ", DMZ(LJ));
+							fmt::print("{:.4}, ", DMZ[LJ-1]);
 						fmt::print("\n");
 					}
 				}
@@ -1729,20 +1695,19 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 					// check for error tolerance satisfaction
 					int IFIN = 1;
 					if (IMESH == 2)
-						ERRCHK(XI.contiguous(), Z.contiguous(), DMZ.contiguous(), 
-							VALSTR.contiguous(), IFIN);
+						ERRCHK(XI, Z, DMZ,VALSTR, IFIN);
 					if (IMESH == 1 || IFIN == 0 && ICARE != 2)
 						goto n460;
 					iflag = output_t::normal;
 					return;
 				}
-			n430: ;
+			n430:;
 				//fmt::print(fg(fmt::color::cornflower_blue), "430:\n");
 
 				// diagnostics for failure of nonlinear iteration.
-				if (IPRINT < 1)  
+				if (IPRINT < 1)
 					fmt::print("NO CONVERGENCE AFTER {} ITERATIONS\n", ITER);
-				
+
 			}
 			else {
 				if (IPRINT < 1) {
@@ -1760,10 +1725,10 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 		}
 	n460:
 		{
-		//fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
-			// update old mesh
+			//fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
+				// update old mesh
 			for (int i = 1; i <= N + 1; ++i)
-				XIOLD(i) = XI(i);
+				XIOLD[i-1] = XI[i-1];
 			NOLD = N;
 
 			// pick a new mesh
@@ -1773,7 +1738,7 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				IMESH = 2;
 			if (MSHALT >= MSHLMT && MSHNUM < MSHLMT)
 				MSHALT = 1;
-			
+
 			int NYCB;
 			if (NY == 0)
 				NYCB = 1;
@@ -1781,23 +1746,23 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 				NYCB = NY;
 
 
-			NEWMSH(IMESH, XI.contiguous(), XIOLD.contiguous(), Z.contiguous(), DMZ.contiguous(),
-				DMV.contiguous(), VALSTR.contiguous(),
-				SLOPE.contiguous(), ACCUM.contiguous(), NFXPNT,
-				FIXPNT.contiguous(), DF.contiguous(), dfsub,
+			NEWMSH(IMESH, XI, XIOLD, Z, DMZ,
+				DMV, VALSTR,
+				SLOPE, ACCUM, NFXPNT,
+				FIXPNT, DF, dfsub,
 				FCSP.contiguous(), CBSP.contiguous(), NYCB);
 
 			// exit if expected n is too large (but may try n=nmax once)
-			if (N > NMAX){
+			if (N > NMAX) {
 				N = N / 2;
 				iflag = output_t::outOfMemory;
 				if (ICONV == 0 && IPRINT < 1)
-					fmt::print("NO CONVERGENCE\n"); 
-				if (ICONV == 1 && IPRINT < 1)  
+					fmt::print("NO CONVERGENCE\n");
+				if (ICONV == 1 && IPRINT < 1)
 					fmt::print("PROBABLY TOLERANCES TOO STRINGENT OR NMAX TOO SMALL\n");
 				return;
 			}
-			if (ICONV == 0) 
+			if (ICONV == 0)
 				IMESH = 1;
 			if (ICARE == 1)  ICONV = 0;
 		}
@@ -1823,49 +1788,43 @@ void CONTRL(dar1 XI, dar1 XIOLD, dar1 Z, dar1 DMZ, dar1 DMV, dar1 RHS, dar1 DELZ
 //            dscale = scaling vector for dmz
 //
 //**********************************************************************
-void SKALE(dar2 Z, dar2 DMZ, dar1 XI, dar2 SCALE, dar2 DSCALE)
+void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
 {
-	Z.reshape(MSTAR, 1);
-	Z.assertDim(MSTAR, 1);
-	SCALE.reshape(MSTAR, 1); 
-	SCALE.assertDim(MSTAR, 1);
-	DMZ.reshape(KDY, N); 
-	DMZ.assertDim(KDY, N);
-	DSCALE.reshape(KDY, N); 
-	DSCALE.assertDim(KDY, N);
-	XI.assertDim(1);
+	//Z(MSTAR, 1);
+	//SCALE(MSTAR, 1); 
+	//DMZ(KDY, N); 
+	//DSCALE(KDY, N); 
 	
 	double BASM[5];
 
 	BASM[0] = 1.0;
 	for (int j = 1; j <= N; ++j) {
 		int IZ = 1;
-		double H = XI(j + 1) - XI(j);
+		double H = XI[j] - XI[j-1];
 		for (int l = 1; l <= MMAX; ++l)
 			BASM[l] = BASM[l-1] * H / double(l);
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-			double SCAL = (abs(Z(IZ, j)) + abs(Z(IZ, j + 1))) * .5 + 1.0;
+			double SCAL = (abs(Z[IZ-1+(j-1)* MSTAR]) + abs(Z[IZ - 1 + (j) * MSTAR])) * .5 + 1.0;
 			int MJ = MT(ICOMP);
 			for (int l = 1; l <= MJ; ++l) {
-				SCALE(IZ, j) = BASM[l-1] / SCAL;
+				SCALE[IZ - 1 + (j - 1) * MSTAR] = BASM[l-1] / SCAL;
 				IZ = IZ + 1;
 			}
 			SCAL = BASM[MJ] / SCAL;
 			for (int IDMZ = ICOMP; IDMZ <= KDY; IDMZ += NCY)
-				DSCALE(IDMZ, j) = SCAL;
+				DSCALE[IDMZ-1+ (j-1)*KDY] = SCAL;
 
 		}
 		for (int ICOMP = 1 + NCOMP; ICOMP <= NCY; ++ICOMP) {
-			double SCAL = 1.0 / (abs(DMZ(ICOMP, j)) + 1.0);
+			double SCAL = 1.0 / (abs(DMZ[ICOMP-1+(j-1)*KDY]) + 1.0);
 			for (int IDMZ = ICOMP; IDMZ <= KDY; IDMZ += NCY) {
-				DSCALE(IDMZ, j) = SCAL;
+				DSCALE[IDMZ - 1 + (j - 1) * KDY] = SCAL;
 			}
 		}
 	}
-	int NP1 = N + 1;
 	for (int IZ = 1; IZ <= MSTAR; ++IZ)
-		SCALE(IZ, NP1) = SCALE(IZ, N);
+		SCALE[IZ - 1 + (N) * MSTAR] = SCALE[IZ - 1 + (N - 1) * MSTAR];
 }
 
 
