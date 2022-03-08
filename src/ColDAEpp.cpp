@@ -159,8 +159,8 @@ int main()
 		opts.numFixedPoints = 0;
 	}
 
-	iad1 ispace(opts.idim);
-	dad1 fspace(opts.fdim);
+	std::vector<int> ispace(opts.idim);
+	std::vector<double> fspace(opts.fdim);
 
 	cda solver;
 	output_t iflag;
@@ -168,7 +168,7 @@ int main()
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	
-		solver.COLDAE(sys.params, opts, ispace, fspace, iflag,
+		solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(), iflag,
 			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub,
 			decltype(sys)::dgsub, nullptr);
 	}
@@ -177,11 +177,11 @@ int main()
 	if (iflag == output_t::normal) {
 		fmt::print(fg(fmt::color::green_yellow), "Successful return!\n");
 		std::ofstream file("result_cpp.txt");
-		for (int i = 1; i <= ispace(1) + 1; ++i) {
-			double x = fspace(i);
-			dad1 z(2), y(1);
-			solver.APPSLN(x, z, y, fspace, ispace);
-			file << x << " " << z(1) << " " << y(1) << std::endl;
+		for (int i = 1; i <= ispace[0] + 1; ++i) {
+			double x = fspace[i-1];
+			double z[2], y[1];
+			solver.APPSLN(x, z, y, fspace.data(), ispace.data());
+			file << x << " " << z[0] << " " << y[0] << std::endl;
 		}
 		file.close();
 
@@ -191,9 +191,9 @@ int main()
 		std::ifstream infile("../../original/result_f77.txt");
 		double maxError = 0, x, z1, y1;
 		while (infile >> x >> z1 >> y1) {
-			dad1 z(2), y(1);
-			solver.APPSLN(x, z, y, fspace, ispace);
-			maxError = std::max({ maxError,z1 - z(1),y1 - y(1) });
+			double z[2], y[1];
+			solver.APPSLN(x, z, y, fspace.data(), ispace.data());
+			maxError = std::max({ maxError,z1 - z[0],y1 - y[0] });
 		}
 		fmt::print(fg(fmt::color::cornflower_blue), "Max deviation from FORTRAN is {}.\n", maxError);
 		infile.close();

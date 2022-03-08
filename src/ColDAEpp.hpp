@@ -796,11 +796,11 @@ class cda{
 
 public:
 void COLDAE(systemParams const& params, options const& opts,
-	iar1 ispace, dar1 fspace, output_t& iflag,
+	int* const ispace, double* const fspace, output_t& iflag,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
-	ispace.assertDim(opts.idim);
-	fspace.assertDim(opts.fdim);
+	//ispace(opts.idim);
+	//fspace(opts.fdim);
 
 	this->NCOMP = params.ncomp;
 	this->NY = params.ny;
@@ -811,10 +811,7 @@ void COLDAE(systemParams const& params, options const& opts,
 	this->TOL.copyFrom(opts.tol);
 
 
-	dad1 DUMMY(1);// , DUMMY2(840);
-
-	double* DUMMY2 = nullptr;
-
+	
 	//*********************************************************************
 	//
 	//     the actual subroutine coldae serves as an interface with
@@ -827,13 +824,12 @@ void COLDAE(systemParams const& params, options const& opts,
 	//
 	//**********************************************************************
 
-	//  specify machine dependent output unit  iout  and compute machine
-	//  dependent constant  precis = 100 * machine unit roundoff
-
 
 	if (opts.printLevel != printMode::none) 
 		fmt::print("VERSION *1* OF COLDAE\n");
 
+	//  specify machine dependent output unit  iout  and compute machine
+	//  dependent constant  precis = 100 * machine unit roundoff
 	IOUT = 6;
 	PRECIS = 1.0;
 	double PRECP1;
@@ -978,7 +974,8 @@ void COLDAE(systemParams const& params, options const& opts,
 	int NREC = 0;
 	for (int i = 1; i <= MSTAR; ++i) {
 		int IB = MSTAR + 1 - i;
-		if (params.bcpoints(IB) >= ARIGHT)  NREC = i;
+		if (params.bcpoints(IB) >= ARIGHT) 
+			NREC = i;
 	}
 	int NFIXI = MSTAR;
 	int NSIZEI = 3 + KDY + MSTAR;
@@ -1030,25 +1027,25 @@ void COLDAE(systemParams const& params, options const& opts,
 	if (IGUESS >= 2) {
 		NOLD = N;
 		if (IGUESS == 4)
-			NOLD = ispace(1);
+			NOLD = ispace[1-1];
 		NZ = MSTAR * (NOLD + 1);
 		NDMZ = KDY * NOLD;
 		int NP1 = N + 1;
 		if (IGUESS == 4)
 			NP1 = NP1 + NOLD + 1;
 		for (int i = 1; i <= NZ; ++i)
-			fspace(LZ + i - 1) = fspace(NP1 + i);
+			fspace[LZ + i - 1-1] = fspace[NP1 + i-1];
 		int IDMZ = NP1 + NZ;
 		for (int i = 1; i <= NDMZ; ++i)
-			fspace(LDMZ + i - 1) = fspace(IDMZ + i);
+			fspace[LDMZ + i - 1-1] = fspace[IDMZ + i-1];
 		NP1 = NOLD + 1;
 		if (IGUESS == 4) {
 			for (int i = 1; i <= NP1; ++i)
-				fspace(LXIOLD + i - 1) = fspace(N + 1 + i);
+				fspace[LXIOLD + i - 1-1] = fspace[N + 1 + i-1];
 		}
 		else {
 			for (int i = 1; i <= NP1; ++i)
-				fspace(LXIOLD + i - 1) = fspace(LXI + i - 1);
+				fspace[LXIOLD + i - 1-1] = fspace[LXI + i - 1-1];
 		}
 	}
 
@@ -1063,56 +1060,56 @@ void COLDAE(systemParams const& params, options const& opts,
 		NYCB = NY;
 
 	int meshmode = 3 + IREAD;
-	NEWMSH(meshmode, fspace.sub(LXI).contiguous(), fspace.sub(LXIOLD).contiguous(),
+	NEWMSH(meshmode, fspace+(LXI-1), fspace+(LXIOLD-1),
 		nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-		NFXPNT, opts.fixpnt.contiguous(), DUMMY2, dfsub, DUMMY2, DUMMY2, NYCB);
+		NFXPNT, opts.fixpnt.contiguous(), nullptr, dfsub, nullptr, nullptr, NYCB);
 
 	//  determine first approximation, if the problem is nonlinear.
 	if (IGUESS < 2) {
 		for (int i = 1; i <= N + 1; ++i)
-			fspace(i + LXIOLD - 1) = fspace(i + LXI - 1);
+			fspace[i + LXIOLD - 1-1] = fspace[i + LXI - 1-1];
 		NOLD = N;
 		if (NONLIN != 0 && IGUESS != 1) {
 			//  system provides first approximation of the solution.
 			//  choose z(j) = 0  for j=1,...,mstar.
 			for (int i = 1; i <= NZ; ++i)
-				fspace(LZ - 1 + i) = 0.0;
+				fspace[LZ - 1 + i-1] = 0.0;
 			for (int i = 1; i <= NDMZ; ++i)
-				fspace(LDMZ - 1 + i) = 0.0;
+				fspace[LDMZ - 1 + i-1] = 0.0;
 		}
 	}
 	if (IGUESS >= 2)  
 		IGUESS = 0;
 
 	
-	CONTRL(fspace.sub(LXI).contiguous(), fspace.sub(LXIOLD).contiguous(), fspace.sub(LZ).contiguous(), fspace.sub(LDMZ).contiguous(), fspace.sub(LDMV).contiguous(),
-		fspace.sub(LRHS).contiguous(), fspace.sub(LDELZ).contiguous(), fspace.sub(LDELDZ).contiguous(), fspace.sub(LDQZ).contiguous(),
-		fspace.sub(LDQDMZ).contiguous(), fspace.sub(LG).contiguous(), fspace.sub(LW).contiguous(), fspace.sub(LV).contiguous(), fspace.sub(LFC).contiguous(),
-		fspace.sub(LVALST).contiguous(), fspace.sub(LSLOPE).contiguous(), fspace.sub(LSCL).contiguous(), fspace.sub(LDSCL).contiguous(),
-		fspace.sub(LACCUM).contiguous(), ispace.sub(LPVTG).contiguous(), ispace.sub(LINTEG).contiguous(), ispace.sub(LPVTW).contiguous(),
+	CONTRL(fspace+(LXI-1), fspace+(LXIOLD-1), fspace+(LZ-1), fspace+(LDMZ-1), fspace+(LDMV-1),
+		fspace+(LRHS-1), fspace+(LDELZ-1), fspace+(LDELDZ-1), fspace+(LDQZ-1),
+		fspace+(LDQDMZ-1), fspace+(LG-1), fspace+(LW-1), fspace+(LV-1), fspace+(LFC-1),
+		fspace+(LVALST-1), fspace+(LSLOPE-1), fspace+(LSCL-1), fspace+(LDSCL-1),
+		fspace+(LACCUM-1), ispace+(LPVTG-1), ispace+(LINTEG-1), ispace+(LPVTW-1),
 		NFXPNT, opts.fixpnt.contiguous(), iflag, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
-	ispace(1) = N;
-	ispace(2) = K;
-	ispace(3) = NCOMP;
-	ispace(4) = NY;
-	ispace(5) = MSTAR;
-	ispace(6) = MMAX;
-	ispace(7) = NZ + NDMZ + N + 2;
+	ispace[1-1] = N;
+	ispace[2-1] = K;
+	ispace[3-1] = NCOMP;
+	ispace[4-1] = NY;
+	ispace[5-1] = MSTAR;
+	ispace[6-1] = MMAX;
+	ispace[7-1] = NZ + NDMZ + N + 2;
 	int K2 = K * K;
-	ispace(8) = ispace(7) + K2 - 1;
+	ispace[8-1] = ispace[7-1] + K2 - 1;
 	for (int i = 1; i <= NCOMP; ++i)
-		ispace(8 + i) = params.orders(i);
+		ispace[8 + i-1] = params.orders(i);
 	for (int i = 1; i <= NZ; ++i)
-		fspace(N + 1 + i) = fspace(LZ - 1 + i);
+		fspace[N + 1 + i-1] = fspace[LZ - 1 + i-1];
 	int IDMZ = N + 1 + NZ;
 
 	for (int i = 1; i <= NDMZ; ++i)
-		fspace(IDMZ + i) = fspace(LDMZ - 1 + i);
+		fspace[IDMZ + i-1] = fspace[LDMZ - 1 + i-1];
 	int IC = IDMZ + NDMZ;
 	for (int i = 1; i <= K2; ++i)
-		fspace(IC + i) = COEF.contiguous()[i-1];
+		fspace[IC + i-1] = COEF.contiguous()[i-1];
 }
 
 // * ****************************************************************
@@ -1126,22 +1123,17 @@ void COLDAE(systemParams const& params, options const& opts,
 //           from the work arrays  ispaceand fspace .
 //
 //*****************************************************************
-void APPSLN(double& X, dar1 Z, dar1 Y, dar1 FSPACE, iar1 ISPACE) {
-	Z.assertDim(1);
-	Y.assertDim(1);
-	FSPACE.assertDim(1);
-	ISPACE.assertDim(1);
+void APPSLN(double& X, double* const Z, double* const Y, double const* const FSPACE, int const* const ISPACE) {
+	double A[28];
 
-	dad1 A(28);
-
-	int IS6 = ISPACE(7);
-	int IS5 = ISPACE(1) + 2;
-	int IS4 = IS5 + ISPACE(5) * (ISPACE(1) + 1);
+	int IS6 = ISPACE[6];
+	int IS5 = ISPACE[0] + 2;
+	int IS4 = IS5 + ISPACE[4] * (ISPACE[0] + 1);
 	int i = 1;
-	APPROX(i, X, Z.contiguous(), Y.contiguous(), A.contiguous(), FSPACE.sub(IS6).contiguous(),
-		FSPACE.sub(1).contiguous(), ISPACE(1),
-		FSPACE.sub(IS5).contiguous(), FSPACE.sub(IS4).contiguous(), ISPACE(2), ISPACE(3),
-		ISPACE(4), ISPACE(6), ISPACE.sub(9).contiguous(), ISPACE(5), 2, nullptr, 1);
+	APPROX(i, X, Z, Y, A, FSPACE+(IS6-1),
+		FSPACE, ISPACE[0],
+		FSPACE+(IS5-1), FSPACE+(IS4-1), ISPACE[1], ISPACE[2],
+		ISPACE[3], ISPACE[5], ISPACE+8, ISPACE[4], 2, nullptr, 1);
 }
 
 
