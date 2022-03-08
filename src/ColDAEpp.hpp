@@ -657,76 +657,49 @@ struct options {
 
 class cda{
 
-	struct { // COLOUT 
-		double PRECIS; int IOUT, IPRINT;
-	};
-	struct { // COLLOC 
-		dad1 RHO = dad1( 7 );
-		dad2 COEF = dad2( 7, 7 );
-	};
-	struct { // COLORD 
-		int K; 
-		union {
-			int NC;
-			int NCOMP;
-			int NCDUM;
-		};
-		union {
-			int NNY;
-			int NYD;
-			int NY;
-		};
-		union {
-			int NCY;
-			int NCYD;
-			int NDM;
-		};
-		int MSTAR, KD;
-		union {
-			int KDY;
-			int KDUM;
-			int KDYM;
-		};
-		int MMAX;
-		iad1 MT = iad1( 20);
+	// COLOUT 
+	double PRECIS; int IOUT, IPRINT;
+	
+	// COLLOC 
+	dad1 RHO = dad1( 7 );
+	dad2 COEF = dad2( 7, 7 );
+	
+	// COLORD 
+	int K; 
+	int NCOMP;
+	int NY;
+	int NCY;
+	int MSTAR, KD;
+	int KDY;
+	int MMAX;
+	iad1 MT = iad1( 20);
+	
+	// COLAPR 
+	int N, NOLD, NMAX, NZ, NDMZ;
+	
+	// COLMSH 
+	int MSHFLG, MSHNUM, MSHLMT, MSHALT;
+	
+	// COLSID 	
+	dad1 TZETA = dad1( 40);
+	double TLEFT;
+	double TRIGHT;
+	int IZETA;
+	int IZSAVE;
+	
+	// COLNLN 
+	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
+	
+	// COLEST 
+	dad1 TOL = dad1(40), WGTMSH = dad1(40), WGTERR = dad1(40), TOLIN = dad1(40), ROOT = dad1(40);
+	iad1 JTOL = iad1(40), LTOL = iad1(40);
+	int NTOL;
+	
+	// COLBAS 
+	dad2 B = dad2( 7, 4 ), ACOL = dad2( 28, 7 ), ASAVE = dad2( 28, 4 );
+	
 
-		//// aliases
-		//auto& M = MT;
-	};
-	struct { // COLAPR 
-		int N, NOLD, NMAX, NZ, NDMZ;
-	};
-	struct { // COLMSH 
-		int MSHFLG, MSHNUM, MSHLMT, MSHALT;
-	};
-	struct { // COLSID 
-		
-		dad1 TZETA = dad1( 40);
-		union {
-			double TLEFT;
-			double ALEFT;
-		};
-		union {
-			double TRIGHT;
-			double ARIGHT;
-		};
-		int IZETA;
-		union {
-			int IDUM;
-			int IZSAVE;
-		};
-	};
-	struct { // COLNLN 
-		int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
-	};
-	struct { // COLEST 
-		dad1 TOL = dad1(40), WGTMSH = dad1(40), WGTERR = dad1(40), TOLIN = dad1(40), ROOT = dad1(40);
-		iad1 JTOL = iad1(40), LTOL = iad1(40);
-		int NTOL;
-	};
-	struct { // COLBAS 
-		dad2 B = dad2( 7, 4 ), ACOL = dad2( 28, 7 ), ASAVE = dad2( 28, 4 );
-	};
+
 
 	void dumpState() {
 		std::ofstream file("state_cpp.txt");
@@ -742,7 +715,7 @@ class cda{
 			file << std::endl;
 		}
 		{
-			file << fmt::format("{} {} {} {} {} {} {} {} ", K, NC, NNY, NCY, MSTAR, KD, KDY, MMAX);
+			file << fmt::format("{} {} {} {} {} {} {} {} ", K, this->NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX);
 			for (int i = 1; i <= 20; ++i)
 				file << MT(i) << " ";
 			file << std::endl;
@@ -759,7 +732,7 @@ class cda{
 			for (int i = 1; i <= 40; ++i)
 				file << TZETA(i) << " ";
 			file << std::endl;
-			file << fmt::format("{} {} {} {} ", TLEFT, TRIGHT, IZETA, IDUM);
+			file << fmt::format("{} {} {} {} ", TLEFT, TRIGHT, IZETA, IZSAVE);
 			file << std::endl;
 		}
 		{
@@ -804,8 +777,8 @@ void COLDAE(systemParams const& params, options const& opts,
 
 	this->NCOMP = params.ncomp;
 	this->NY = params.ny;
-	this->ALEFT = params.left;
-	this->ARIGHT = params.right;
+	this->TLEFT = params.left;
+	this->TRIGHT = params.right;
 
 	this->LTOL.copyFrom(opts.ltol);
 	this->TOL.copyFrom(opts.tol);
@@ -888,10 +861,6 @@ void COLDAE(systemParams const& params, options const& opts,
 		LTOL(i) = LTOL(i);
 		TOLIN(i) = TOL(i);
 	}
-	TLEFT = ALEFT;
-	TRIGHT = ARIGHT;
-	NC = NCOMP;
-	NNY = NY;
 	KD = K * NCOMP;
 	KDY = K * NCY;
 
@@ -946,7 +915,7 @@ void COLDAE(systemParams const& params, options const& opts,
 
 	int IP = 1;
 	for (int i = 1; i <= MSTAR; ++i) {
-		if (abs(params.bcpoints(i) - ALEFT) < PRECIS || abs(params.bcpoints(i) - ARIGHT) < PRECIS)
+		if (abs(params.bcpoints(i) - TLEFT) < PRECIS || abs(params.bcpoints(i) - TRIGHT) < PRECIS)
 			continue;
 
 		while (true) {
@@ -974,7 +943,7 @@ void COLDAE(systemParams const& params, options const& opts,
 	int NREC = 0;
 	for (int i = 1; i <= MSTAR; ++i) {
 		int IB = MSTAR + 1 - i;
-		if (params.bcpoints(IB) >= ARIGHT) 
+		if (params.bcpoints(IB) >= TRIGHT)
 			NREC = i;
 	}
 	int NFIXI = MSTAR;
@@ -2912,20 +2881,20 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 					if (MODE != 0) {
 						if (IGUESS == 1) {
 							// case where user provided current approximation
-							guess(ARIGHT, ZVAL, YVAL, DMVAL);
+							guess(TRIGHT, ZVAL, YVAL, DMVAL);
 						}
 						else {
 							// other nonlinear case
 							if (MODE == 1) {
 								auto temp = NOLD + 1;
-								APPROX(temp, ARIGHT, ZVAL, nullptr, AT,
+								APPROX(temp, TRIGHT, ZVAL, nullptr, AT,
 									COEF.contiguous(), XIOLD, NOLD, Z,
 									DMZ, K,
 									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
 							}
 							else {
 								auto temp = N + 1;
-								APPROX(temp, ARIGHT, ZVAL, nullptr, AT,
+								APPROX(temp, TRIGHT, ZVAL, nullptr, AT,
 									COEF.contiguous(), XI, N, Z,
 									DMZ, K,
 									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
