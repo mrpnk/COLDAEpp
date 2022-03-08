@@ -646,12 +646,12 @@ struct options {
 	meshMode meshSource;   // mesh control
 	guessMode guessSource; // guess control
 	
-	int numTolerances;     // no. of solution and derivative tolerances
-	iad1 ltol;
-	dad1 tol;
+	//int numTolerances;          // no. of solution and derivative tolerances
+	std::vector<int> ltol;      // what component of z the tolerances are for
+	std::vector<double> tol;    // the tolerances tol
 
-	int numFixedPoints;    // no. of fixed points in the mesh other than aleft and aright.
-	dad1 fixpnt;
+	int numFixedPoints;         // no. of fixed points in the mesh other than aleft and aright.
+	std::vector<double> fixpnt; // the fixed points
 };
 
 
@@ -661,8 +661,8 @@ class cda{
 	double PRECIS; int IOUT, IPRINT;
 	
 	// COLLOC 
-	dad1 RHO = dad1( 7 );
-	dad2 COEF = dad2( 7, 7 );
+	double RHO[7];
+	double COEF[7*7];
 	
 	// COLORD 
 	int K; 
@@ -672,7 +672,7 @@ class cda{
 	int MSTAR, KD;
 	int KDY;
 	int MMAX;
-	iad1 MT = iad1( 20);
+	int MT[20];
 	
 	// COLAPR 
 	int N, NOLD, NMAX, NZ, NDMZ;
@@ -681,9 +681,9 @@ class cda{
 	int MSHFLG, MSHNUM, MSHLMT, MSHALT;
 	
 	// COLSID 	
-	dad1 TZETA = dad1( 40);
-	double TLEFT;
-	double TRIGHT;
+	double TZETA[40]; // boundary condition points
+	double TLEFT;     // left domain end
+	double TRIGHT;    // right domain end
 	int IZETA;
 	int IZSAVE;
 	
@@ -691,9 +691,9 @@ class cda{
 	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
 	
 	// COLEST 
-	dad1 TOL = dad1(40), WGTMSH = dad1(40), WGTERR = dad1(40), TOLIN = dad1(40), ROOT = dad1(40);
-	iad1 JTOL = iad1(40), LTOL = iad1(40);
-	int NTOL;
+	double TOL[40], WGTMSH[40], WGTERR[40], TOLIN[40], ROOT[40];
+	int    JTOL[40], LTOL[40];
+	int NTOL; // number of tolerances
 	
 	// COLBAS 
 	dad2 B = dad2( 7, 4 ), ACOL = dad2( 28, 7 ), ASAVE = dad2( 28, 4 );
@@ -708,16 +708,16 @@ class cda{
 		}
 		{
 			for (int i = 1; i <= 7; ++i)
-				file << RHO(i) << " ";
+				file << RHO[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 49; ++i)
-				file << COEF.contiguous()[i-1] << " ";
+				file << COEF[i-1] << " ";
 			file << std::endl;
 		}
 		{
 			file << fmt::format("{} {} {} {} {} {} {} {} ", K, this->NCOMP, NY, NCY, MSTAR, KD, KDY, MMAX);
 			for (int i = 1; i <= 20; ++i)
-				file << MT(i) << " ";
+				file << MT[i-1] << " ";
 			file << std::endl;
 		}
 		{
@@ -730,7 +730,7 @@ class cda{
 		}
 		{
 			for (int i = 1; i <= 40; ++i)
-				file << TZETA(i) << " ";
+				file << TZETA[i-1] << " ";
 			file << std::endl;
 			file << fmt::format("{} {} {} {} ", TLEFT, TRIGHT, IZETA, IZSAVE);
 			file << std::endl;
@@ -742,34 +742,34 @@ class cda{
 		{
 			file << NTOL << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << TOL(i) << " ";
+				file << TOL[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << WGTMSH(i) << " ";
+				file << WGTMSH[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << WGTERR(i) << " ";
+				file << WGTERR[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << TOLIN(i) << " ";
+				file << TOLIN[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << ROOT(i) << " ";
+				file << ROOT[i-1] << " ";
 			file << std::endl;
 
 			for (int i = 1; i <= 40; ++i)
-				file << JTOL(i) << " ";
+				file << JTOL[i-1] << " ";
 			file << std::endl;
 			for (int i = 1; i <= 40; ++i)
-				file << LTOL(i) << " ";
+				file << LTOL[i-1] << " ";
 			file << std::endl;
 		}
 		file.close();
 	}
 
 public:
-void COLDAE(systemParams const& params, options const& opts,
-	int* const ispace, double* const fspace, output_t& iflag,
+output_t COLDAE(systemParams const& params, options const& opts,
+	int* const ispace, double* const fspace,
 	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	//ispace(opts.idim);
@@ -780,9 +780,13 @@ void COLDAE(systemParams const& params, options const& opts,
 	this->TLEFT = params.left;
 	this->TRIGHT = params.right;
 
-	this->LTOL.copyFrom(opts.ltol);
-	this->TOL.copyFrom(opts.tol);
+	if (opts.ltol.size() != opts.tol.size()) {
+		return output_t::inputError;
+	}
 
+	std::copy(opts.ltol.begin(), opts.ltol.end(), this->LTOL);
+	std::copy(opts.tol.begin(), opts.tol.end(), this->TOL);
+	
 
 	
 	//*********************************************************************
@@ -815,17 +819,16 @@ void COLDAE(systemParams const& params, options const& opts,
 
 	//  in case incorrect input data is detected, the program returns
 	//  immediately with iflag=-3.
-	iflag = output_t::inputError;
 	NCY = NCOMP + NY;
 	if (NCOMP < 0 || NCOMP > 20)
-		return;
+		return output_t::inputError;
 	if (NY < 0 || NY > 20)
-		return;
+		return output_t::inputError;
 	if (NCY < 1 || NCY > 40)
-		return;
+		return output_t::inputError;
 	for (int i = 1; i <= NCOMP; ++i)
 		if (params.orders(i) < 1 || params.orders(i) > 4)
-			return;
+			return output_t::inputError;
 
 
 	//  rename some of the parameters and set default values.
@@ -839,7 +842,7 @@ void COLDAE(systemParams const& params, options const& opts,
 	if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
 	if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
 	ICARE = static_cast<int>(params.reg);
-	NTOL = opts.numTolerances;
+	NTOL = opts.tol.size();
 	int NDIMF = opts.fdim;
 	int NDIMI = opts.idim;
 	int NFXPNT = opts.numFixedPoints;
@@ -852,14 +855,14 @@ void COLDAE(systemParams const& params, options const& opts,
 	for (int i = 1; i <= NCOMP; ++i) {
 		MMAX = std::max(MMAX, params.orders(i));
 		MSTAR = MSTAR + params.orders(i);
-		MT(i) = params.orders(i);
+		MT[i-1] = params.orders(i);
 	}
 	if (K == 0)   K = std::max(MMAX + 1, 5 - MMAX);
 	for (int i = 1; i <= MSTAR; ++i)
-		TZETA(i) = params.bcpoints(i);
+		TZETA[i-1] = params.bcpoints(i);
 	for (int i = 1; i <= NTOL; ++i) {
-		LTOL(i) = LTOL(i);
-		TOLIN(i) = TOL(i);
+		LTOL[i-1] = LTOL[i-1];
+		TOLIN[i-1] = TOL[i-1];
 	}
 	KD = K * NCOMP;
 	KDY = K * NCY;
@@ -890,7 +893,7 @@ void COLDAE(systemParams const& params, options const& opts,
 		}
 		fmt::print("NUMBER OF COLLOC PTS PER INTERVAL IS {}\n", K);	
 		fmt::print("COMPONENTS OF Z REQUIRING TOLERANCES: {}\n", 
-			std::vector<int>(LTOL.contiguous(), LTOL.contiguous() + NTOL));
+			std::vector<int>(LTOL, LTOL + NTOL));
 		fmt::print("CORRESPONDING ERROR TOLERANCES: {}\n", TOL);
 
 		if (IGUESS >= 2) {
@@ -902,16 +905,16 @@ void COLDAE(systemParams const& params, options const& opts,
 	}
 
 	//  check for correctness of data
-	if (K < 0 || K > 7)                return;
-	if (N < 0)                         return;
-	if (IREAD < 0 || IREAD > 2)        return;
-	if (IGUESS < 0 || IGUESS > 4)      return;
-	if (ICARE < -1 || ICARE > 2)	   return;
-	if (INDEX < 0 || INDEX > 2)        return;
-	if (NTOL < 0 || NTOL > MSTAR)      return;
-	if (NFXPNT < 0)                    return;
-	if (IPRINT < (-1) || IPRINT > 1)   return;
-	if (MSTAR < 0 || MSTAR > 40)       return;
+	if (K < 0 || K > 7)                return output_t::inputError;
+	if (N < 0)                         return output_t::inputError;
+	if (IREAD < 0 || IREAD > 2)        return output_t::inputError;
+	if (IGUESS < 0 || IGUESS > 4)      return output_t::inputError;
+	if (ICARE < -1 || ICARE > 2)	   return output_t::inputError;
+	if (INDEX < 0 || INDEX > 2)        return output_t::inputError;
+	if (NTOL < 0 || NTOL > MSTAR)      return output_t::inputError;
+	if (NFXPNT < 0)                    return output_t::inputError;
+	if (IPRINT < (-1) || IPRINT > 1)   return output_t::inputError;
+	if (MSTAR < 0 || MSTAR > 40)       return output_t::inputError;
 
 	int IP = 1;
 	for (int i = 1; i <= MSTAR; ++i) {
@@ -920,14 +923,14 @@ void COLDAE(systemParams const& params, options const& opts,
 
 		while (true) {
 			if (IP > NFXPNT)
-				return;
-			if (params.bcpoints(i) - PRECIS < opts.fixpnt(IP))
+				return output_t::inputError;
+			if (params.bcpoints(i) - PRECIS < opts.fixpnt[IP])
 				break;
 			IP = IP + 1;
 		}
 
-		if (params.bcpoints(i) + PRECIS < opts.fixpnt(IP))
-			return;
+		if (params.bcpoints(i) + PRECIS < opts.fixpnt[IP])
+			return output_t::inputError;
 	}
 
 	//  set limits on iterations and initialize counters.
@@ -958,9 +961,9 @@ void COLDAE(systemParams const& params, options const& opts,
 	}
 	NMAX = std::min(NMAXF, NMAXI);
 	if (NMAX < N)
-		return;
+		return output_t::inputError;
 	if (NMAX < NFXPNT + 1)   
-		return;
+		return output_t::inputError;
 	if (NMAX < 2 * NFXPNT + 2 && IPRINT < 1) {
 		fmt::print("INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE\n");
 	}
@@ -1018,8 +1021,6 @@ void COLDAE(systemParams const& params, options const& opts,
 		}
 	}
 
-	//dumpState();
-
 	//  initialize collocation points, constants, mesh.
 	CONSTS();
 	int NYCB;
@@ -1031,7 +1032,7 @@ void COLDAE(systemParams const& params, options const& opts,
 	int meshmode = 3 + IREAD;
 	NEWMSH(meshmode, fspace+(LXI-1), fspace+(LXIOLD-1),
 		nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-		NFXPNT, opts.fixpnt.contiguous(), nullptr, dfsub, nullptr, nullptr, NYCB);
+		NFXPNT, opts.fixpnt.data(), nullptr, dfsub, nullptr, nullptr, NYCB);
 
 	//  determine first approximation, if the problem is nonlinear.
 	if (IGUESS < 2) {
@@ -1050,13 +1051,13 @@ void COLDAE(systemParams const& params, options const& opts,
 	if (IGUESS >= 2)  
 		IGUESS = 0;
 
-	
+	output_t iflag;
 	CONTRL(fspace+(LXI-1), fspace+(LXIOLD-1), fspace+(LZ-1), fspace+(LDMZ-1), fspace+(LDMV-1),
 		fspace+(LRHS-1), fspace+(LDELZ-1), fspace+(LDELDZ-1), fspace+(LDQZ-1),
 		fspace+(LDQDMZ-1), fspace+(LG-1), fspace+(LW-1), fspace+(LV-1), fspace+(LFC-1),
 		fspace+(LVALST-1), fspace+(LSLOPE-1), fspace+(LSCL-1), fspace+(LDSCL-1),
 		fspace+(LACCUM-1), ispace+(LPVTG-1), ispace+(LINTEG-1), ispace+(LPVTW-1),
-		NFXPNT, opts.fixpnt.contiguous(), iflag, fsub, dfsub, gsub, dgsub, guess);
+		NFXPNT, opts.fixpnt.data(), iflag, fsub, dfsub, gsub, dgsub, guess);
 
 	//  prepare output
 	ispace[1-1] = N;
@@ -1078,7 +1079,9 @@ void COLDAE(systemParams const& params, options const& opts,
 		fspace[IDMZ + i-1] = fspace[LDMZ - 1 + i-1];
 	int IC = IDMZ + NDMZ;
 	for (int i = 1; i <= K2; ++i)
-		fspace[IC + i-1] = COEF.contiguous()[i-1];
+		fspace[IC + i-1] = COEF[i-1];
+
+	return iflag;
 }
 
 // * ****************************************************************
@@ -1178,7 +1181,7 @@ void CONTRL(double* const XI, double* const XIOLD, double* const Z,
 	// compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
-		CHECK = std::max(TOLIN(i), CHECK);
+		CHECK = std::max(TOLIN[i-1], CHECK);
 	int IMESH = 1;
 	int ICONV = 0;
 	if (NONLIN == 0) ICONV = 1;
@@ -1347,9 +1350,9 @@ void CONTRL(double* const XI, double* const XIOLD, double* const Z,
 
 			// check convergence (iconv = 1).
 			for (int IT = 1; IT <= NTOL; ++IT) {
-				int INZ = LTOL(IT);
+				int INZ = LTOL[IT-1];
 				for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-					if (abs(DELZ[IZ-1]) > TOLIN(IT) * (abs(Z[IZ-1]) + 1.0))
+					if (abs(DELZ[IZ-1]) > TOLIN[IT-1] * (abs(Z[IZ-1]) + 1.0))
 						goto n60;
 				}
 			}
@@ -1602,9 +1605,9 @@ void CONTRL(double* const XI, double* const XIOLD, double* const Z,
 					//fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
 					// check convergence (iconv = 0).
 					for (int IT = 1; IT <= NTOL; ++IT) {
-						int INZ = LTOL(IT);
+						int INZ = LTOL[IT-1];
 						for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-							if (abs(DQZ[IZ-1]) > TOLIN(IT) * (abs(Z[IZ-1]) + 1.0))
+							if (abs(DQZ[IZ-1]) > TOLIN[IT-1] * (abs(Z[IZ-1]) + 1.0))
 								goto n170;
 						}
 					}
@@ -1767,7 +1770,7 @@ void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
 
 		for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
 			double SCAL = (abs(Z[IZ-1+(j-1)* MSTAR]) + abs(Z[IZ - 1 + (j) * MSTAR])) * .5 + 1.0;
-			int MJ = MT(ICOMP);
+			int MJ = MT[ICOMP-1];
 			for (int l = 1; l <= MJ; ++l) {
 				SCALE[IZ - 1 + (j - 1) * MSTAR] = BASM[l-1] / SCAL;
 				IZ = IZ + 1;
@@ -1786,6 +1789,7 @@ void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
 	}
 	for (int IZ = 1; IZ <= MSTAR; ++IZ)
 		SCALE[IZ - 1 + (N) * MSTAR] = SCALE[IZ - 1 + (N - 1) * MSTAR];
+
 }
 
 
@@ -1859,7 +1863,7 @@ void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
 //                     slope(i)=     max   (weight(l) *u      (xi(i)))
 //                               1.le.l.le.ntol         j
 //
-//                     where j=jtol(l)
+//                     where j=JTOL[l-1]
 //            slphmx - maximum of slope(i)*(xiold(i+1)-xiold(i)) for
 //                     i = 1 ,..., nold.
 //            accum  - accum(i) is the integral of  slope  from  aleft
@@ -1986,13 +1990,13 @@ n100:
 				APPROX(i, X, VALSTR+(KSTORE-1), nullptr,
 					ASAVE.sub(1, 1).contiguous(), nullptr, XIOLD,
 					NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-					MT.contiguous(), MSTAR, 4, nullptr, 0);
+					MT, MSTAR, 4, nullptr, 0);
 				X = X + 4.0 * HD6;
 				KSTORE = KSTORE + 3 * MSTAR;
 				APPROX(i, X, VALSTR+(KSTORE-1), nullptr,
 					ASAVE.sub(1, 4).contiguous(), nullptr, XIOLD,
 					NOLD, Z, DMZ, K, NCOMP, NY, MMAX, 
-					MT.contiguous(), MSTAR, 4, nullptr, 0);
+					MT, MSTAR, 4, nullptr, 0);
 				KSTORE += MSTAR;
 			}
 		}
@@ -2011,7 +2015,7 @@ n100:
 					APPROX(i, X, VALSTR+(KSTORE-1), nullptr, 
 						ASAVE.sub(1, j).contiguous(), nullptr,
 						XIOLD, NOLD, Z, DMZ,
-						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
+						K, NCOMP, NY, MMAX, MT, MSTAR, 4, nullptr, 0);
 					KSTORE = KSTORE + MSTAR;
 				}
 			}
@@ -2054,8 +2058,8 @@ n100:
 				for (int i = 1; i <= NOLD; ++i) {
 					double XI1 = XIOLD[i];
 					APPROX(i, XI1, ZVAL, YVAL, A,
-						COEF.contiguous(), XIOLD, NOLD, Z, DMZ,
-						K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 3, nullptr, 1);
+						COEF, XIOLD, NOLD, Z, DMZ,
+						K, NCOMP, NY, MMAX, MT, MSTAR, 3, nullptr, 1);
 					dfsub(XI1, ZVAL, YVAL, DF);
 
 					// if index=2, form projection matrices directly
@@ -2070,7 +2074,7 @@ n100:
 							for (int J1 = 1; J1 <= NY; ++J1) {
 								double FACT = 0.0;
 								for (int l = 1, ML = 0; l <= NCOMP; ++l) {
-									ML += MT(l);
+									ML += MT[l-1];
 									FACT += DF[j + NCOMP-1 + (ML-1)*NCY] * DF[l-1+ (MSTAR + J1-1) * NCY];
 								}
 								CB[j-1+(J1-1)*NYCB] = FACT;
@@ -2085,7 +2089,7 @@ n100:
 						// form columns of fc
 						int ML = 0;
 						for (int l = 1; l <= NCOMP; ++l) {
-							ML += MT(l);
+							ML += MT[l-1];
 							for (int J1 = 1; J1 <= NY; ++J1)
 								BCOL[J1-1] = DF[J1 + NCOMP-1+ (ML-1) * NCY];
 
@@ -2135,11 +2139,11 @@ n100:
 			SLOPE[0] = 0.0;
 			double ONEOVH = 2.0 / (XIOLD[2] - XIOLD[0]);
 			for (int j = 1; j <= NTOL; ++j) {
-				int JJ = JTOL(j);
-				int JZ = LTOL(j);
+				int JJ = JTOL[j-1];
+				int JZ = LTOL[j-1];
 				SLOPE[0] = std::max(SLOPE[0],
-					pow(abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z[JZ-1])),
-						ROOT(j)));
+					pow(abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + abs(Z[JZ-1])),
+						ROOT[j-1]));
 			}
 			double SLPHMX = SLOPE[0] * (XIOLD[1] - XIOLD[0]);
 			ACCUM[1] = SLPHMX;
@@ -2159,10 +2163,10 @@ n100:
 
 				// evaluate function to be equidistributed
 				for (int j = 1; j <= NTOL; ++j) {
-					int JJ = JTOL(j);
-					int JZ = LTOL(j) + (i - 1) * MSTAR;
-					auto temp = abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH(j) * ONEOVH / (1.0 + abs(Z[JZ-1]));
-					SLOPE[i-1] = std::max(SLOPE[i-1], pow(temp, ROOT(j)));
+					int JJ = JTOL[j-1];
+					int JZ = LTOL[j-1] + (i - 1) * MSTAR;
+					auto temp = abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + abs(Z[JZ-1]));
+					SLOPE[i-1] = std::max(SLOPE[i-1], pow(temp, ROOT[j-1]));
 				}
 
 				// accumulate approximate integral of function to be equidistributed
@@ -2303,8 +2307,8 @@ n100:
 //              is aiming for errors .1x as large as the user
 //              requested tolerances.
 //     jtol   - components of differential system to which tolerances
-//              refer (viz, if ltol(i) refers to a derivative of u(j),
-//              then jtol(i)=j)
+//              refer (viz, if LTOL[i-1] refers to a derivative of u(j),
+//              then JTOL[i-1]=j)
 //     root   - reciprocals of expected rates of convergence of compo-
 //              nents of z(j) for which tolerances are specified
 //     rho    - the k collocation points on (0,1)
@@ -2315,10 +2319,8 @@ n100:
 //**********************************************************************
 void CONSTS()
 {
-	RHO.assertDim(7);
-	COEF.reshape(K, K);
-	COEF.assertDim(K, K);
-
+	//COEF(K, K);
+	
 	double CNSTS1[28] = {0.25e0, 0.625e-1, 7.2169e-2, 1.8342e-2,
 	      1.9065e-2, 5.8190e-2, 5.4658e-3, 5.3370e-3, 1.8890e-2,
 	      2.7792e-2, 1.6095e-3, 1.4964e-3, 7.5938e-3, 5.7573e-3,
@@ -2336,96 +2338,96 @@ void CONSTS()
 	int KOFF = K * (K + 1) / 2;
 	int IZ = 1;
 	for (int j = 1; j <= NCOMP; ++j) {
-		int MJ = MT(j);
+		int MJ = MT[j-1];
 		for (int l = 1; l <= MJ; ++l) {
-			WGTERR(IZ) = CNSTS1[KOFF - MJ + l-1];
+			WGTERR[IZ-1] = CNSTS1[KOFF - MJ + l-1];
 			IZ = IZ + 1;
 		}
 	}
 
 	// assign array values for mesh selection: wgtmsh, jtol, and root
 	int JCOMP = 1;
-	int MTOT = MT(1);
+	int MTOT = MT[1-1];
 	for (int i = 1; i <= NTOL; ++i) {
-		int LTOLI = LTOL(i);
+		int LTOLI = LTOL[i-1];
 		while (true) {
 			if (LTOLI <= MTOT)
 				break;
 			JCOMP = JCOMP + 1;
-			MTOT = MTOT + MT(JCOMP);
+			MTOT = MTOT + MT[JCOMP-1];
 		}
-		JTOL(i) = JCOMP;
-		WGTMSH(i) = 10 * CNSTS2[KOFF + LTOLI - MTOT-1] / TOLIN(i);
-		ROOT(i) = 1.0 / double(K + MTOT - LTOLI + 1);
+		JTOL[i-1] = JCOMP;
+		WGTMSH[i-1] = 10 * CNSTS2[KOFF + LTOLI - MTOT-1] / TOLIN[i-1];
+		ROOT[i-1] = 1.0 / double(K + MTOT - LTOLI + 1);
 	}
 
 	// specify collocation points
 	switch (K) {
-	case 1: RHO(1) = 0.0;
+	case 1: RHO[1-1] = 0.0;
 		break;
 
 	case 2:
-		RHO(2) = .577350269189625764510;
-		RHO(1) = -RHO(2);
+		RHO[2-1] = .577350269189625764510;
+		RHO[1-1] = -RHO[2-1];
 		break;
 
 	case 3:
-		RHO(3) = .774596669241483377040;
-		RHO(2) = .00;
-		RHO(1) = -RHO(3);
+		RHO[3-1] = .774596669241483377040;
+		RHO[2-1] = .00;
+		RHO[1-1] = -RHO[3-1];
 		break;
 
 	case 4:
-		RHO(4) = .861136311594052575230;
-		RHO(3) = .339981043584856264800;
-		RHO(2) = -RHO(3);
-		RHO(1) = -RHO(4);
+		RHO[4-1] = .861136311594052575230;
+		RHO[3-1] = .339981043584856264800;
+		RHO[2-1] = -RHO[3-1];
+		RHO[1-1] = -RHO[4-1];
 		break;
 
 	case 5:
-		RHO(5) = .906179845938663992800;
-		RHO(4) = .538469310105683091040;
-		RHO(3) = .00;
-		RHO(2) = -RHO(4);
-		RHO(1) = -RHO(5);
+		RHO[5-1] = .906179845938663992800;
+		RHO[4-1] = .538469310105683091040;
+		RHO[3-1] = .00;
+		RHO[2-1] = -RHO[4-1];
+		RHO[1-1] = -RHO[5-1];
 		break;
 
 	case 6:
-		RHO(6) = .932469514203152027810;
-		RHO(5) = .661209386466264513660;
-		RHO(4) = .238619186083196908630;
-		RHO(3) = -RHO(4);
-		RHO(2) = -RHO(5);
-		RHO(1) = -RHO(6);
+		RHO[6-1] = .932469514203152027810;
+		RHO[5-1] = .661209386466264513660;
+		RHO[4-1] = .238619186083196908630;
+		RHO[3-1] = -RHO[4-1];
+		RHO[2-1] = -RHO[5-1];
+		RHO[1-1] = -RHO[6-1];
 		break;
 
 	case 7:
-		RHO(7) = .9491079912342758524520;
-		RHO(6) = .741531185599394439860;
-		RHO(5) = .405845151377397166900;
-		RHO(4) = 0.0;
-		RHO(3) = -RHO(5);
-		RHO(2) = -RHO(6);
-		RHO(1) = -RHO(7);
+		RHO[7-1] = .9491079912342758524520;
+		RHO[6-1] = .741531185599394439860;
+		RHO[5-1] = .405845151377397166900;
+		RHO[4-1] = 0.0;
+		RHO[3-1] = -RHO[5-1];
+		RHO[2-1] = -RHO[6-1];
+		RHO[1-1] = -RHO[7-1];
 		break;
 	}
 
 	// map (-1,1) to (0,1) by  t = .5 * (1. + x)
 	for (int j = 1; j<=K; ++j)
-		RHO(j) = .50 * (1.0 + RHO(j));
+		RHO[j-1] = .50 * (1.0 + RHO[j-1]);
 
 
 	// now find runge-kutta coeffitients b, acol and asave
 	// the values of asave are to be used in  newmsh  and errchk .
 	for (int j = 1; j <= K; ++j) {
 		for (int i = 1; i <= K; ++i)
-			COEF(i, j) = 0.0;
-		COEF(j, j) = 1.0;
-		VMONDE(COEF.sub(1, j).contiguous(), K);
+			COEF[i-1+(j-1)*K] = 0.0;
+		COEF[j - 1 + (j - 1) * K] = 1.0;
+		VMONDE(COEF+(j - 1) * K, K);
 	}
 	RKBAS(1.0, K, MMAX, B.contiguous(), nullptr, 0);
 	for (int i = 1; i <= K; ++i)
-		RKBAS(RHO(i), K, MMAX, ACOL.sub(1, i).contiguous(), nullptr, 0);
+		RKBAS(RHO[i-1], K, MMAX, ACOL.sub(1, i).contiguous(), nullptr, 0);
 
 	RKBAS(1.0 / 6.0, K, MMAX, ASAVE.sub(1, 1).contiguous(), nullptr, 0);
 	RKBAS(1.0 / 3.0, K, MMAX, ASAVE.sub(1, 2).contiguous(), nullptr, 0);
@@ -2487,9 +2489,9 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 		double X = XI[i-1] + (XI[i ] - XI[i-1]) * 2.0 / 3.0;
 		APPROX(i, X, VALSTR+(KNEW-1), nullptr, ASAVE.sub(1, 3).contiguous(),
 			nullptr, XI, N, Z, DMZ, K, NCOMP, NY, 
-			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
+			MMAX, MT, MSTAR, 4, nullptr, 0);
 		for (int l = 0; l < MSTAR; ++l) {
-			ERR[l] = WGTERR(l+1) * abs(VALSTR[KNEW-1] - VALSTR[KSTORE-1]);
+			ERR[l] = WGTERR[l+1-1] * abs(VALSTR[KNEW-1] - VALSTR[KSTORE-1]);
 			KNEW++;
 			KSTORE++;
 		}
@@ -2498,9 +2500,9 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 		X = XI[i-1] + (XI[i] - XI[i - 1]) / 3.0;
         APPROX(i, X, VALSTR+(KNEW-1), nullptr, ASAVE.sub(1, 2).contiguous(),
 			nullptr, XI, N, Z, DMZ, K, NCOMP, NY,
-			MMAX, MT.contiguous(), MSTAR, 4, nullptr, 0);
+			MMAX, MT, MSTAR, 4, nullptr, 0);
         for (int l = 0; l < MSTAR; ++l) {
-			ERR[l] += WGTERR(l+1) * abs(VALSTR[KNEW - 1] - VALSTR[KSTORE-1]);
+			ERR[l] += WGTERR[l+1-1] * abs(VALSTR[KNEW - 1] - VALSTR[KSTORE-1]);
 			KNEW++;
 			KSTORE++;
 		}
@@ -2514,9 +2516,9 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 		if (IFIN == 0)
 			continue;
 		for (int j = 1; j <= NTOL; ++j) {
-			int LTOLJ = LTOL(j);
+			int LTOLJ = LTOL[j-1];
 			int LTJZ = LTOLJ + (i - 1) * MSTAR;
-			if (ERR[LTOLJ-1] > TOLIN(j) * (abs(Z[LTJZ-1]) + 1.0))
+			if (ERR[LTOLJ-1] > TOLIN[j-1] * (abs(Z[LTJZ-1]) + 1.0))
 				IFIN = 0;
 		}
 	}
@@ -2526,7 +2528,7 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 	fmt::print("THE ESTIMATED ERRORS ARE\n");
 	int LJ = 1;
 	for (int j = 1; j <= NCOMP; ++j) {
-		int MJ = LJ - 1 + MT(j);
+		int MJ = LJ - 1 + MT[j-1];
 		fmt::print("{}:  ", j);
 		for (int l = LJ; l <= MJ; ++l)
 			fmt::print("{}, ", ERREST[l-1]);
@@ -2671,7 +2673,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 					while (true) {
 						if (LSIDE == MSTAR)
 							break;
-						if (TZETA(LSIDE + 1) >= XI[i] + PRECIS)
+						if (TZETA[LSIDE] >= XI[i] + PRECIS)
 							break;
 						LSIDE++;
 					}
@@ -2698,7 +2700,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 			while (true) {
 				if (IZETA > MSTAR)
 					break;
-				if (TZETA(IZETA) > XII + PRECIS)
+				if (TZETA[IZETA-1] > XII + PRECIS)
 					break;
 
 				// build equation for a side condition.
@@ -2711,15 +2713,15 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 						// other nonlinear case
 						if (MODE == 1) {
 							APPROX(IOLD, XII, ZVAL, nullptr, AT,
-								COEF.contiguous(), XIOLD, NOLD, Z,
-								DMZ, K, NCOMP, NY, MMAX, MT.contiguous(),
+								COEF, XIOLD, NOLD, Z,
+								DMZ, K, NCOMP, NY, MMAX, MT,
 								MSTAR, 2, nullptr, 0);
 						}
 						else {
 							auto temp = i + 1;
 							APPROX(temp, XII, ZVAL, nullptr, AT,
 								nullptr, XI, N, Z, DMZ,
-								K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
+								K, NCOMP, NY, MMAX, MT, MSTAR, 1, nullptr, 0);
 							i = temp - 1;
 							if (MODE == 3)
 								goto n120;
@@ -2741,7 +2743,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 
 			// assemble collocation equations
 			for (int j = 1; j <= K; ++j) {
-				double HRHO = H * RHO(j);
+				double HRHO = H * RHO[j-1];
 				double XCOL = XII + HRHO;
 
 				// this value corresponds to a collocation (interior)
@@ -2760,9 +2762,9 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 				if (MODE == 1) {
 					// find  rhs  values
 					APPROX(IOLD, XCOL, ZVAL, YVAL, AT,
-						COEF.contiguous(), XIOLD,
+						COEF, XIOLD,
 						NOLD, Z, DMZ, K, NCOMP, NY, MMAX,
-						MT.contiguous(), MSTAR, 2,
+						MT, MSTAR, 2,
 						DMZO + (IRHS - 1), 2);
 
 				n170:
@@ -2781,8 +2783,8 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 					// evaluate former collocation solution
 					{auto temp = i + 1;
 					APPROX(temp, XCOL, ZVAL, nullptr, ACOL.sub(1, j).contiguous(),
-						COEF.contiguous(), XI, N, Z,
-						DMZ, K, NCOMP, NY, MMAX, MT.contiguous(), MSTAR,
+						COEF, XI, N, Z,
+						DMZ, K, NCOMP, NY, MMAX, MT, MSTAR,
 						4, nullptr, 0);
 					i = temp - 1;
 					}
@@ -2827,33 +2829,33 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 					else {
 						if (MODE == 1) {
 							APPROX(IOLD, XI1, ZVAL, YVAL, AT,
-								COEF.contiguous(), // here IOLD gets changed! simon
+								COEF, // here IOLD gets changed! simon
 								XIOLD, NOLD, Z, DMZ,
 								K, NCOMP, NY, MMAX,
-								MT.contiguous(), MSTAR, 2, nullptr, 1);
+								MT, MSTAR, 2, nullptr, 1);
 							if (i + 1 == N) {
 								auto temp = NOLD + 1;
 								APPROX(temp, XI1, ZVAL, YVAL,
-									AT, COEF.contiguous(),
+									AT, COEF,
 									XIOLD, NOLD, Z,
 									DMZ, K, NCOMP, NY, MMAX,
-									MT.contiguous(), MSTAR, 1, nullptr, 0);
+									MT, MSTAR, 1, nullptr, 0);
 								NOLD = temp - 1; // TODO propably useless
 							}
 						}
 						else {
 							auto temp = i + 1;
 							APPROX(temp, XI1, ZVAL, YVAL, AT,
-								COEF.contiguous(),
+								COEF,
 								XI, N, Z, DMZ, K, NCOMP, NY, MMAX,
-								MT.contiguous(), MSTAR, 3, nullptr, 1);
+								MT, MSTAR, 3, nullptr, 1);
 							i = temp - 1;
 
 							temp = i + 1 + 1;
 							APPROX(temp, XI1, ZVAL, YVAL, AT,
-								COEF.contiguous(), XI, N, Z,
+								COEF, XI, N, Z,
 								DMZ, K, NCOMP, NY, MMAX,
-								MT.contiguous(), MSTAR, 1, nullptr, 0);
+								MT, MSTAR, 1, nullptr, 0);
 
 						}
 					}
@@ -2888,16 +2890,16 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 							if (MODE == 1) {
 								auto temp = NOLD + 1;
 								APPROX(temp, TRIGHT, ZVAL, nullptr, AT,
-									COEF.contiguous(), XIOLD, NOLD, Z,
+									COEF, XIOLD, NOLD, Z,
 									DMZ, K,
-									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
+									NCOMP, NY, MMAX, MT, MSTAR, 1, nullptr, 0);
 							}
 							else {
 								auto temp = N + 1;
 								APPROX(temp, TRIGHT, ZVAL, nullptr, AT,
-									COEF.contiguous(), XI, N, Z,
+									COEF, XI, N, Z,
 									DMZ, K,
-									NCOMP, NY, MMAX, MT.contiguous(), MSTAR, 1, nullptr, 0);
+									NCOMP, NY, MMAX, MT, MSTAR, 1, nullptr, 0);
 								if (MODE == 3)
 									goto n260;
 							}
@@ -3206,7 +3208,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ,
 	}
 	int JN = 1;
 	for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
-		int MJ = MT(JCOMP);
+		int MJ = MT[JCOMP-1];
 		JN = JN + MJ;
 		for (int l = 1; l <= MJ; ++l) {
 			int JV = JN - l - 1;
@@ -3286,7 +3288,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 	//  compute the maximum tolerance
 	double CHECK = 0.0;
 	for (int i = 1; i <= NTOL; ++i)
-		CHECK = std::max(TOLIN(i), CHECK);
+		CHECK = std::max(TOLIN[i-1], CHECK);
 
 	//  construct d and find its svd
 	for (int i = 0; i < NY; ++i)
@@ -3319,7 +3321,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 				double FACT = 0;
 				int ML = 0;
 				for (int l = 0; l < NCOMP; ++l) {
-					ML += MT(l + 1);
+					ML += MT[l + 1-1];
 					FACT += DF[i + NCOMP + (ML - 1) * NCY] * DF[l + (MSTAR + j) * NCY];
 				}
 				D[i + j * NY] = FACT;
@@ -3383,7 +3385,7 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 			for (int i = 0; i < NCOMP; ++i){
 				int MJ = 0;
 				for (int j = 0; j < NCOMP; ++j) {
-					MJ += MT(j+1);
+					MJ += MT[j+1-1];
 					double FACT = 0;
 					for (int l = 0; l < NY; ++l)
 						FACT += FC[i + (l + MSTAR) * NCOMP] * DF[l + NCOMP + (MJ-1) * NCY];
@@ -3474,7 +3476,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 			//  compute the block gi
 			int IR = IROW;
 			for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-				int MJ = MT(ICOMP);
+				int MJ = MT[ICOMP-1];
 				IR = IR + MJ;
 				for (int l = 0; l < MJ; ++l) {
 					int ID = IR - l-1;
@@ -3516,7 +3518,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 						FACT = 0;
 						int ML = -1;
 						for (int l = 0; l < NCOMP; ++l) {
-							ML += MT(l+1);
+							ML += MT[l+1-1];
 							FACT += DF[i + NCOMP + ML*NCY] * DF[l + (MSTAR + j) * NCY];
 						}
 						CB[i + j * NYCB] = FACT;
@@ -3563,7 +3565,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 				}
 				int ML = -1;
 				for (int i = 0; i < NCOMP; ++i) {
-					ML += MT(i+1);
+					ML += MT[i+1-1];
 					GI[IROW - 1 + ML + j * NCY] -= BCOL[i];
 				}
 			}
@@ -3598,7 +3600,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 	
 		int IR = IROW;
 		for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
-			int MJ = MT(JCOMP);
+			int MJ = MT[JCOMP-1];
 			IR = IR + MJ;
 			for (int l = 1; l <= MJ; ++l) {
 				int	IND = JCOMP;
@@ -3624,7 +3626,7 @@ void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
 		}
 		int ML = 0;
 		for (int i = 1; i <= NCOMP; ++i) {
-			ML += MT(i);
+			ML += MT[i-1];
 			RHSZ[IROW - 1 + ML-1] -= BCOL[i-1] + F[i-1];
 		}	
 
@@ -3671,18 +3673,18 @@ void RKBAS(double const S, int const k, int const M, double* const RKB,
 		for (int l = 0; l < M; ++l) {
 			int LB = k + l + 2;
 			for (int i = 0; i < k; ++i) {
-				double P = COEF(1, i+1);
+				double P = COEF[0+ i*K];
 				for (int j = 2; j <= k; ++j)
-					P = P * T[LB - j - 1] + COEF(j, i+1);
+					P = P * T[LB - j - 1] + COEF[j-1 + i * K];
 				RKB[i + l*7] = P;
 			}
 		}
 		if (MODE == 0)
 			return;
 		for (int i = 0; i < k; ++i) {
-			double P = COEF(1, i+1);
+			double P = COEF[0 + i * K];
 			for (int j = 2; j <= k; ++j)
-				P = P * T[k - j] + COEF(j, i + 1);
+				P = P * T[k - j] + COEF[j-1 + i * K];
 			DM[i] = P;
 		}
 		return;
@@ -3868,7 +3870,6 @@ purpose
 * **********************************************************************/
 void VMONDE(double* const coef, int const k)
 {
-	RHO.assertDim(k);
 	//coef(k);
 	
 	AutoTimer at(g_timer, _FUNC_);
@@ -3879,7 +3880,7 @@ void VMONDE(double* const coef, int const k)
 	for (int i = 1; i <= KM1; ++i) {
 		int KMI = k - i;
 		for (int j = 1; j <= KMI; ++j) {
-			coef[j-1] = (coef[j] - coef[j-1]) / (RHO(j + i) - RHO(j));
+			coef[j-1] = (coef[j] - coef[j-1]) / (RHO[j + i-1] - RHO[j-1]);
 		}
 	}
 
@@ -3887,7 +3888,7 @@ void VMONDE(double* const coef, int const k)
 	for (int i = 1; i <= KM1; ++i) {
 		int KMI = k + 1 - i;
 		for (int j = 2; j <= KMI; ++j)
-			coef[j-1] -= RHO(j + i - 1) * coef[j - 2];
+			coef[j-1] -= RHO[j + i - 2] * coef[j - 2];
 		coef[KMI-1] *= double(IFAC);
 		IFAC *= i;
 	}
@@ -3926,7 +3927,7 @@ void HORDER(int const i, double* const UHIGH, double const HI, double const * co
 	int KIN = 1;
 	int IDMZ = (i - 1) * K * NCY;
 	for (int j = 1; j <= K;++j) {
-		double FACT = DN * COEF.contiguous()[KIN-1];
+		double FACT = DN * COEF[KIN-1];
 		for (int ID = 0; ID < NCOMP;++ID) {
 			UHIGH[ID] += FACT * DMZ[IDMZ];
 			IDMZ++;

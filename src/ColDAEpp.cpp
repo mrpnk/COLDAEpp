@@ -152,9 +152,8 @@ int main()
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		
-		opts.numTolerances = 1; // TODO set=2, compare with fortran
-		opts.ltol = { 1, 2 };
-		opts.tol = { 0.0001, 0.0001 };
+		opts.ltol = { 1 };
+		opts.tol = { 0.0001 };
 
 		opts.numFixedPoints = 0;
 	}
@@ -168,7 +167,7 @@ int main()
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	
-		solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(), iflag,
+		iflag = solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(),
 			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub,
 			decltype(sys)::dgsub, nullptr);
 	}
