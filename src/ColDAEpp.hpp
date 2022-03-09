@@ -375,8 +375,6 @@
 //     or when solving large scale sparse jacobian problems.
 //----------------------------------------------------------------------
 
-
-
 //------------------------------------------------------------------------------------------------------
 
 
@@ -655,6 +653,16 @@ struct options {
 };
 
 
+using dvec = double* const __restrict;
+using ivec = int* const __restrict;
+using dmat = double* const __restrict;
+using imat = int* const __restrict;
+
+using cdvec = double const * const __restrict;
+using civec = int const * const __restrict;
+using cdmat = double const * const __restrict;
+using cimat = int const * const __restrict;
+
 class cda{
 
 	// COLOUT 
@@ -769,8 +777,8 @@ class cda{
 
 public:
 output_t COLDAE(systemParams const& params, options const& opts,
-	int* const ispace, double* const fspace,
-	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+		ivec ispace, dvec fspace,
+		fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	//ispace(opts.idim);
 	//fspace(opts.fdim);
@@ -1095,7 +1103,8 @@ output_t COLDAE(systemParams const& params, options const& opts,
 //           from the work arrays  ispaceand fspace .
 //
 //*****************************************************************
-void APPSLN(double& X, double* const Z, double* const Y, double const* const FSPACE, int const* const ISPACE) {
+void APPSLN(double& X, dvec Z, dvec Y, cdvec FSPACE, civec ISPACE)
+{
 	double A[28];
 
 	int IS6 = ISPACE[6];
@@ -1159,15 +1168,10 @@ private:
 //                 previous mesh
 //
 //**********************************************************************
-void CONTRL(double* const XI, double* const XIOLD, double* const Z,
-	double* const DMZ, double* const DMV, double* const RHS,
-	double* const DELZ, double* const DELDMZ, double* const DQZ,
-	double* const DQDMZ, double* const G, double* const W, 
-	double* const V, double* const FC, double* const VALSTR, 
-	double* const SLOPE, double* const SCALE, double* const DSCALE,
-	double* const ACCUM, int* const IPVTG, int* const INTEGS, 
-	int* const IPVTW, const int NFXPNT, double const* const FIXPNT,
-	output_t& iflag, fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+void CONTRL(dvec XI, dvec XIOLD, dvec Z, dvec DMZ, dvec DMV, dvec RHS, dvec DELZ, dvec DELDMZ,
+	dvec DQZ, dvec DQDMZ, dvec G, dvec W, dvec V, dvec FC, dvec VALSTR, dvec SLOPE, dvec SCALE, dvec DSCALE,
+	dvec ACCUM, ivec IPVTG, ivec INTEGS, ivec IPVTW, const int NFXPNT, cdvec FIXPNT, output_t& iflag,
+	fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 {
 	double DF[800];
 	dad2 FCSP(NCOMP, 60), CBSP(20, 20);
@@ -1752,7 +1756,7 @@ void CONTRL(double* const XI, double* const XIOLD, double* const Z,
 //            dscale = scaling vector for dmz
 //
 //**********************************************************************
-void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
+void SKALE(dmat Z, dmat DMZ, dvec XI, dmat SCALE, dmat DSCALE)
 {
 	//Z(MSTAR, 1);
 	//SCALE(MSTAR, 1); 
@@ -1872,12 +1876,12 @@ void SKALE(double* Z, double* DMZ, double* XI, double* SCALE, double* DSCALE)
 //                     error estimate.
 //            fc     - you know
 //**********************************************************************
-void NEWMSH(int& MODE, double* const XI, double const* const XIOLD, 
-	double const* const Z, double const* const DMZ, double* const DMV,
-	double* const VALSTR, double* const SLOPE, double* const ACCUM, 
-	const int NFXPNT, double const* const FIXPNT,
-	double* const DF, dfsub_t dfsub, double* const FC,
-	double* const CB, const int NYCB)
+void NEWMSH(int& MODE, dvec XI, cdvec XIOLD, 
+	cdvec Z, cdvec DMZ, dvec DMV,
+	dvec VALSTR, dvec SLOPE, dvec ACCUM, 
+	const int NFXPNT, cdvec FIXPNT,
+	dmat DF, dfsub_t dfsub, dmat FC,
+	dmat CB, const int NYCB)
 {
 	//XIOLD(NOLD + 1);
 	//FC(NCOMP, 60);
@@ -2461,8 +2465,7 @@ void CONSTS()
 //                 the array valstr. (0 for no, 1 for yes)
 //
 //**********************************************************************
-void ERRCHK(double const * const XI, double const * const Z, double const * const DMZ,
-            double* const VALSTR, int& IFIN)
+void ERRCHK(cdvec XI, cdvec Z, cdvec DMZ, dvec VALSTR, int& IFIN)
 {
 	MSHFLG = 1;
 
@@ -2607,15 +2610,10 @@ void ERRCHK(double const * const XI, double const * const Z, double const * cons
 //
 //
 //*********************************************************************
-void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
-	double* const Z,
-	double* const DMZ, double* const DELZ, double* const DELDMZ,
-	double* const G, double* const W, double* const V,
-	double* const FC, double* const RHS, double* const DMZO,
-	int* const INTEGS, int* const IPVTG, int* const IPVTW,
-	double& RNORM,
-	const int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub,
-	dgsub_t dgsub, guess_t guess, int& ISING)
+void LSYSLV(int& MSING, cdvec XI, cdvec XIOLD, dvec Z, dvec DMZ, dvec DELZ, dvec DELDMZ,
+	dvec G, dvec W, dvec V, dvec FC, dvec RHS, dvec DMZO,
+	imat INTEGS, ivec IPVTG, ivec IPVTW, double& RNORM,
+	const int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess, int& ISING)
 {
 	//INTEGS(3, 1);
 
@@ -3070,8 +3068,7 @@ void LSYSLV(int& MSING, double const* const XI, double const* const XIOLD,
 //      dg     - the derivatives of the side condition.
 //
 //**********************************************************************
-void GDERIV(double* const GI, const int NROW, const int IROW,
-	double const* ZVAL, double* DGZ, const int MODE, dgsub_t dgsub)
+void GDERIV(dmat GI, const int NROW, const int IROW, dvec ZVAL, dvec DGZ, const int MODE, dgsub_t dgsub)
 {
 	//GI(NROW, 1);
 
@@ -3137,11 +3134,8 @@ void GDERIV(double* const GI, const int NROW, const int IROW,
 //      jcomp  - counter for the component being dealt with.
 //
 //**********************************************************************
-void VWBLOK(const double XCOL, const double HRHO, const int JJ, 
-	double* const WI, double* const VI, int* const IPVTW,
-	double const * const ZVAL, double const* const YVAL, 
-	double* const DF, double const* const acol, double* const DMZO,
-	dfsub_t dfsub, int& MSING)
+void VWBLOK(const double XCOL, const double HRHO, const int JJ, dmat WI, dmat VI, ivec IPVTW,
+	cdvec ZVAL, cdvec YVAL, dmat DF, cdmat acol, dvec DMZO, dfsub_t dfsub, int& MSING)
 {
 	//WI(KDY, 1);
 	//VI(KDY, 1);
@@ -3272,9 +3266,7 @@ void VWBLOK(const double XCOL, const double HRHO, const int JJ,
 //                 (then fc consists of only ncomp columns)
 //
 //**********************************************************************
-void PRJSVD(double* const FC, double const* const DF, double* const D, 
-	double* const U, double* const V,
-	int* const IPVTCB, int& ISING, const int MODE)
+void PRJSVD(dmat FC, cdmat DF, dmat D, dmat U, dmat V, ivec IPVTCB, int& ISING, const int MODE)
 {
 	//FC(NCOMP, 1);
 	//DF(NCY, 1);
@@ -3429,14 +3421,14 @@ void PRJSVD(double* const FC, double const* const DF, double* const D,
 //
 //**********************************************************************
 // double const * WI (dgesl)
-void GBLOCK(const double H, double* const GI, const int NROW, const int IROW,
-	double* const  WI, double const* const VI,
-	double* const RHSZ, double* const RHSDMZ,
-	int* const IPVTW, const int MODE,
-	const int MODL, const double XI1, double const* const ZVAL,
-	double const* const YVAL, double* const F,
-	double* const DF, double* const CB, int* const IPVTCB,
-	double* const FC, dfsub_t dfsub, int& ISING, const int NYCB)
+void GBLOCK(const double H, dmat GI, const int NROW, const int IROW,
+	dvec  WI, cdmat VI,
+	dvec RHSZ, dvec RHSDMZ,
+	ivec IPVTW, const int MODE,
+	const int MODL, const double XI1, cdvec ZVAL,
+	cdvec YVAL, dvec F,
+	dmat DF, dmat CB, ivec IPVTCB,
+	dmat FC, dfsub_t dfsub, int& ISING, const int NYCB)
 {	
 	AutoTimer at(g_timer, _FUNC_);
 
@@ -3658,8 +3650,7 @@ variables
 			these are evaluated if mode > 0.
 
 * **********************************************************************/
-void RKBAS(double const S, int const k, int const M, double* const RKB,
-	double* const DM, int const MODE)
+void RKBAS(const double S, const int k, const int M, dmat RKB, dvec DM, const int MODE)
 {
 	//COEF(k, k);
 	//RKB(7, 1);
@@ -3735,11 +3726,9 @@ void RKBAS(double const S, int const k, int const M, double* const RKB,
 //   dmval  - the mth derivatives of u(x)
 //
 //**********************************************************************
-void APPROX(int& i, double& X, double* const ZVAL, double* const YVAL,
-	double* const A, double const* const coef, double const* const XI,
-	const int n, double const* const Z, double const * const DMZ, const int k, const int ncomp,
-	const int ny, const int mmax, int const * const M,
-	const int mstar, const int MODE, double* const DMVAL, const int MODM)
+void APPROX(int& i, double& X, dvec ZVAL, dvec YVAL, dmat A, cdvec coef, cdvec XI,
+		const int n, cdvec Z, cdvec DMZ, const int k, const int ncomp, const int ny, const int mmax, civec M,
+		const int mstar, const int MODE, dvec DMVAL, const int MODM) 
 { // TODO check the use of coef inside this function
 	//A(7, 1);
 
@@ -3868,7 +3857,7 @@ purpose
 		with  v(i, j) = rho(j) * *(i - 1) / (i - 1)!.
 
 * **********************************************************************/
-void VMONDE(double* const coef, int const k)
+void VMONDE(dvec coef, int const k)
 {
 	//coef(k);
 	
@@ -3914,7 +3903,7 @@ variables
 						j
 
 * **********************************************************************/
-void HORDER(int const i, double* const UHIGH, double const HI, double const * const DMZ)
+void HORDER(int const i, dvec UHIGH, double const HI, cdvec DMZ)
 {
 	AutoTimer at(g_timer, _FUNC_);
 	
@@ -3945,7 +3934,7 @@ purpose
 		dmz(i) = dmz(i) + v(i) * z(i), i = 1, ..., n
 
 * **********************************************************************/
-void DMZSOL(double* V, double* Z, double* DMZ)
+void DMZSOL(dmat V, dvec Z, dmat DMZ)
 {
 	//V(KDY, 1);
 	//DMZ(KDY, 1);
@@ -4006,8 +3995,7 @@ void DMZSOL(double* V, double* Z, double* DMZ)
 // = n if the pivot element in the nth gauss step is zero.
 //
 //**********************************************************************
-void FCBLOK(double* const BLOKS, int const * const INTEGS, 
-	int const NBLOKS, int* const IPIVOT, double* const SCRTCH, int& INFO)
+void FCBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, ivec IPIVOT, dvec SCRTCH, int& INFO)
 {
 	AutoTimer at(g_timer, _FUNC_);
 	//INTEGS.assertDim(3, NBLOKS);
@@ -4075,8 +4063,7 @@ void FCBLOK(double* const BLOKS, int const * const INTEGS,
 //
 // * *********************************************************************
 //
-void FACTRB(double* const W, int* const IPIVOT, double* const D,
-            const int NROW, const int NCOL, const int LAST, int& INFO)
+void FACTRB(dmat W, ivec IPIVOT, dvec D, const int NROW, const int NCOL, const int LAST, int& INFO)
 {
 	//IPIVOT(NROW);
 	//W(NROW, NCOL);
@@ -4209,8 +4196,7 @@ void FACTRB(double* const W, int* const IPIVOT, double* const D,
 //
 // * ********************************************************************
 //
-void SHIFTB(double* const AI, const int NROWI, const int NCOLI, const int LAST,
-            double* const AI1, const int NROWI1, const int NCOLI1)
+void SHIFTB(dmat AI, const int NROWI, const int NCOLI, const int LAST, dmat AI1, const int NROWI1, const int NCOLI1)
 {
 	//AI(NROWI, NCOLI);
 	//AI1(NROWI1, NCOLI1)
@@ -4256,8 +4242,7 @@ void SHIFTB(double* const AI, const int NROWI, const int NCOLI, const int LAST,
 //
 //*********************************************************************
 //
-void SBBLOK(double* const BLOKS, int const * const INTEGS, 
-	int const NBLOKS, int const * const IPIVOT, double* const X)
+void SBBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, civec IPIVOT, dvec X)
 {
 	// double BLOKS[?]
 	// int INTEGS[3][NBLOKS]
@@ -4313,8 +4298,7 @@ void SBBLOK(double* const BLOKS, int const * const INTEGS,
 //
 //*********************************************************************
 //
-void SUBFOR(double const * const W, int const * const IPIVOT, int const NROW,
-	int const LAST, double* const X)
+void SUBFOR(cdmat W, civec IPIVOT, const int NROW, const int LAST, dvec X)
 {
 	// double W[NROW, LAST]
 	// double X[NROW]
@@ -4361,11 +4345,11 @@ void SUBFOR(double const * const W, int const * const IPIVOT, int const NROW,
 //*********************************************************************
 //
 
-void SUBBAK(double* const W, int const NROW, int const NCOL, int const LAST, double* const X)
+void SUBBAK(cdmat W, const int NROW, const int NCOL, const int LAST, dvec X)
 {
 	// W(NROW, NCOL), X(NCOL)
 	AutoTimer at(g_timer, _FUNC_);
-	
+
 	int LP1 = LAST + 1;
 	if (LP1 <= NCOL) {
 		for (int j = LP1; j <= NCOL; ++j) {
@@ -4387,7 +4371,7 @@ void SUBBAK(double* const W, int const NROW, int const NCOL, int const LAST, dou
 			if (T == 0.0)
 				continue;
 			for (int i = 1; i <= KM1; ++i)
-				X[i-1] += W[(i - 1) + (k - 1) * NROW] * T;
+				X[i - 1] += W[(i - 1) + (k - 1) * NROW] * T;
 		}
 	}
 	X[0] /= W[0];
