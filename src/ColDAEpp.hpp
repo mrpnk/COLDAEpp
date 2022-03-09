@@ -3,13 +3,13 @@
 #pragma once
 
 #include "linpack/linpack_d.hpp"
+#include "timer.h"
 
 #define FMT_HEADER_ONLY 
 #include "../fmt/include/fmt/format.h"
 #include "../fmt/include/fmt/ranges.h"
 #include "../fmt/include/fmt/color.h"
 
-#include <iostream>
 
 //------------------------------------------------------------------------------------------------------
 
