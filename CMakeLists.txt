@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt: CMake-Projekt für "ColDAEpp".
 cmake_minimum_required (VERSION 3.8)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
 
 project ("ColDAEpp")

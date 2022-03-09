@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-misplaced-const"
+#pragma once
 
 #include "linpack/linpack_d.hpp"
 
@@ -109,22 +111,31 @@ struct options {
 
 /* Short notation for pointers. 
    Matrices are stores one-dimensional, column-wise. */
-using dvec = double* const __restrict;
-using ivec = int* const __restrict;
-using dmat = double* const __restrict;
-using imat = int* const __restrict;
+//using dvec = double* const __restrict;
+//using ivec = int* const __restrict;
+//using dmat = double* const __restrict;
+//using imat = int* const __restrict;
+//
+//using cdvec = double const * const __restrict;
+//using civec = int const * const __restrict;
+//using cdmat = double const * const __restrict;
+//using cimat = int const * const __restrict;
 
-using cdvec = double const * const __restrict;
-using civec = int const * const __restrict;
-using cdmat = double const * const __restrict;
-using cimat = int const * const __restrict;
+using dvec = double* const ;
+using ivec = int* const ;
+using dmat = double* const ;
+using imat = int* const ;
 
+using cdvec = double const* const ;
+using civec = int const* const ;
+using cdmat = double const* const ;
+using cimat = int const* const ;
 
 /* Class that holds the solver state. */
 class cda{
 
 	// COLOUT 
-	double PRECIS; int IOUT, IPRINT;
+	double PRECIS; int IPRINT;
 	
 	// COLLOC 
 	double RHO[7];
@@ -135,7 +146,7 @@ class cda{
 	int NCOMP;
 	int NY;
 	int NCY;
-	int MSTAR, KD;
+	int MSTAR;
 	int KDY;
 	int MMAX;
 	int MT[20];
@@ -194,8 +205,8 @@ public:
 		//     the actual subroutine coldae serves as an interface with
 		//     the package of subroutines referred to collectively as
 		//     coldae. the subroutine serves to test some of the input
-		//     parameters, rename some of the parameters (to make under-
-		//     standing of the coding easier), to do some initialization,
+		//     parameters, rename some of the parameters (to make understanding
+		//     of the coding easier), to do some initialization,
 		//     and to break the work areas fspace and ispace up into the
 		//     arrays needed by the program.
 		//
@@ -205,16 +216,8 @@ public:
 		if (opts.printLevel != printMode::none) 
 			fmt::print("VERSION *1* OF COLDAE\n");
 
-		//  specify machine dependent output unit  iout  and compute machine
-		//  dependent constant  precis = 100 * machine unit roundoff
-		IOUT = 6;
-		PRECIS = 1.0;
-		double PRECP1;
-		do {
-			PRECIS = PRECIS / 2.0;
-			PRECP1 = PRECIS + 1.0;
-		} while (PRECP1 > 1.0);
-
+		//  specify machine dependent constant  precis = 100 * machine unit roundoff
+		PRECIS = std::numeric_limits<double>::epsilon();
 		PRECIS = PRECIS * 100.0;
 
 		//  in case incorrect input data is detected, the program returns
@@ -242,7 +245,7 @@ public:
 		if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
 		if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
 		ICARE = static_cast<int>(params.reg);
-		NTOL = opts.tol.size();
+		NTOL = static_cast<int>(opts.tol.size());
 		int NDIMF = opts.fdim;
 		int NDIMI = opts.idim;
 		int NFXPNT = opts.numFixedPoints;
@@ -264,9 +267,8 @@ public:
 			LTOL[i-1] = LTOL[i-1];
 			TOLIN[i-1] = TOL[i-1];
 		}
-		KD = K * NCOMP;
 		KDY = K * NCY;
-
+		
 		//  print the input data for checking.
 		if (IPRINT <= -1)
 		{
@@ -294,7 +296,8 @@ public:
 			fmt::print("NUMBER OF COLLOC PTS PER INTERVAL IS {}\n", K);	
 			fmt::print("COMPONENTS OF Z REQUIRING TOLERANCES: {}\n", 
 				std::vector<int>(LTOL, LTOL + NTOL));
-			fmt::print("CORRESPONDING ERROR TOLERANCES: {}\n", TOL);
+			fmt::print("CORRESPONDING ERROR TOLERANCES: {}\n",
+				std::vector<double>(TOL, TOL + NTOL));
 
 			if (IGUESS >= 2) {
 				fmt::print("INITIAL MESH(ES) AND Z, DMZ PROVIDED BY USER\n");
@@ -318,7 +321,7 @@ public:
 
 		int IP = 1;
 		for (int i = 1; i <= MSTAR; ++i) {
-			if (abs(params.bcpoints[i-1] - TLEFT) < PRECIS || abs(params.bcpoints[i - 1] - TRIGHT) < PRECIS)
+			if (std::abs(params.bcpoints[i-1] - TLEFT) < PRECIS || std::abs(params.bcpoints[i - 1] - TRIGHT) < PRECIS)
 				continue;
 
 			while (true) {
@@ -546,7 +549,7 @@ private:
 	//            = 1  no damped newton
 	//            = 2  used for continuation (see description of ipar(10)
 	//                 in coldae).
-	//     rnorm  - norm of rhs (right hand side) for current iteration
+	//     rnorm  - norm of rhs (right-hand side) for current iteration
 	//     rnold  - norm of rhs for previous iteration
 	//     anscl  - scaled norm of newton correction
 	//     anfix  - scaled norm of newton correction at next step
@@ -569,6 +572,9 @@ private:
 		std::vector<double> FCSP(NCOMP* 60); // TODO check of array is possible
 		double CBSP[20* 20];
 		double RNORM, RNOLD;
+
+		
+
 
 		// constants for control of nonlinear iteration
 		double RELMIN = 1.e-3;
@@ -594,7 +600,6 @@ private:
 		double RELAX;
 		double ANORM = 0.0;
 		double ANFIX = 0.0;
-
 
 		//  the main iteration begins here .
 		//  loop 20 is executed until error tolerances are satisfied or
@@ -749,7 +754,7 @@ private:
 				for (int IT = 1; IT <= NTOL; ++IT) {
 					int INZ = LTOL[IT-1];
 					for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-						if (abs(DELZ[IZ-1]) > TOLIN[IT-1] * (abs(Z[IZ-1]) + 1.0))
+						if (std::abs(DELZ[IZ-1]) > TOLIN[IT-1] * (std::abs(Z[IZ-1]) + 1.0))
 							goto n60;
 					}
 				}
@@ -972,7 +977,7 @@ private:
 						goto n170;
 					if (ARG > .25 * RELAX + .125 * RELAX * RELAX) {
 						double FACTOR = -1.0 + sqrt(1.0 + 8.0 * ARG);
-						if (abs(FACTOR - 1.0) < .10 * FACTOR)
+						if (std::abs(FACTOR - 1.0) < .10 * FACTOR)
 							goto n170;
 						if (FACTOR < 0.50)
 							FACTOR = 0.5;
@@ -1004,7 +1009,7 @@ private:
 						for (int IT = 1; IT <= NTOL; ++IT) {
 							int INZ = LTOL[IT-1];
 							for (int IZ = INZ; IZ <= NZ; IZ += MSTAR) {
-								if (abs(DQZ[IZ-1]) > TOLIN[IT-1] * (abs(Z[IZ-1]) + 1.0))
+								if (std::abs(DQZ[IZ-1]) > TOLIN[IT-1] * (std::abs(Z[IZ-1]) + 1.0))
 									goto n170;
 							}
 						}
@@ -1057,7 +1062,7 @@ private:
 						int IFIN = 1;
 						if (IMESH == 2)
 							ERRCHK(XI, Z, DMZ,VALSTR, IFIN);
-						if (IMESH == 1 || IFIN == 0 && ICARE != 2)
+						if (IMESH == 1 || (IFIN == 0 && ICARE != 2))
 							goto n460;
 						iflag = output_t::normal;
 						return;
@@ -1149,7 +1154,7 @@ private:
 	//            dscale = scaling vector for dmz
 	//
 	//**********************************************************************
-	void SKALE(dmat Z, dmat DMZ, dvec XI, dmat SCALE, dmat DSCALE)
+	void SKALE(dmat Z, dmat DMZ, cdvec XI, dmat SCALE, dmat DSCALE)
 	{
 		//Z(MSTAR, 1);
 		//SCALE(MSTAR, 1); 
@@ -1166,7 +1171,7 @@ private:
 				BASM[l] = BASM[l-1] * H / double(l);
 
 			for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-				double SCAL = (abs(Z[IZ-1+(j-1)* MSTAR]) + abs(Z[IZ - 1 + (j) * MSTAR])) * .5 + 1.0;
+				double SCAL = (std::abs(Z[IZ-1+(j-1)* MSTAR]) + std::abs(Z[IZ - 1 + (j) * MSTAR])) * .5 + 1.0;
 				int MJ = MT[ICOMP-1];
 				for (int l = 1; l <= MJ; ++l) {
 					SCALE[IZ - 1 + (j - 1) * MSTAR] = BASM[l-1] / SCAL;
@@ -1178,7 +1183,7 @@ private:
 
 			}
 			for (int ICOMP = 1 + NCOMP; ICOMP <= NCY; ++ICOMP) {
-				double SCAL = 1.0 / (abs(DMZ[ICOMP-1+(j-1)*KDY]) + 1.0);
+				double SCAL = 1.0 / (std::abs(DMZ[ICOMP-1+(j-1)*KDY]) + 1.0);
 				for (int IDMZ = ICOMP; IDMZ <= KDY; IDMZ += NCY) {
 					DSCALE[IDMZ - 1 + (j - 1) * KDY] = SCAL;
 				}
@@ -1539,7 +1544,7 @@ private:
 					int JJ = JTOL[j-1];
 					int JZ = LTOL[j-1];
 					SLOPE[0] = std::max(SLOPE[0],
-						pow(abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + abs(Z[JZ-1])),
+						pow(std::abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + std::abs(Z[JZ-1])),
 							ROOT[j-1]));
 				}
 				double SLPHMX = SLOPE[0] * (XIOLD[1] - XIOLD[0]);
@@ -1562,7 +1567,7 @@ private:
 					for (int j = 1; j <= NTOL; ++j) {
 						int JJ = JTOL[j-1];
 						int JZ = LTOL[j-1] + (i - 1) * MSTAR;
-						auto temp = abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + abs(Z[JZ-1]));
+						auto temp = std::abs(D2[JJ-1] - D1[JJ-1]) * WGTMSH[j-1] * ONEOVH / (1.0 + std::abs(Z[JZ-1]));
 						SLOPE[i-1] = std::max(SLOPE[i-1], pow(temp, ROOT[j-1]));
 					}
 
@@ -1660,7 +1665,7 @@ private:
 							XI[IN - 1] = XIOLD[LOLD - 1 - 1] + (TEMP - ACCUM[LOLD - 1 - 1]) / SLOPE[LOLD - 1 - 1];
 						}
 					}
-					IN = IN + 1;;
+					IN++;
 					ACCL = ACCR;
 					LOLD = LNEW;
 				}
@@ -1668,6 +1673,7 @@ private:
 				break;
 			}
 		}
+        default:;
 		} // end of switch
 
 
@@ -1706,8 +1712,8 @@ private:
 	//     jtol   - components of differential system to which tolerances
 	//              refer (viz, if LTOL[i-1] refers to a derivative of u(j),
 	//              then JTOL[i-1]=j)
-	//     root   - reciprocals of expected rates of convergence of compo-
-	//              nents of z(j) for which tolerances are specified
+	//     root   - reciprocals of expected rates of convergence of components
+    //              of z(j) for which tolerances are specified
 	//     rho    - the k collocation points on (0,1)
 	//     coef   -
 	//     acol  -  the runge-kutta coefficients values at collocation
@@ -1814,7 +1820,7 @@ private:
 			RHO[j-1] = .50 * (1.0 + RHO[j-1]);
 
 
-		// now find runge-kutta coeffitients b, acol and asave
+		// now find runge-kutta coefficients b, acol and asave
 		// the values of asave are to be used in  newmsh  and errchk .
 		for (int j = 1; j <= K; ++j) {
 			for (int i = 1; i <= K; ++i)
@@ -1887,7 +1893,7 @@ private:
 				nullptr, XI, N, Z, DMZ, K, NCOMP, NY, 
 				MMAX, MT, MSTAR, 4, nullptr, 0);
 			for (int l = 0; l < MSTAR; ++l) {
-				ERR[l] = WGTERR[l+1-1] * abs(VALSTR[KNEW-1] - VALSTR[KSTORE-1]);
+				ERR[l] = WGTERR[l+1-1] * std::abs(VALSTR[KNEW-1] - VALSTR[KSTORE-1]);
 				KNEW++;
 				KSTORE++;
 			}
@@ -1898,7 +1904,7 @@ private:
 				nullptr, XI, N, Z, DMZ, K, NCOMP, NY,
 				MMAX, MT, MSTAR, 4, nullptr, 0);
 			for (int l = 0; l < MSTAR; ++l) {
-				ERR[l] += WGTERR[l+1-1] * abs(VALSTR[KNEW - 1] - VALSTR[KSTORE-1]);
+				ERR[l] += WGTERR[l+1-1] * std::abs(VALSTR[KNEW - 1] - VALSTR[KSTORE-1]);
 				KNEW++;
 				KSTORE++;
 			}
@@ -1914,7 +1920,7 @@ private:
 			for (int j = 1; j <= NTOL; ++j) {
 				int LTOLJ = LTOL[j-1];
 				int LTJZ = LTOLJ + (i - 1) * MSTAR;
-				if (ERR[LTOLJ-1] > TOLIN[j-1] * (abs(Z[LTJZ-1]) + 1.0))
+				if (ERR[LTOLJ-1] > TOLIN[j-1] * (std::abs(Z[LTJZ-1]) + 1.0))
 					IFIN = 0;
 			}
 		}
@@ -1945,7 +1951,7 @@ private:
 	//*********************************************************************
 	//
 	//   purpose
-	//         this routine controls the set up and solution of a linear
+	//         this routine controls the set-up and solution of a linear
 	//      system of collocation equations.
 	//         the matrix  g  is cast into an almost block diagonal
 	//      form by an appropriate ordering of the columns and solved
@@ -1965,10 +1971,10 @@ private:
 	//
 	//         lsyslv operates according to one of 5 modes:
 	//      mode = 0 - set up the collocation matrices  v , w , g
-	//                 and the right hand side  rhs ,  and solve.
+	//                 and the right-hand side  rhs ,  and solve.
 	//                 (for linear problems only.)
 	//      mode = 1 - set up the collocation matrices  v , w , g
-	//                 and the right hand sides  rhs  and  dmzo ,
+	//                 and the right-hand sides  rhs  and  dmzo ,
 	//                 and solve. also set up  integs .
 	//                 (first iteration of nonlinear problems only).
 	//      mode = 2 - set up  rhs  only and compute its norm.
@@ -1981,7 +1987,7 @@ private:
 	//      ig,izeta  - pointers to g,zeta respectively
 	//                       (necessary to keep track of blocks of g
 	//                       during matrix manipulations)
-	//      idmz,irhs,iv,iw - pointers to  rhs,v,w rspectively
+	//      idmz,irhs,iv,iw - pointers to  rhs,v,w respectively
 	//      df    - partial derivatives of f from dfsub
 	//      rnorm - euclidean norm of rhs
 	//      lside - number of side conditions in current and previous blocks
@@ -2086,7 +2092,7 @@ private:
 				double H = XI[i + 1] - XI[i];
 				int NROW = INTEGS[0 + i * 3];
 
-				// go thru the ncomp collocation equations and side conditions
+				// go through the ncomp collocation equations and side conditions
 				// in the i-th subinterval
 				while (true) {
 					if (IZETA > MSTAR)
@@ -2437,6 +2443,7 @@ private:
 			//  finally find dmz
 			DMZSOL(V, Z, DMZ);
 		}
+        default:;
 		}
 	}
 
@@ -2447,7 +2454,7 @@ private:
 	//   purpose:
 	//
 	//      construct a collocation matrix row according to mode:
-	//      mode = 1  -  a row corresponding to a initial condition
+	//      mode = 1  -  a row corresponding to an initial condition
 	//                   (i.e. at the left end of the subinterval).
 	//      mode = 2  -  a row corresponding to a condition at  aright.
 	//
@@ -2461,7 +2468,7 @@ private:
 	//      dg     - the derivatives of the side condition.
 	//
 	//**********************************************************************
-	void GDERIV(dmat GI, const int NROW, const int IROW, dvec ZVAL, dvec DGZ, const int MODE, dgsub_t dgsub)
+	void GDERIV(dmat GI, const int NROW, const int IROW, dvec ZVAL, dvec DGZ, const int MODE, dgsub_t dgsub) const
 	{
 		//GI(NROW, 1);
 
@@ -2798,9 +2805,9 @@ private:
 	//h - the  local stepsize.
 	//gi - the sub - block of the collocation matrix in
 	//which the equations are to be formed.
-	//wi - the sub - block of noncondensed collocation equations,
+	//wi - the sub - block of non-condensed collocation equations,
 	//left - hand side part.
-	//vi - the sub - block of noncondensed collocation equations,
+	//vi - the sub - block of non-condensed collocation equations,
 	//right - hand side part.
 	//rhsdmz - the inhomogenous term of the uncondensed collocation
 	//equations.
@@ -2821,202 +2828,201 @@ private:
 		const int MODL, const double XI1, cdvec ZVAL,
 		cdvec YVAL, dvec F,
 		dmat DF, dmat CB, ivec IPVTCB,
-		dmat FC, dfsub_t dfsub, int& ISING, const int NYCB)
-	{	
-		AutoTimer at(g_timer, _FUNC_);
+		dmat FC, dfsub_t dfsub, int& ISING, const int NYCB) {
+        // TODO RHSZ aliases with CB
 
-		//GI(NROW, 1); 
-		//VI(KDY, 1);
-		//DF(NCY, 1); 
-		//CB(NYCB, NYCB);
-		//FC(NCOMP, 1);
-	
-	
-		double HB[7 * 4]; //HB(7, 4);
-		double BASM[5], BCOL[40], U[400], V[400];
+        AutoTimer at(g_timer, _FUNC_);
 
-		//  compute local basis
-		double FACT = 1.0;
-		BASM[0] = 1.0;
-		for (int l = 0; l < MMAX; ++l) {
-			FACT = FACT * H / double(l+1);
-			BASM[l+1] = FACT;
-			for (int j = 0; j < K; ++j)
-				HB[j + l*7] = FACT * B[j + l*7];
-		}
+        //GI(NROW, 1);
+        //VI(KDY, 1);
+        //DF(NCY, 1);
+        //CB(NYCB, NYCB);
+        //FC(NCOMP, 1);
 
-		//  branch according to  m o d e
-		switch (MODE) {
-		case 1:
-			//  set right gi-block to identity
-			if (MODL != 2)
-			{
-				for (int j = 0; j < MSTAR; ++j) {
-					for (int IR = 0; IR < MSTAR; ++IR) {
-						GI[IROW - 1 + IR + j * NROW] = 0.0;
-						GI[IROW - 1 + IR + (MSTAR + j)* NROW] = 0.0;
-					}
-					GI[IROW - 1 + j + (MSTAR + j) * NROW] = 1.0;
-				}
-				//  compute the block gi
-				int IR = IROW;
-				for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
-					int MJ = MT[ICOMP-1];
-					IR = IR + MJ;
-					for (int l = 0; l < MJ; ++l) {
-						int ID = IR - l-1;
-						for (int JCOL = 0; JCOL < MSTAR; ++JCOL) {
-							int IND = ICOMP-1;
-							double RSUM = 0.0;
-							for (int j = 0; j < K; ++j) {
-								RSUM -= HB[j + l*7] * VI[IND + JCOL*KDY];
-								IND += NCY;
-							}
-							GI[ID-1+ JCOL*NROW] = RSUM;
-						}
-						int JD = ID - IROW;
-						for (int LL = 1; LL <= l+1; ++LL)
-							GI[ID - 1 + (JD + LL-1) * NROW] -= BASM[LL - 1];
 
-					}
-				}
+        double HB[7 * 4]; //HB(7, 4);
+        double BASM[5], BCOL[40], U[400], V[400];
 
-				if (INDEX == 1 || NY == 0)
-					return;
+        //  compute local basis
+        double FACT = 1.0;
+        BASM[0] = 1.0;
+        for (int l = 0; l < MMAX; ++l) {
+            FACT = FACT * H / double(l + 1);
+            BASM[l + 1] = FACT;
+            for (int j = 0; j < K; ++j)
+                HB[j + l * 7] = FACT * B[j + l * 7];
+        }
 
-				//  projected collocation
-				//  set up projection matrix and update gi-block
-				dfsub(XI1, ZVAL, YVAL, DF);
+        //  branch according to  m o d e
+        switch (MODE) {
+            case 1: {
+                //  set right gi-block to identity
+                if (MODL != 2) {
+                    for (int j = 0; j < MSTAR; ++j) {
+                        for (int IR = 0; IR < MSTAR; ++IR) {
+                            GI[IROW - 1 + IR + j * NROW] = 0.0;
+                            GI[IROW - 1 + IR + (MSTAR + j) * NROW] = 0.0;
+                        }
+                        GI[IROW - 1 + j + (MSTAR + j) * NROW] = 1.0;
+                    }
+                    //  compute the block gi
+                    int IR = IROW;
+                    for (int ICOMP = 1; ICOMP <= NCOMP; ++ICOMP) {
+                        int MJ = MT[ICOMP - 1];
+                        IR = IR + MJ;
+                        for (int l = 0; l < MJ; ++l) {
+                            int ID = IR - l - 1;
+                            for (int JCOL = 0; JCOL < MSTAR; ++JCOL) {
+                                int IND = ICOMP - 1;
+                                double RSUM = 0.0;
+                                for (int j = 0; j < K; ++j) {
+                                    RSUM -= HB[j + l * 7] * VI[IND + JCOL * KDY];
+                                    IND += NCY;
+                                }
+                                GI[ID - 1 + JCOL * NROW] = RSUM;
+                            }
+                            int JD = ID - IROW;
+                            for (int LL = 1; LL <= l + 1; ++LL)
+                                GI[ID - 1 + (JD + LL - 1) * NROW] -= BASM[LL - 1];
 
-				//  if index=2 then form projection matrices directly
-				//  otherwise use svd to define appropriate projection
-				if (INDEX == 0) {
-					PRJSVD(FC, DF, CB, // TODO wieso ändert sich die erste Dimension von CB hier?
-						U, V, IPVTCB, ISING, 1); // TODO warum haben wir U,V?
-					if (ISING != 0)
-						return;
-				}
-				else {
-					//  form  cb
-					for (int i = 0; i < NY; ++i) {
-						for (int j = 0; j < NY; ++j) {
-							FACT = 0;
-							int ML = -1;
-							for (int l = 0; l < NCOMP; ++l) {
-								ML += MT[l+1-1];
-								FACT += DF[i + NCOMP + ML*NCY] * DF[l + (MSTAR + j) * NCY];
-							}
-							CB[i + j * NYCB] = FACT;
-						}
-					}
+                        }
+                    }
 
-					//  decompose cb
-					ISING = dgefa(CB, NY, NY, IPVTCB);
-					if (ISING != 0)
-						return;
+                    if (INDEX == 1 || NY == 0)
+                        return;
 
-					//  form columns of fc
-					for (int j = 0; j < MSTAR + NY; ++j) {
-						if (j+1 <= MSTAR) {
-							for (int i = 0; i < NY; ++i)
-								BCOL[i] = DF[i + NCOMP + j*NCY];
-						}
-						else {
-							for (int i = 0; i < NY; ++i)
-								BCOL[i] = 0.0;
-							BCOL[j - MSTAR] = 1.0;
-						}
+                    //  projected collocation
+                    //  set up projection matrix and update gi-block
+                    dfsub(XI1, ZVAL, YVAL, DF);
 
-						dgesl(CB, NY, NY, IPVTCB, BCOL, 0);
-					
-						for (int i = 0; i < NCOMP; ++i) {
-							FACT = 0.0;
-							for (int l = 0; l < NY; ++l)
-								FACT += DF[i + (l + MSTAR)* NCY] * BCOL[l];
+                    //  if index=2 then form projection matrices directly
+                    //  otherwise use svd to define appropriate projection
+                    if (INDEX == 0) {
+                        PRJSVD(FC, DF, CB, // TODO wieso ändert sich die erste Dimension von CB hier?
+                               U, V, IPVTCB, ISING, 1); // TODO warum haben wir U,V?
+                        if (ISING != 0)
+                            return;
+                    } else {
+                        //  form  cb
+                        for (int i = 0; i < NY; ++i) {
+                            for (int j = 0; j < NY; ++j) {
+                                FACT = 0;
+                                int ML = -1;
+                                for (int l = 0; l < NCOMP; ++l) {
+                                    ML += MT[l + 1 - 1];
+                                    FACT += DF[i + NCOMP + ML * NCY] * DF[l + (MSTAR + j) * NCY];
+                                }
+                                CB[i + j * NYCB] = FACT;
+                            }
+                        }
 
-							FC[i + j * NCOMP] = FACT;
-						}
-					}
-				}
+                        //  decompose cb
+                        ISING = dgefa(CB, NY, NY, IPVTCB);
+                        if (ISING != 0)
+                            return;
 
-				//  update gi
-				for (int j = 0; j < MSTAR; ++j) {
-					for (int i = 0; i < NCOMP; ++i) {
-						FACT = 0;
-						for (int l = 0; l < MSTAR; ++l)
-							FACT += FC[i + l * NCOMP] * GI[IROW - 1 + l + j*NCY];
+                        //  form columns of fc
+                        for (int j = 0; j < MSTAR + NY; ++j) {
+                            if (j + 1 <= MSTAR) {
+                                for (int i = 0; i < NY; ++i)
+                                    BCOL[i] = DF[i + NCOMP + j * NCY];
+                            } else {
+                                for (int i = 0; i < NY; ++i)
+                                    BCOL[i] = 0.0;
+                                BCOL[j - MSTAR] = 1.0;
+                            }
 
-						BCOL[i] = FACT;
-					}
-					int ML = -1;
-					for (int i = 0; i < NCOMP; ++i) {
-						ML += MT[i+1-1];
-						GI[IROW - 1 + ML + j * NCY] -= BCOL[i];
-					}
-				}
-			}
+                            dgesl(CB, NY, NY, IPVTCB, BCOL, 0);
 
-			//  prepare extra rhs piece; two if new mesh TODO carefully check indices here
-			if (INDEX == 1 || NY == 0)
-				return;
-			for (int JCOL = 1; JCOL <= 2; ++JCOL) {
-				for (int i = 0; i < NCOMP; ++i) {
-					FACT = 0;
-					for (int l = 1; l <= NY; ++l)
-						FACT += FC[i + (l + MSTAR-1)*NCOMP] * F[l + NCOMP-1];
-					FC[i + (JCOL + MSTAR + NY-1)* NCOMP] = FACT;
-				}
+                            for (int i = 0; i < NCOMP; ++i) {
+                                FACT = 0.0;
+                                for (int l = 0; l < NY; ++l)
+                                    FACT += DF[i + (l + MSTAR) * NCY] * BCOL[l];
 
-				if (MODL != 1 || JCOL == 2)
-					return;
-				for (int i = 1 + NCOMP; i <= NY + NCOMP; ++i)
-					F[i - 1] = 0;
-				for (int j = 0; j < MSTAR;++j) {
-					FACT = -ZVAL[j];
-					for (int i = NCOMP; i < NY + NCOMP; ++i)
-						F[i] += DF[i + j* NCY] * FACT;
-				}
-			}
-			return;
+                                FC[i + j * NCOMP] = FACT;
+                            }
+                        }
+                    }
 
-		case 2:
-			//  compute the appropriate piece of  rhsz
-			dgesl(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
-	
-			int IR = IROW;
-			for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
-				int MJ = MT[JCOMP-1];
-				IR = IR + MJ;
-				for (int l = 1; l <= MJ; ++l) {
-					int	IND = JCOMP;
-					double RSUM = 0.0;
-					for (int j = 1; j <= K; ++j) {
-						RSUM += HB[(j-1) + (l-1) * 7] * RHSDMZ[IND-1];
-						IND += NCY;
-					}
-					RHSZ[IR - l-1] = RSUM;
-				}
-			}
+                    //  update gi
+                    for (int j = 0; j < MSTAR; ++j) {
+                        for (int i = 0; i < NCOMP; ++i) {
+                            FACT = 0;
+                            for (int l = 0; l < MSTAR; ++l)
+                                FACT += FC[i + l * NCOMP] * GI[IROW - 1 + l + j * NCY];
 
-			if (INDEX == 1 || NY == 0)
-				return;
+                            BCOL[i] = FACT;
+                        }
+                        int ML = -1;
+                        for (int i = 0; i < NCOMP; ++i) {
+                            ML += MT[i + 1 - 1];
+                            GI[IROW - 1 + ML + j * NCY] -= BCOL[i];
+                        }
+                    }
+                }
 
-			//  projected collocation
-			//  calculate projected rhsz
-			for (int i = 0; i < NCOMP; ++i) {
-				FACT = 0;
-				for (int l = 0; l < MSTAR; ++l)
-					FACT += FC[i + l * NCOMP] * RHSZ[l + IROW - 1];
-				BCOL[i] = FACT;
-			}
-			int ML = 0;
-			for (int i = 1; i <= NCOMP; ++i) {
-				ML += MT[i-1];
-				RHSZ[IROW - 1 + ML-1] -= BCOL[i-1] + F[i-1];
-			}	
+                //  prepare extra rhs piece; two if new mesh TODO carefully check indices here
+                if (INDEX == 1 || NY == 0)
+                    return;
+                for (int JCOL = 1; JCOL <= 2; ++JCOL) {
+                    for (int i = 0; i < NCOMP; ++i) {
+                        FACT = 0;
+                        for (int l = 1; l <= NY; ++l)
+                            FACT += FC[i + (l + MSTAR - 1) * NCOMP] * F[l + NCOMP - 1];
+                        FC[i + (JCOL + MSTAR + NY - 1) * NCOMP] = FACT;
+                    }
 
-		}
-	}
+                    if (MODL != 1 || JCOL == 2)
+                        return;
+                    for (int i = 1 + NCOMP; i <= NY + NCOMP; ++i)
+                        F[i - 1] = 0;
+                    for (int j = 0; j < MSTAR; ++j) {
+                        FACT = -ZVAL[j];
+                        for (int i = NCOMP; i < NY + NCOMP; ++i)
+                            F[i] += DF[i + j * NCY] * FACT;
+                    }
+                }
+                return;
+            }
+            case 2: {
+                //  compute the appropriate piece of  rhsz
+                dgesl(WI, KDY, KDY, IPVTW, RHSDMZ, 0);
+
+                int IR = IROW;
+                for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
+                    int MJ = MT[JCOMP - 1];
+                    IR = IR + MJ;
+                    for (int l = 1; l <= MJ; ++l) {
+                        int IND = JCOMP;
+                        double RSUM = 0.0;
+                        for (int j = 1; j <= K; ++j) {
+                            RSUM += HB[(j - 1) + (l - 1) * 7] * RHSDMZ[IND - 1];
+                            IND += NCY;
+                        }
+                        RHSZ[IR - l - 1] = RSUM;
+                    }
+                }
+
+                if (INDEX == 1 || NY == 0)
+                    return;
+
+                //  projected collocation
+                //  calculate projected rhsz
+                for (int i = 0; i < NCOMP; ++i) {
+                    FACT = 0;
+                    for (int l = 0; l < MSTAR; ++l)
+                        FACT += FC[i + l * NCOMP] * RHSZ[l + IROW - 1];
+                    BCOL[i] = FACT;
+                }
+                int ML = 0;
+                for (int i = 1; i <= NCOMP; ++i) {
+                    ML += MT[i - 1];
+                    RHSZ[IROW - 1 + ML - 1] -= BCOL[i - 1] + F[i - 1];
+                }
+            }
+            default:;
+        }
+    }
 
 
 
@@ -3179,64 +3185,66 @@ private:
 			RKBAS(S, k, mmax, A, DM, MODM);
 			}
 			[[fallthrough]];
-		case 4:
-			//  mode = 2, 3, or 4, compute mesh dependent rk - basis.
-			BM[0] = X - XI[i - 1];
+		case 4: {
+            //  mode = 2, 3, or 4, compute mesh dependent rk - basis.
+            BM[0] = X - XI[i - 1];
 
-			for (int l = 2; l <= mmax; ++l)
-				BM[l-1] = BM[0] / double(l);
+            for (int l = 2; l <= mmax; ++l)
+                BM[l - 1] = BM[0] / double(l);
 
-			//  evaluate  z(u(x)).
-			int IR = 1;
-			NCY = ncomp + ny;
-			IZ = (i - 1) * mstar + 1;
-			int IDMZ = (i - 1) * k * NCY;
-			for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
-				int MJ = M[JCOMP-1];
-				IR = IR + MJ;
-				IZ = IZ + MJ;
-				for (int l = 1; l <= MJ; ++l) {
-					int IND = IDMZ + JCOMP;
-					double ZSUM = 0.0;
-					for (int j = 1; j <= k; ++j) {
-						ZSUM = ZSUM + A[(j - 1) + (l-1)*7] * DMZ[IND - 1];
-						IND = IND + NCY;
-					}
-					for (int LL = 1; LL <= l; ++LL) {
-						int LB = l + 1 - LL;
-						ZSUM = ZSUM * BM[LB-1] + Z[IZ - LL - 1];
-					}
-					ZVAL[IR - l-1] = ZSUM;
-				}
-			}
-			if (MODM == 0)
-				return;
+            //  evaluate  z(u(x)).
+            int IR = 1;
+            NCY = ncomp + ny;
+            IZ = (i - 1) * mstar + 1;
+            int IDMZ = (i - 1) * k * NCY;
+            for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
+                int MJ = M[JCOMP - 1];
+                IR = IR + MJ;
+                IZ = IZ + MJ;
+                for (int l = 1; l <= MJ; ++l) {
+                    int IND = IDMZ + JCOMP;
+                    double ZSUM = 0.0;
+                    for (int j = 1; j <= k; ++j) {
+                        ZSUM = ZSUM + A[(j - 1) + (l - 1) * 7] * DMZ[IND - 1];
+                        IND = IND + NCY;
+                    }
+                    for (int LL = 1; LL <= l; ++LL) {
+                        int LB = l + 1 - LL;
+                        ZSUM = ZSUM * BM[LB - 1] + Z[IZ - LL - 1];
+                    }
+                    ZVAL[IR - l - 1] = ZSUM;
+                }
+            }
+            if (MODM == 0)
+                return;
 
-			//  for modm = 1 evaluate  y(j) = j - th component of y.
-			for (int JCOMP = 1; JCOMP <= ny; ++JCOMP)
-				YVAL[JCOMP-1] = 0.0;
-			for (int j = 1; j <= k; ++j) {
-				int IND = IDMZ + (j - 1) * NCY + ncomp + 1;
-				double FACT = DM[j - 1];
-				for (int JCOMP = 1; JCOMP <= ny; ++JCOMP) {
-					YVAL[JCOMP - 1] += FACT * DMZ[IND-1];
-					IND = IND + 1;
-				}
-			}
-			if (MODM == 1)
-				return;
+            //  for modm = 1 evaluate  y(j) = j - th component of y.
+            for (int JCOMP = 1; JCOMP <= ny; ++JCOMP)
+                YVAL[JCOMP - 1] = 0.0;
+            for (int j = 1; j <= k; ++j) {
+                int IND = IDMZ + (j - 1) * NCY + ncomp + 1;
+                double FACT = DM[j - 1];
+                for (int JCOMP = 1; JCOMP <= ny; ++JCOMP) {
+                    YVAL[JCOMP - 1] += FACT * DMZ[IND - 1];
+                    IND = IND + 1;
+                }
+            }
+            if (MODM == 1)
+                return;
 
-			//  for modm = 2 evaluate  dmval(j) = mj - th derivative of uj.
-			for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP)
-				DMVAL[JCOMP - 1] = 0.0;
-			for (int j = 1; j <= k; ++j) {
-				int IND = IDMZ + (j - 1) * NCY + 1;
-				double FACT = DM[j - 1];
-				for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
-					DMVAL[JCOMP - 1] += FACT * DMZ[IND-1];
-					IND = IND + 1;
-				}
-			}
+            //  for modm = 2 evaluate  dmval(j) = mj - th derivative of uj.
+            for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP)
+                DMVAL[JCOMP - 1] = 0.0;
+            for (int j = 1; j <= k; ++j) {
+                int IND = IDMZ + (j - 1) * NCY + 1;
+                double FACT = DM[j - 1];
+                for (int JCOMP = 1; JCOMP <= ncomp; ++JCOMP) {
+                    DMVAL[JCOMP - 1] += FACT * DMZ[IND - 1];
+                    IND = IND + 1;
+                }
+            }
+        }
+        default:;
 		}
 	}
 
@@ -3327,7 +3335,7 @@ private:
 			dmz(i) = dmz(i) + v(i) * z(i), i = 1, ..., n
 
 	* **********************************************************************/
-	void DMZSOL(dmat V, dvec Z, dmat DMZ)
+	void DMZSOL(cdmat V, cdvec Z, dmat DMZ) const
 	{
 		//V(KDY, 1);
 		//DMZ(KDY, 1);
@@ -3372,14 +3380,13 @@ private:
 	//	            the next block
 	//	
 	//	     parameters
-	//	      bloks   an array that initially contains the almost block diago -
-	//	            nal matrix  a  to be factored, and on return contains the
+	//	      bloks   an array that initially contains the almost block diagonal
+	//	            matrix  a  to be factored, and on return contains the
 	//	            computed factorization of  a .
 	//	      integs  an integer array describing the block structure of  a .
 	//	      nbloks  the number of blocks in  a .
 	//	      ipivot  an integer array of dimension   sum(integs(3, n); n = 1,
-	//		            ..., nbloks) which, on return, contains the pivoting stra -
-	//	            tegy used.
+	//		            ..., nbloks) which, on return, contains the pivoting strategy used.
 	//	      scrtch  work area required, of length  max(integs(1, n); n = 1,
 	//		            ..., nbloks).
 	//	      info    output parameter;
@@ -3388,7 +3395,7 @@ private:
 	// = n if the pivot element in the nth gauss step is zero.
 	//
 	//**********************************************************************
-	void FCBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, ivec IPIVOT, dvec SCRTCH, int& INFO)
+	static void FCBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, ivec IPIVOT, dvec SCRTCH, int& INFO)
 	{
 		AutoTimer at(g_timer, _FUNC_);
 		//INTEGS.assertDim(3, NBLOKS);
@@ -3450,13 +3457,13 @@ private:
 	//       nrow    number of rows of w.
 	//       ncol    number of columns of w.
 	//       last    number of elimination steps to be carried out.
-	//       info    on output, zero if the matrix is found to be non -
+	//       info    on output, zero if the matrix is found to be non-
 	//               singular, in case a zero pivot was encountered in row
 	//               n, info = n on output.
 	//
 	// * *********************************************************************
 	//
-	void FACTRB(dmat W, ivec IPIVOT, dvec D, const int NROW, const int NCOL, const int LAST, int& INFO)
+	static void FACTRB(dmat W, ivec IPIVOT, dvec D, const int NROW, const int NCOL, const int LAST, int& INFO)
 	{
 		//IPIVOT(NROW);
 		//W(NROW, NCOL);
@@ -3474,7 +3481,7 @@ private:
 
 		for (int j = 0; j < NCOL; ++j)
 			for (int i = 0; i < NROW; ++i)
-				D[i] = std::max(D[i], abs(W[i + j*NROW]));
+				D[i] = std::max(D[i], std::abs(W[i + j*NROW]));
 
 		//  gauss elimination with pivoting of scaled rows, loop over
 		//  k = 1, ., last
@@ -3493,18 +3500,18 @@ private:
 			}
 			if (k == NROW) {
 				// if  last.eq.nrow, check now that pivot element in last row is nonzero.
-				if (abs(W[NROW-1 + (NROW-1)* NROW]) <= 0)
+				if (std::abs(W[NROW-1 + (NROW-1)* NROW]) <= 0)
 					INFO = k;
 			}
 
 			l = k;
 			KP1 = k + 1;
-			COLMAX = abs(W[(k-1)+(k-1)*NROW]) / D[k-1];
+			COLMAX = std::abs(W[(k-1)+(k-1)*NROW]) / D[k-1];
 			// find the (relatively) largest pivot
 			for (int i = KP1; i <= NROW; ++i) {
-				if (abs(W[(i - 1) + (k - 1) * NROW]) <= COLMAX * D[i - 1])
+				if (std::abs(W[(i - 1) + (k - 1) * NROW]) <= COLMAX * D[i - 1])
 					continue;
-				COLMAX = abs(W[(i - 1) + (k - 1) * NROW]) / D[i - 1];
+				COLMAX = std::abs(W[(i - 1) + (k - 1) * NROW]) / D[i - 1];
 				l = i;
 			}
 
@@ -3520,7 +3527,7 @@ private:
 
 			// if pivot element is too small in absolute value, declare
 			// matrix to be noninvertible and quit.
-			if (abs(T) <= 0)
+			if (std::abs(T) <= 0)
 			{
 				INFO = k; //  singularity flag set
 				return;
@@ -3589,7 +3596,7 @@ private:
 	//
 	// * ********************************************************************
 	//
-	void SHIFTB(dmat AI, const int NROWI, const int NCOLI, const int LAST, dmat AI1, const int NROWI1, const int NCOLI1)
+	static void SHIFTB(cdmat AI, const int NROWI, const int NCOLI, const int LAST, dmat AI1, const int NROWI1, const int NCOLI1)
 	{
 		//AI(NROWI, NCOLI);
 		//AI1(NROWI1, NCOLI1)
@@ -3630,12 +3637,12 @@ private:
 	//
 	//    parameters
 	//       bloks, integs, nbloks, ipivot    are as on return from fcblok.
-	//       x       on input : the right hand side, in dense storage
+	//       x       on input : the right-hand side, in dense storage
 	//               on output : the solution vector
 	//
 	//*********************************************************************
 	//
-	void SBBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, civec IPIVOT, dvec X)
+	static void SBBLOK(dvec BLOKS, cimat INTEGS, const int NBLOKS, civec IPIVOT, dvec X)
 	{
 		// double BLOKS[?]
 		// int INTEGS[3][NBLOKS]
@@ -3691,7 +3698,7 @@ private:
 	//
 	//*********************************************************************
 	//
-	void SUBFOR(cdmat W, civec IPIVOT, const int NROW, const int LAST, dvec X)
+	static void SUBFOR(cdmat W, civec IPIVOT, const int NROW, const int LAST, dvec X)
 	{
 		// double W[NROW, LAST]
 		// double X[NROW]
@@ -3721,12 +3728,12 @@ private:
 	//
 	//*********************************************************************
 	//
-	//     carries out backsubstitution for current block.
+	//     carries out back-substitution for current block.
 	//
 	//    parameters
 	//       w, ipivot, nrow, ncol, last  are as on return from factrb.
 	//       x(1), ..., x(ncol)  contains, on input, the right side for the
-	//               equations in this block after backsubstitution has been
+	//               equations in this block after back-substitution has been
 	//               carried up to but not including equation(last).
 	//               means that x(j) contains the right side of equation(j)
 	//               as modified during elimination, j = 1, ..., last, while
@@ -3738,7 +3745,7 @@ private:
 	//*********************************************************************
 	//
 
-	void SUBBAK(cdmat W, const int NROW, const int NCOL, const int LAST, dvec X)
+	static void SUBBAK(cdmat W, const int NROW, const int NCOL, const int LAST, dvec X)
 	{
 		// W(NROW, NCOL), X(NCOL)
 		AutoTimer at(g_timer, _FUNC_);
@@ -3772,3 +3779,5 @@ private:
 
 
 };
+
+#pragma clang diagnostic pop
