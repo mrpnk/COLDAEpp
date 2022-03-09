@@ -62,7 +62,7 @@
             ipar(1)=1 ! problem is linear
             ipar(2)=0 ! auto num of collocation points
             ipar(3)=0 ! auto num of subintervals
-            ipar(4)=2 ! number of tolerances
+            ipar(4)=1 ! number of tolerances
             ipar(5)=1000000 ! dim of fspace
             ipar(6)=100000 ! dim of ispace
             ipar(7)=1 ! -1 for full printout 
@@ -81,7 +81,7 @@
      .                 fsub,dfsub,gsub,dgsub,0)
             enddo
             call cpu_time(finish)
-            print '("Time = ",f10.9," seconds.")',(finish-start)/100
+            print '("Time = ",f10.9," seconds for 100.")',(finish-start)
 
             
 

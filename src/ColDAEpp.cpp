@@ -148,7 +148,7 @@ int main()
 		opts.fdim = 1000000;
 		opts.idim = 100000;
 
-		opts.printLevel = printMode::full;
+		opts.printLevel = printMode::none;
 		opts.meshSource = meshMode::generate;
 		opts.guessSource = guessMode::none;	
 		
@@ -163,7 +163,8 @@ int main()
 
 	cda solver;
 	output_t iflag;
-	for (int i = 0; i < 1; ++i) 
+	auto t0 = std::chrono::high_resolution_clock::now();
+	for (int i = 0; i < 1000; ++i) 
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	
@@ -171,7 +172,8 @@ int main()
 			decltype(sys)::fsub, decltype(sys)::dfsub, decltype(sys)::gsub,
 			decltype(sys)::dgsub, nullptr);
 	}
-	
+	auto t1 = std::chrono::high_resolution_clock::now();
+	std::cout << "time for 1000: " << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count()*1e-6 << std::endl;
 	
 	if (iflag == output_t::normal) {
 		fmt::print(fg(fmt::color::green_yellow), "Successful return!\n");

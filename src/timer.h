@@ -120,16 +120,16 @@ public:
 
 	AutoTimer(Timer& t, std::string cat)
 	{
-		if (omp_in_parallel())
-			return; // Timer is not thread safe. Avoid UB.
-		timer = std::addressof(t);
-		timer->start(cat);
+		//if (omp_in_parallel())
+		//	return; // Timer is not thread safe. Avoid UB.
+		//timer = std::addressof(t);
+		//timer->start(cat);
 	}
 	~AutoTimer()
 	{
-		if (timer)
+		/*if (timer)
 			timer->end();
-		timer = nullptr;
+		timer = nullptr;*/
 	}
 };
 
