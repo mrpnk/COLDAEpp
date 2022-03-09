@@ -75,13 +75,14 @@
            
             call cpu_time(start)
                          
-            do i=1,100
+            do i=1,50000
             call coldae(ncomp,ny,orders,left,right,sides,
      .                 ipar,ltol,tol,fixpnt,ispace,fspace,iflag,
      .                 fsub,dfsub,gsub,dgsub,0)
             enddo
             call cpu_time(finish)
-            print '("Time = ",f10.9," seconds for 100.")',(finish-start)
+            print '("Time = ",f14.9," seconds for 50000.")',
+     .       (finish-start)
 
             
 

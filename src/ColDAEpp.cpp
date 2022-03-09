@@ -7,7 +7,9 @@ unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 #include "timer.h"
 #include "ColDAEpp.hpp"
 
-
+#include <iostream>
+#include <fstream>
+#include <cassert>
 
 //
 //// f'(x) = x, f(0)=1
@@ -164,7 +166,7 @@ int main()
 	cda solver;
 	output_t iflag;
 	auto t0 = std::chrono::high_resolution_clock::now();
-	for (int i = 0; i < 1000; ++i) 
+	for (int i = 0; i < 50000; ++i) 
 	{
 		AutoTimer at(g_timer, "COLDAE");
 	
@@ -173,7 +175,7 @@ int main()
 			decltype(sys)::dgsub, nullptr);
 	}
 	auto t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "time for 1000: " << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count()*1e-6 << std::endl;
+	std::cout << "time for 50000: " << std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count()*1e-6 << std::endl;
 	
 	if (iflag == output_t::normal) {
 		fmt::print(fg(fmt::color::green_yellow), "Successful return!\n");
