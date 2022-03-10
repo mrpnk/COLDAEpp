@@ -1,28 +1,36 @@
 FORT = gfortran
-FORTFLAGS = -Wfatal-errors -std=legacy -O3 -Wall -std=legacy
+FORTFLAGS = -Wfatal-errors -std=legacy -O3
 
-
-SRC := ./
-OBJ := ./
+SRC := ./linpack/
+OBJ := ./bin/
 
 SOURCES := $(wildcard $(SRC)/*.f)
-OBJECTS := $(patsubst $(SRC)/%.f, $(OBJ)/%.o, $(SOURCES))
+OBJECTS := $(patsubst $(SRC)/%.f, $(OBJ)%.o, $(SOURCES))
 
 SOURCES90 := $(wildcard $(SRC)/*.f90)
-OBJECTS90 := $(patsubst $(SRC)/%.f90, $(OBJ)/%.o, $(SOURCES90))
+OBJECTS90 := $(patsubst $(SRC)/%.f90, $(OBJ)%.o, $(SOURCES90))
 
-all: $(OBJECTS) $(OBJECTS90)
-	$(FORT) $(FORTFLAGS) $^ -o ftest.exe
+all: test1 test2 test3
+
+test1: test1.f coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o test1.exe
+test2: test2.f coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o test2.exe
+test3: test3.f coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o test3.exe	
 	
 	
-$(OBJ)/%.o: $(SRC)/%.f
+coldae.o: coldae.f
+	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
+
+$(OBJ)%.o: $(SRC)/%.f
 	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
 	
-$(OBJ)/%.o: $(SRC)/%.f90
+$(OBJ)%.o: $(SRC)/%.f90
 	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
-	
+
 clean:
-	rm -f *.o $(OBJECTS)
+	rm -f $(OBJ)*.o $(OBJECTS)
 
 
 #     $@ means "name of the target"

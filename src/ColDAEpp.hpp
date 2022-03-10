@@ -16,8 +16,8 @@
 /* Define callback function types */
 using fsub_t  = void (*)(double x, double const z[], double const y[], double f[]);
 using dfsub_t = void (*)(double x, double const z[], double const y[], double df[]);
-using gsub_t  = void (*)(int i,    double const z[], double& g);
-using dgsub_t = void (*)(int i,    double const z[], double dg[]);
+using gsub_t  = void (*)(int i,    double const z[],                   double& g);
+using dgsub_t = void (*)(int i,    double const z[],                   double dg[]);
 using guess_t = void (*)(double x, double const z[], double const y[], double dmval[]);
 
 
@@ -85,8 +85,15 @@ struct systemParams {
 	std::vector<double> bcpoints; // j-th side condition point (boundary point)
 
 	bool isNonLinear;             // if the problem is nonlinear
-	regularControl reg;
+	regularControl regularity;
 	indexControl index;           // index of DAE (ignored if ny=0)
+
+    // Returns the total order of the system
+    int getMstar() const{
+        int mstar{0};
+        for(auto const& o: orders) mstar+=o;
+        return mstar;
+    }
 };
 
 
@@ -100,7 +107,6 @@ struct options {
 	meshMode meshSource;   // mesh control
 	guessMode guessSource; // guess control
 	
-	//int numTolerances;          // no. of solution and derivative tolerances
 	std::vector<int> ltol;      // what component of z the tolerances are for
 	std::vector<double> tol;    // the tolerances tol
 
@@ -135,7 +141,8 @@ using cimat = int const* const ;
 class cda{
 
 	// COLOUT 
-	double PRECIS; int IPRINT;
+	double PRECIS;
+    int IPRINT;
 	
 	// COLLOC 
 	double RHO[7];
@@ -161,8 +168,8 @@ class cda{
 	double TZETA[40]; // boundary condition points
 	double TLEFT;     // left domain end
 	double TRIGHT;    // right domain end
-	int IZETA;
-	int IZSAVE;
+	int    IZETA;
+	int    IZSAVE;
 	
 	// COLNLN 
 	int NONLIN, ITER, LIMIT, ICARE, IGUESS, INDEX;
@@ -170,7 +177,7 @@ class cda{
 	// COLEST 
 	double TOL[40], WGTMSH[40], WGTERR[40], TOLIN[40], ROOT[40];
 	int    JTOL[40], LTOL[40];
-	int NTOL; // number of tolerances
+	int    NTOL; // number of tolerances
 	
 	// COLBAS 
 	double B[7*4];
@@ -183,9 +190,6 @@ public:
 			ivec ispace, dvec fspace,
 			fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 	{
-		//ispace(opts.idim);
-		//fspace(opts.fdim);
-
 		this->NCOMP = params.ncomp;
 		this->NY = params.ny;
 		this->TLEFT = params.left;
@@ -244,7 +248,7 @@ public:
 		IGUESS = static_cast<int>(opts.guessSource);
 		if (NONLIN == 0 && IGUESS == 1)  IGUESS = 0;
 		if (IGUESS >= 2 && IREAD == 0)   IREAD = 1;
-		ICARE = static_cast<int>(params.reg);
+		ICARE = static_cast<int>(params.regularity);
 		NTOL = static_cast<int>(opts.tol.size());
 		int NDIMF = opts.fdim;
 		int NDIMI = opts.idim;
@@ -1673,7 +1677,7 @@ private:
 				break;
 			}
 		}
-        default:;
+        default: throw std::invalid_argument("NEWMSH: Invalid case.\n");
 		} // end of switch
 
 
@@ -2237,7 +2241,7 @@ private:
 										XIOLD, NOLD, Z,
 										DMZ, K, NCOMP, NY, MMAX,
 										MT, MSTAR, 1, nullptr, 0);
-									NOLD = temp - 1; // TODO propably useless
+									NOLD = temp - 1; // TODO probably useless
 								}
 							}
 							else {
@@ -2396,7 +2400,6 @@ private:
 			DMZSOL(V, DELZ, DELDMZ);
 
 			if (MODE != 1) {
-				//fmt::print(fg(fmt::color::orange_red), "Leave LSYSLV and RHS(41) = {}\n", RHS(41));
 				return;
 			}
 
@@ -2443,7 +2446,7 @@ private:
 			//  finally find dmz
 			DMZSOL(V, Z, DMZ);
 		}
-        default:;
+        default: throw std::invalid_argument("LSYSLV: Invalid case.\n");
 		}
 	}
 
@@ -2579,7 +2582,7 @@ private:
 		I1 = I0 + 1;
 		int I2 = I0 + NCY;
 
-		// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh
+		// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh // TODO duplicate?
 		if (NONLIN != 0 && ITER <= 0) {
 			for (int j = 0; j < MSTAR + NY; ++j) {
 				if (j + 1 <= MSTAR)
@@ -2820,16 +2823,13 @@ private:
 	//fc - projection matrices
 	//
 	//**********************************************************************
-	// double const * WI (dgesl)
 	void GBLOCK(const double H, dmat GI, const int NROW, const int IROW,
-		dvec  WI, cdmat VI,
-		dvec RHSZ, dvec RHSDMZ,
-		ivec IPVTW, const int MODE,
-		const int MODL, const double XI1, cdvec ZVAL,
-		cdvec YVAL, dvec F,
-		dmat DF, dmat CB, ivec IPVTCB,
-		dmat FC, dfsub_t dfsub, int& ISING, const int NYCB) {
+		dvec  WI, cdmat VI, dvec RHSZ, dvec RHSDMZ, ivec IPVTW, const int MODE,
+		const int MODL, const double XI1, cdvec ZVAL, cdvec YVAL, dvec F,
+		dmat DF, dmat CB, ivec IPVTCB, dmat FC, dfsub_t dfsub, int& ISING, const int NYCB)
+    {
         // TODO RHSZ aliases with CB
+        // double const * WI (dgesl)
 
         AutoTimer at(g_timer, _FUNC_);
 
@@ -3020,7 +3020,7 @@ private:
                     RHSZ[IROW - 1 + ML - 1] -= BCOL[i - 1] + F[i - 1];
                 }
             }
-            default:;
+            default: throw std::invalid_argument("GBLOCK: Invalid case.\n");
         }
     }
 
@@ -3244,7 +3244,7 @@ private:
                 }
             }
         }
-        default:;
+        default: throw std::invalid_argument("APPROX: Invalid case.\n");
 		}
 	}
 

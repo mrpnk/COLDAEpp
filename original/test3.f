@@ -70,41 +70,39 @@
             ipar(9)=0 ! no guess provided
             ipar(10)=0 ! problem is regular
             ipar(11)=0 ! no fixed points
-            ipar(12)=0 ! dae index, ignored
+            ipar(12)=0 ! dae index
 
            
-            call cpu_time(start)
+            ! call cpu_time(start)
                          
-            do i=1,50000
             call coldae(ncomp,ny,orders,left,right,sides,
      .                 ipar,ltol,tol,fixpnt,ispace,fspace,iflag,
      .                 fsub,dfsub,gsub,dgsub,0)
-            enddo
-            call cpu_time(finish)
-            print '("Time = ",f14.9," seconds for 50000.")',
-     .       (finish-start)
+           
+!             call cpu_time(finish)
+!             print '("Time = ",f14.9," seconds for 50000.")',
+!      .       (finish-start)
 
             
 
             write(*,*) "iflag = ", iflag
 
             if(iflag == 1) then
-                  open(100,file=trim("result_f77.txt"))
+                  open(100,file=trim("result3.txt"))
                   do i = 1, ispace(1)+1
                         if(i.eq.ispace(1)+1) then
                               x = fspace(i)
                               call appsln(x,z,y,fspace,ispace)
-                              write(100,outFormat) x,z(1),y(1)
+                              write(100,outFormat) x,z(1),z(2),y(1)
                         else 
                               subsample=1
                               do j = 0, subsample-1
                               x = fspace(i)*(1.0-float(j)/subsample)+
      .                                 fspace(i+1)*float(j)/subsample
                               call appsln(x,z,y,fspace,ispace)
-                              write(100,outFormat) x,z(1),y(1)
+                              write(100,outFormat) x,z(1),z(2),y(1)
                               enddo
                         endif
-
                   enddo
                   close(100)
             endif                                     
