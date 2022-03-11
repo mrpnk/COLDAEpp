@@ -2445,6 +2445,7 @@ private:
 
 			//  finally find dmz
 			DMZSOL(V, Z, DMZ);
+            break;
 		}
         default: throw std::invalid_argument("LSYSLV: Invalid case.\n");
 		}
@@ -3019,6 +3020,7 @@ private:
                     ML += MT[i - 1];
                     RHSZ[IROW - 1 + ML - 1] -= BCOL[i - 1] + F[i - 1];
                 }
+                break;
             }
             default: throw std::invalid_argument("GBLOCK: Invalid case.\n");
         }
@@ -3243,6 +3245,7 @@ private:
                     IND = IND + 1;
                 }
             }
+            break;
         }
         default: throw std::invalid_argument("APPROX: Invalid case.\n");
 		}

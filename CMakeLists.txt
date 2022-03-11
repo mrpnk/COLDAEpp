@@ -17,7 +17,8 @@ file(GLOB_RECURSE SOURCES src/linpack/*.cpp)
 
 
 
-# TODO: Fügen Sie bei Bedarf Tests hinzu, und installieren Sie Ziele.
+# Here come the tests
+
 include(FetchContent)
 FetchContent_Declare(
         googletest
@@ -30,8 +31,8 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable (test1 src/test.cpp ${SOURCES})
-target_link_libraries(test1 gtest_main)
+add_executable (testAll src/test.cpp ${SOURCES})
+target_link_libraries(testAll gtest_main)
 
 include(GoogleTest)
-gtest_discover_tests(test1)
+gtest_discover_tests(testAll)
