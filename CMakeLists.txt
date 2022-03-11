@@ -10,12 +10,6 @@ project ("ColDAEpp")
 file(GLOB_RECURSE SOURCES src/linpack/*.cpp)
 
 
-# set some options for the project
-#target_compile_options(ColDAEpp PRIVATE /W4)
-#target_compile_features(ColDAEpp PRIVATE cxx_std_20)
-
-
-
 
 # Here come the tests
 
@@ -33,6 +27,13 @@ enable_testing()
 
 add_executable (testAll src/test.cpp ${SOURCES})
 target_link_libraries(testAll gtest_main)
+
+
+# set some options for the project
+#target_compile_options(ColDAEpp PRIVATE /W4)
+target_compile_features(testAll PRIVATE cxx_std_20)
+
+
 
 include(GoogleTest)
 gtest_discover_tests(testAll)
