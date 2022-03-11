@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <filesystem>
 
 #if defined _MSC_VER
 // break on nan
@@ -37,7 +38,13 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
 
     // Compare result with FORTRAN version
     std::ifstream infile(comparisonFile);
-    EXPECT_EQ(infile.fail(), false) << "The Fortran output file for comparison was not found.\n";
+
+
+
+    std::filesystem::path cwd = std::filesystem::current_path();
+    EXPECT_EQ(cwd.string(),"");
+
+    ASSERT_EQ(infile.fail(), false) << "The Fortran output file for comparison was not found.\n";
     double maxError = 0;
     int count = 0;
     int ncomp=sys.params.getMstar(), ny=sys.params.ny;
