@@ -82,7 +82,7 @@ TEST(BasicUses, firstOrder) {
 
         opts.numFixedPoints = 0;
     }
-    compareSolution(sys1{}, opts, "../../original/result1.txt");
+    compareSolution(sys1{}, opts, "original/result1.txt");
 }
 TEST(BasicUses, twoComponents) {
     options opts;
@@ -102,7 +102,7 @@ TEST(BasicUses, twoComponents) {
 
         opts.numFixedPoints = 0;
     }
-    compareSolution(sys2{}, opts, "../../original/result2.txt");
+    compareSolution(sys2{}, opts, "original/result2.txt");
 }
 TEST(BasicUses, algebraic) {
     options opts;
@@ -122,5 +122,5 @@ TEST(BasicUses, algebraic) {
 
         opts.numFixedPoints = 0;
     }
-    compareSolution(sys3{}, opts, "../../original/result3.txt");
+    compareSolution(sys3{}, opts, "original/result3.txt");
 }
