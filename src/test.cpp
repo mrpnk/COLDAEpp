@@ -42,7 +42,7 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
 
 
     std::filesystem::path cwd = std::filesystem::current_path();
-    EXPECT_EQ(cwd.string(),"");
+    //EXPECT_EQ(cwd.string(),"");
 
     ASSERT_EQ(infile.fail(), false) << "The Fortran output file for comparison was not found.\n";
     double maxError = 0;
