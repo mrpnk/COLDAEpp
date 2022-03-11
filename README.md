@@ -1,3 +1,5 @@
+![test workflow](https://github.com/mrpnk/COLDAEpp/actions/workflows/test.yml/badge.svg)
+
 # Coldae++
 Coldae++ is a C++ port of NetLib's COLDAE.
 
