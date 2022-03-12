@@ -1,5 +1,5 @@
 FORT = gfortran
-FORTFLAGS = -Wfatal-errors -std=legacy -O3
+FORTFLAGS = -Wfatal-errors -O3 -ffree-line-length-none -std=legacy
 
 SRC := ./linpack/
 OBJ := ./bin/
@@ -17,11 +17,15 @@ test1: test1.f coldae.o $(OBJECTS) $(OBJECTS90)
 test2: test2.f coldae.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test2.exe
 test3: test3.f coldae.o $(OBJECTS) $(OBJECTS90)
-	$(FORT) $(FORTFLAGS) $^ -o test3.exe	
-test4: test4.f coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o test3.exe
+test4: test4.f90 colnew.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test4.exe
 	
 coldae.o: coldae.f
+	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
+colsys.o: colsys.f
+	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
+colnew.o: colnew.f
 	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
 
 $(OBJ)%.o: $(SRC)/%.f

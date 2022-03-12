@@ -41,7 +41,7 @@ enum class guessMode {
 	customCoefficients = 2, /*if an initial mesh and approximate solution
 							 coefficients are provided by the user in  fspace.
 							 (the former and new mesh are the same).*/
-	customCoefficientsRefine = 3, /* if a former meshand approximate solution
+	customCoefficientsRefine = 3, /* if a former mesh and approximate solution
 								coefficients are provided by the user in fspace,
 								and the new mesh is to be taken twice as coarse;
 								i.e., every second point from the former mesh.*/

@@ -206,7 +206,7 @@ C             = 0 causes coldae to generate a uniform initial mesh.
 C             = 1 if the initial mesh is provided by the user.  it
 C                 is defined in fspace as follows:  the mesh
 C                 aleft=x(1).lt.x(2).lt. ... .lt.x(n).lt.x(n+1)=aright
-C                 will occupy  fspace(1), ..., fspacen+1). the
+C                 will occupy  fspace(1), ..., fspace(n+1). the
 C                 user needs to supply only the interior mesh
 C                 points  fspace(j) = x(j), j = 2, ..., n.
 C             = 2 if the initial mesh is supplied by the user
@@ -444,8 +444,8 @@ C
 C     for ipar(9) = 4 the user specifies a new mesh of n subintervals
 C     as follows.
 C     the values in  fspace(1),...,fspace(ispace(8))  have to be
-C     shifted by n+1 locations to  fspacen+2),..,fspace(ispace(8)+n+1)
-C     and the new mesh is then specified in fspace(1),..., fspacen+1).
+C     shifted by n+1 locations to  fspace(n+2),..,fspace(ispace(8)+n+1)
+C     and the new mesh is then specified in fspace(1),..., fspace(n+1).
 C     also set ipar(3) = n.
 C
 C
