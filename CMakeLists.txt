@@ -10,7 +10,6 @@ project ("ColDAEpp")
 file(GLOB_RECURSE SOURCES test/linpack/*.cpp)
 
 
-
 # Here come the tests
 
 include(FetchContent)

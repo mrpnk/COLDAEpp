@@ -10,7 +10,7 @@ OBJECTS := $(patsubst $(SRC)/%.f, $(OBJ)%.o, $(SOURCES))
 SOURCES90 := $(wildcard $(SRC)/*.f90)
 OBJECTS90 := $(patsubst $(SRC)/%.f90, $(OBJ)%.o, $(SOURCES90))
 
-all: test1 test2 test3
+all: test1 test2 test3 test4
 
 test1: test1.f coldae.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test1.exe
@@ -18,7 +18,8 @@ test2: test2.f coldae.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test2.exe
 test3: test3.f coldae.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test3.exe	
-	
+test4: test4.f coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o test4.exe
 	
 coldae.o: coldae.f
 	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@

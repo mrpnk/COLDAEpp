@@ -1,6 +1,4 @@
-﻿#pragma clang diagnostic push
-#pragma ide diagnostic ignored "misc-misplaced-const"
-#pragma once
+﻿#pragma once
 
 #include "test/linpack/linpack_d.hpp"
 #include "test/timer.h"
@@ -9,7 +7,6 @@
 #include "fmt/include/fmt/format.h"
 #include "fmt/include/fmt/ranges.h"
 #include "fmt/include/fmt/color.h"
-
 
 //------------------------------------------------------------------------------------------------------
 
