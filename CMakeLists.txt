@@ -7,7 +7,7 @@ cmake_minimum_required (VERSION 3.8)
 project ("ColDAEpp")
 
 # define the 'sources' to be all the .cpp files in this directory and all subdirectories
-file(GLOB_RECURSE SOURCES src/linpack/*.cpp)
+file(GLOB_RECURSE SOURCES test/linpack/*.cpp)
 
 
 
@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable (testAll src/test.cpp ${SOURCES})
+add_executable (testAll test/test.cpp ${SOURCES})
 target_link_libraries(testAll gtest_main)
 
 

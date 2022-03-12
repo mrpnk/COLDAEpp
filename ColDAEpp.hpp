@@ -2,13 +2,13 @@
 #pragma ide diagnostic ignored "misc-misplaced-const"
 #pragma once
 
-#include "linpack/linpack_d.hpp"
-#include "timer.h"
+#include "test/linpack/linpack_d.hpp"
+#include "test/timer.h"
 
 #define FMT_HEADER_ONLY 
-#include "../fmt/include/fmt/format.h"
-#include "../fmt/include/fmt/ranges.h"
-#include "../fmt/include/fmt/color.h"
+#include "fmt/include/fmt/format.h"
+#include "fmt/include/fmt/ranges.h"
+#include "fmt/include/fmt/color.h"
 
 
 //------------------------------------------------------------------------------------------------------

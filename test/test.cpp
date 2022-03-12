@@ -1,6 +1,6 @@
 ﻿#include "test.hpp"
 #include "timer.h"
-#include "ColDAEpp.hpp"
+#include "../ColDAEpp.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -36,14 +36,13 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
 //    }
 //    outfile.close();
 
-    // Compare result with FORTRAN version
-    std::ifstream infile(comparisonFile);
-
-
 
     std::filesystem::path cwd = std::filesystem::current_path();
     //EXPECT_EQ(cwd.string(),"");
 
+
+    // Compare result with FORTRAN version
+    std::ifstream infile(comparisonFile);
     ASSERT_EQ(infile.fail(), false) << "The Fortran output file for comparison was not found.\n";
     double maxError = 0;
     int count = 0;
