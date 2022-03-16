@@ -5,11 +5,11 @@
 #include <gtest/gtest.h>
 
 template<typename T>
-void benchmarkSolution(T const& sys, options const& opts, int nRuns) {
+void benchmarkSolution(T const& sys, coldae::options const& opts, int nRuns) {
     std::vector<int> ispace(opts.idim);
     std::vector<double> fspace(opts.fdim);
 
-    cda solver{};
+    coldae::cda solver{};
 
     using namespace std::chrono;
     auto t0 = high_resolution_clock::now();
@@ -25,7 +25,7 @@ void benchmarkSolution(T const& sys, options const& opts, int nRuns) {
 
 
 TEST(Benchmarks, algebraic) {
-    options opts;
+    coldae::options opts;
     {
     opts.numCollPoints = 0;
     opts.numSubIntervals = 0;
@@ -33,9 +33,9 @@ TEST(Benchmarks, algebraic) {
     opts.fdim = 1000000;
     opts.idim = 100000;
 
-    opts.printLevel = printMode::none;
-    opts.meshSource = meshMode::generate;
-    opts.guessSource = guessMode::none;
+    opts.printLevel = coldae::printMode::none;
+    opts.meshSource = coldae::meshMode::generate;
+    opts.guessSource = coldae::guessMode::none;
 
     opts.ltol = {1,2};
     opts.tol = {0.0001, 0.0001};

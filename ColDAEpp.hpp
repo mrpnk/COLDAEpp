@@ -10,6 +10,9 @@
 
 //------------------------------------------------------------------------------------------------------
 
+namespace coldae
+{
+
 /* Define callback function types */
 using fsub_t  = void (*)(double x, double const z[], double const y[], double f[]);
 using dfsub_t = void (*)(double x, double const z[], double const y[], double df[]);
@@ -64,7 +67,7 @@ enum class indexControl {
 	one = 1,           // if the index of the dae is 1.
 	twoHessenberg = 2  //if the index of the dae is 2 and it is in Hessenberg form
 };
-enum class output_t {
+enum class result_t {
 	normal = 1,        // for normal return
 	singular = 0,      // if the collocation matrix is singular
 	outOfMemory = -1,  // if the expected no. of subintervals exceeds storage specifications
@@ -176,9 +179,9 @@ class cda{
 	
 
 public:
-	output_t COLDAE(systemParams const& params, options const& opts,
-			ivec ispace, dvec fspace,
-			fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+	result_t COLDAE(systemParams const& params, options const& opts,
+                    ivec ispace, dvec fspace,
+                    fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 	{
 		this->NCOMP = params.ncomp;
 		this->NY = params.ny;
@@ -186,7 +189,7 @@ public:
 		this->TRIGHT = params.right;
 
 		if (opts.ltol.size() != opts.tol.size()) {
-			return output_t::inputError;
+			return result_t::inputError;
 		}
 
 		std::copy(opts.ltol.begin(), opts.ltol.end(), this->LTOL);
@@ -219,21 +222,21 @@ public:
 		NCY = NCOMP + NY;
 		if (NCOMP < 0 || NCOMP > 20){
 		    fmt::print(fg(fmt::color::red), "Violated (0 <= NCOMP <= 20).\n");
-			return output_t::inputError;
+			return result_t::inputError;
         }
 		if (NY < 0 || NY > 20){
             fmt::print(fg(fmt::color::red), "Violated (0 <= NY <= 20).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		if (NCY < 1 || NCY > 40) {
             fmt::print(fg(fmt::color::red), "Violated (1 <= NCOMP + NY <= 40).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		for (int i = 0; i < NCOMP; ++i)
 			if (params.orders[i] < 1 || params.orders[i] > 4) {
                 fmt::print(fg(fmt::color::red),
                            "Violated (1 <= orders[{}] <= 4).\n", i);
-                return output_t::inputError;
+                return result_t::inputError;
             }
 
 		//  rename some of the parameters and set default values.
@@ -312,23 +315,23 @@ public:
 		//  check for correctness of data
 		if (K < 0 || K > 7){
             fmt::print(fg(fmt::color::red), "Violated (0 <= K <= 7).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		if (N < 0){
             fmt::print(fg(fmt::color::red), "Violated (0 <= N).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		if (NTOL < 0 || NTOL > MSTAR){
             fmt::print(fg(fmt::color::red), "Violated (0 <= NTOL <= MSTAR).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		if (NFXPNT < 0) {
             fmt::print(fg(fmt::color::red), "Violated (0 <= NFXPNT).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 		if (MSTAR < 0 || MSTAR > 40){
             fmt::print(fg(fmt::color::red), "Violated (0 <= MSTAR <= 40).\n");
-            return output_t::inputError;
+            return result_t::inputError;
         }
 
 		int IP = 1;
@@ -338,14 +341,14 @@ public:
 
 			while (true) {
 				if (IP > NFXPNT)
-					return output_t::inputError;
+					return result_t::inputError;
 				if (params.bcpoints[i - 1] - PRECIS < opts.fixpnt[IP])
 					break;
 				IP = IP + 1;
 			}
 
 			if (params.bcpoints[i - 1] + PRECIS < opts.fixpnt[IP])
-				return output_t::inputError;
+				return result_t::inputError;
 		}
 
 		//  set limits on iterations and initialize counters.
@@ -376,9 +379,9 @@ public:
 		}
 		NMAX = std::min(NMAXF, NMAXI);
 		if (NMAX < N)
-			return output_t::inputError;
+			return result_t::inputError;
 		if (NMAX < NFXPNT + 1)   
-			return output_t::inputError;
+			return result_t::inputError;
 		if (NMAX < 2 * NFXPNT + 2 && IPRINT < 1) {
 			fmt::print("INSUFFICIENT SPACE TO DOUBLE MESH FOR ERROR ESTIMATE\n");
 		}
@@ -462,7 +465,7 @@ public:
 		if (IGUESS >= 2)  
 			IGUESS = 0;
 
-		output_t iflag;
+		result_t iflag;
 		CONTRL(fspace+(LXI-1), fspace+(LXIOLD-1), fspace+(LZ-1), fspace+(LDMZ-1), fspace+(LDMV-1),
 			fspace+(LRHS-1), fspace+(LDELZ-1), fspace+(LDELDZ-1), fspace+(LDQZ-1),
 			fspace+(LDQDMZ-1), fspace+(LG-1), fspace+(LW-1), fspace+(LV-1), fspace+(LFC-1),
@@ -573,9 +576,9 @@ private:
 	//
 	//**********************************************************************
 	void CONTRL(dvec XI, dvec XIOLD, dvec Z, dvec DMZ, dvec DMV, dvec RHS, dvec DELZ, dvec DELDMZ,
-		dvec DQZ, dvec DQDMZ, dvec G, dvec W, dvec V, dvec FC, dvec VALSTR, dvec SLOPE, dvec SCALE, dvec DSCALE,
-		dvec ACCUM, ivec IPVTG, ivec INTEGS, ivec IPVTW, const int NFXPNT, cdvec FIXPNT, output_t& iflag,
-		fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+                dvec DQZ, dvec DQDMZ, dvec G, dvec W, dvec V, dvec FC, dvec VALSTR, dvec SLOPE, dvec SCALE, dvec DSCALE,
+                dvec ACCUM, ivec IPVTG, ivec INTEGS, ivec IPVTW, const int NFXPNT, cdvec FIXPNT, result_t& iflag,
+                fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 	{
 		double DF[800];
 		std::vector<double> FCSP(NCOMP * 60);
@@ -628,7 +631,7 @@ private:
 						if (IPRINT < 1) {
 							fmt::print("SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
 						}
-						iflag = output_t::singular;
+						iflag = result_t::singular;
 						return;
 					}
 					if (MSING == 0)
@@ -643,7 +646,7 @@ private:
 					if (IPRINT < 1) {
 						fmt::print(fg(fmt::color::red), "THE GLOBAL BVP - MATRIX IS SINGULAR\n");
 					}
-					iflag = output_t::singular;
+					iflag = result_t::singular;
 					return;
 				}
 
@@ -705,7 +708,7 @@ private:
 					if (IPRINT < 1) {
 						fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
 					}
-					iflag = output_t::singular;
+					iflag = result_t::singular;
 					return;
 				}
 				if (IFREEZ != 1) {
@@ -798,7 +801,7 @@ private:
 					goto n30;
 				if (ISING != 0) {
 					if (IPRINT < 1)  fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
-					iflag = output_t::singular;
+					iflag = result_t::singular;
 					return;
 				}
 
@@ -847,7 +850,7 @@ private:
 
 				if (ISING != 0) {
 					if (IPRINT < 1)  fmt::print(fg(fmt::color::red), "SINGULAR PROJECTION MATRIX DUE TO INDEX > 2\n");
-					iflag = output_t::singular;
+					iflag = result_t::singular;
 					return;
 				}
 
@@ -1035,7 +1038,7 @@ private:
 							ERRCHK(XI, Z, DMZ,VALSTR, IFIN);
 						if (IMESH == 1 || (IFIN == 0 && ICARE != 2))
 							goto n460;
-						iflag = output_t::normal;
+						iflag = result_t::normal;
 						return;
 					}
 				n430:
@@ -1051,7 +1054,7 @@ private:
 					}
 				}
 
-				iflag = output_t::notConverged;
+				iflag = result_t::notConverged;
 				NOCONV = NOCONV + 1;
 				if (ICARE == 2 && NOCONV > 1)
 					return;
@@ -1085,7 +1088,7 @@ private:
 				// exit if expected n is too large (but may try n=nmax once)
 				if (N > NMAX) {
 					N = N / 2;
-					iflag = output_t::outOfMemory;
+					iflag = result_t::outOfMemory;
 					if (ICONV == 0 && IPRINT < 1)
 						fmt::print("NO CONVERGENCE\n");
 					if (ICONV == 1 && IPRINT < 1)
@@ -3736,4 +3739,4 @@ private:
 
 };
 
-#pragma clang diagnostic pop
+}

@@ -4,7 +4,7 @@
 
 // f'(x) = x, f(0)=1
 struct sys1 {
-    systemParams params;
+    coldae::systemParams params;
     sys1() {
         params.ncomp = 1;
         params.ny = 0;
@@ -13,7 +13,7 @@ struct sys1 {
         params.right = 1;
         params.bcpoints = { 0 };
         params.isNonLinear = false;
-        params.regularity = regularControl::regular;
+        params.regularity = coldae::regularControl::regular;
     }
 
     static void fsub(double x, const double z[1], const double y[0], double f[1]) {
@@ -33,7 +33,7 @@ struct sys1 {
 
 // f''(x) = sin(0.6*f'(x)) + x, f(0)=1, f(1)=-0.1
 struct sys2 {
-    systemParams params;
+    coldae::systemParams params;
     sys2() {
         params.ncomp = 2;
         params.ny = 0;
@@ -42,8 +42,8 @@ struct sys2 {
         params.right = 1;
         params.bcpoints = { 0, 1 };
         params.isNonLinear = true;
-        params.regularity = regularControl::regular;
-        params.index = indexControl::automatic; // not used
+        params.regularity = coldae::regularControl::regular;
+        params.index = coldae::indexControl::automatic; // not used
     }
 
     static void fsub(double x, const double z[2], const double y[], double f[2]) {
@@ -79,7 +79,7 @@ struct sys2 {
 
 // f1''(x) = f2+f1', 0 = f2 + f1*f1' - x, f1(0)=1, f1'(0)=0.1
 struct sys3 {
-    systemParams params;
+    coldae::systemParams params;
     sys3() {
         params.ncomp = 1;
         params.ny = 1;
@@ -88,11 +88,11 @@ struct sys3 {
         params.right = 5;
         params.bcpoints = { 0, 5 };
         params.isNonLinear = true;
-        params.regularity = regularControl::regular;
-        params.index = indexControl::automatic;
+        params.regularity = coldae::regularControl::regular;
+        params.index = coldae::indexControl::automatic;
     }
 
-    static void fsub(double x, double const z[2], double const y[1], double f[2]) {
+    static void fsub(double x, double const z[2], double const y[1], double f[2])  {
         f[0] = y[0] + z[1]; // f_1 = f1''(x)
         f[1] = y[0] + z[0] * z[1] - x; // f_2 = 0 = algebraic
     }

@@ -11,13 +11,13 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
     std::vector<double> fspace(opts.fdim);
 
     cda solver{};
-    output_t iflag;
+    result_t iflag;
 
     iflag = solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(),
                           T::fsub, T::dfsub, T::gsub,
                           T::dgsub, nullptr);
 
-    ASSERT_EQ(iflag, output_t::normal) << "COLDAE did not return normally.\n";
+    ASSERT_EQ(iflag, result_t::normal) << "COLDAE did not return normally.\n";
 
 //    std::ofstream outfile("out.txt");
 //    for(int i=1;i<=ispace[0]+1;++i) {
