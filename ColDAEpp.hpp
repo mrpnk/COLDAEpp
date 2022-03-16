@@ -571,7 +571,9 @@ private:
 	{
 		double DF[800];
 		std::vector<double> FCSP(NCOMP* 60); // TODO check of array is possible
-		double CBSP[20* 20];
+
+
+        double CBSP[20* 20];
 		double RNORM, RNOLD;
 
 		
@@ -1117,7 +1119,7 @@ private:
 					DMV, VALSTR,
 					SLOPE, ACCUM, NFXPNT,
 					FIXPNT, DF, dfsub,
-					FCSP.data(), CBSP, NYCB);
+                    FCSP.data(), CBSP, NYCB);
 
 				// exit if expected n is too large (but may try n=nmax once)
 				if (N > NMAX) {

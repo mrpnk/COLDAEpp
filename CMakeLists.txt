@@ -26,13 +26,12 @@ enable_testing()
 
 add_executable (testAll test/test.cpp ${SOURCES})
 target_link_libraries(testAll gtest_main)
-
-
-# set some options for the project
-#target_compile_options(ColDAEpp PRIVATE /W4)
 target_compile_features(testAll PRIVATE cxx_std_20)
 
+add_executable (benchmarkAll test/benchmark.cpp ${SOURCES})
+target_link_libraries(benchmarkAll gtest_main)
+target_compile_features(benchmarkAll PRIVATE cxx_std_20)
 
 
 include(GoogleTest)
-gtest_discover_tests(testAll)
+gtest_discover_tests(testAll benchmarkAll)

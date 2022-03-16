@@ -1,17 +1,9 @@
-﻿#include "test.hpp"
-#include "timer.h"
-#include "../ColDAEpp.hpp"
+﻿#include "systems.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <gtest/gtest.h>
-#include <filesystem>
 
-#if defined _MSC_VER
-// break on nan
-#include <float.h>
-unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
-#endif
 
 template<typename T>
 void compareSolution(T const& sys, options const& opts, std::string comparisonFile) {
@@ -35,10 +27,6 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
 //        outfile << x<<" " <<z[0]<< std::endl;
 //    }
 //    outfile.close();
-
-
-    std::filesystem::path cwd = std::filesystem::current_path();
-    //EXPECT_EQ(cwd.string(),"");
 
 
     // Compare result with FORTRAN version
@@ -130,3 +118,4 @@ TEST(BasicUses, algebraic) {
     }
     compareSolution(sys3{}, opts, "original/result3.txt");
 }
+
