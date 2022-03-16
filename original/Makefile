@@ -20,7 +20,10 @@ test3: test3.f coldae.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test3.exe
 test4: test4.f90 colnew.o $(OBJECTS) $(OBJECTS90)
 	$(FORT) $(FORTFLAGS) $^ -o test4.exe
-	
+
+bench1: bench1.f90 coldae.o $(OBJECTS) $(OBJECTS90)
+	$(FORT) $(FORTFLAGS) $^ -o bench1.exe
+
 coldae.o: coldae.f
 	$(FORT) $(FORTFLAGS) $< -I $(SRC) -c -o $@
 colsys.o: colsys.f

@@ -42,5 +42,5 @@ TEST(Benchmarks, algebraic) {
 
     opts.numFixedPoints = 0;
     }
-    benchmarkSolution(sys3{}, opts,10000);
+    benchmarkSolution(sys3{}, opts,50000);
 }

@@ -113,26 +113,19 @@ struct options {
 
 
 /* Short notation for pointers. 
-   Matrices are stores one-dimensional, column-wise. */
-//using dvec = double* const __restrict;
-//using ivec = int* const __restrict;
-//using dmat = double* const __restrict;
-//using imat = int* const __restrict;
-//
-//using cdvec = double const * const __restrict;
-//using civec = int const * const __restrict;
-//using cdmat = double const * const __restrict;
-//using cimat = int const * const __restrict;
+   Matrices are stores one-dimensional, column-wise.
+   Use restrict for 4% performance increase (g++). */
+using dvec = double* const __restrict;
+using ivec = int* const __restrict;
+using dmat = double* const __restrict;
+using imat = int* const __restrict;
 
-using dvec = double* const ;
-using ivec = int* const ;
-using dmat = double* const ;
-using imat = int* const ;
+using cdvec = double const * const __restrict;
+using civec = int const * const __restrict;
+using cdmat = double const * const __restrict;
+using cimat = int const * const __restrict;
 
-using cdvec = double const* const ;
-using civec = int const* const ;
-using cdmat = double const* const ;
-using cimat = int const* const ;
+
 
 /* Class that holds the solver state. */
 class cda{
@@ -224,16 +217,24 @@ public:
 		//  in case incorrect input data is detected, the program returns
 		//  immediately with iflag=-3.
 		NCY = NCOMP + NY;
-		if (NCOMP < 0 || NCOMP > 20)
+		if (NCOMP < 0 || NCOMP > 20){
+		    fmt::print(fg(fmt::color::red), "Violated (0 <= NCOMP <= 20).\n");
 			return output_t::inputError;
-		if (NY < 0 || NY > 20)
-			return output_t::inputError;
-		if (NCY < 1 || NCY > 40)
-			return output_t::inputError;
-		for (int i = 1; i <= NCOMP; ++i)
-			if (params.orders[i - 1] < 1 || params.orders[i - 1] > 4)
-				return output_t::inputError;
-
+        }
+		if (NY < 0 || NY > 20){
+            fmt::print(fg(fmt::color::red), "Violated (0 <= NY <= 20).\n");
+            return output_t::inputError;
+        }
+		if (NCY < 1 || NCY > 40) {
+            fmt::print(fg(fmt::color::red), "Violated (1 <= NCOMP + NY <= 40).\n");
+            return output_t::inputError;
+        }
+		for (int i = 0; i < NCOMP; ++i)
+			if (params.orders[i] < 1 || params.orders[i] > 4) {
+                fmt::print(fg(fmt::color::red),
+                           "Violated (1 <= orders[{}] <= 4).\n", i);
+                return output_t::inputError;
+            }
 
 		//  rename some of the parameters and set default values.
 		NONLIN = params.isNonLinear ? 1 : 0;
@@ -309,16 +310,26 @@ public:
 		}
 
 		//  check for correctness of data
-		if (K < 0 || K > 7)                return output_t::inputError;
-		if (N < 0)                         return output_t::inputError;
-		if (IREAD < 0 || IREAD > 2)        return output_t::inputError;
-		if (IGUESS < 0 || IGUESS > 4)      return output_t::inputError;
-		if (ICARE < -1 || ICARE > 2)	   return output_t::inputError;
-		if (INDEX < 0 || INDEX > 2)        return output_t::inputError;
-		if (NTOL < 0 || NTOL > MSTAR)      return output_t::inputError;
-		if (NFXPNT < 0)                    return output_t::inputError;
-		if (IPRINT < (-1) || IPRINT > 1)   return output_t::inputError;
-		if (MSTAR < 0 || MSTAR > 40)       return output_t::inputError;
+		if (K < 0 || K > 7){
+            fmt::print(fg(fmt::color::red), "Violated (0 <= K <= 7).\n");
+            return output_t::inputError;
+        }
+		if (N < 0){
+            fmt::print(fg(fmt::color::red), "Violated (0 <= N).\n");
+            return output_t::inputError;
+        }
+		if (NTOL < 0 || NTOL > MSTAR){
+            fmt::print(fg(fmt::color::red), "Violated (0 <= NTOL <= MSTAR).\n");
+            return output_t::inputError;
+        }
+		if (NFXPNT < 0) {
+            fmt::print(fg(fmt::color::red), "Violated (0 <= NFXPNT).\n");
+            return output_t::inputError;
+        }
+		if (MSTAR < 0 || MSTAR > 40){
+            fmt::print(fg(fmt::color::red), "Violated (0 <= MSTAR <= 40).\n");
+            return output_t::inputError;
+        }
 
 		int IP = 1;
 		for (int i = 1; i <= MSTAR; ++i) {
@@ -427,11 +438,7 @@ public:
 
 		//  initialize collocation points, constants, mesh.
 		CONSTS();
-		int NYCB;
-		if (NY == 0)
-			NYCB = 1;
-		else
-			NYCB = NY;
+		int NYCB = (NY == 0 ? 1 : NY);
 
 		int meshmode = 3 + IREAD;
 		NEWMSH(meshmode, fspace+(LXI-1), fspace+(LXIOLD-1),
@@ -507,6 +514,7 @@ public:
 		int IS5 = ISPACE[0] + 2;
 		int IS4 = IS5 + ISPACE[4] * (ISPACE[0] + 1);
 		int i = 1;
+
 		APPROX(i, X, Z, Y, A, FSPACE+(IS6-1),
 			FSPACE, ISPACE[0],
 			FSPACE+(IS5-1), FSPACE+(IS4-1), ISPACE[1], ISPACE[2],
@@ -570,14 +578,10 @@ private:
 		fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
 	{
 		double DF[800];
-		std::vector<double> FCSP(NCOMP* 60); // TODO check of array is possible
+		std::vector<double> FCSP(NCOMP * 60);
 
-
-        double CBSP[20* 20];
+        double CBSP[20*20];
 		double RNORM, RNOLD;
-
-		
-
 
 		// constants for control of nonlinear iteration
 		double RELMIN = 1.e-3;
@@ -589,14 +593,12 @@ private:
 		for (int i = 1; i <= NTOL; ++i)
 			CHECK = std::max(TOLIN[i-1], CHECK);
 		int IMESH = 1;
-		int ICONV = 0;
-		if (NONLIN == 0) ICONV = 1;
+		int ICONV = (NONLIN == 0);
 		int ICOR = 0;
 		int NOCONV = 0;
 		int MSING = 0;
 		int ISING = 0;
 
-		// TODO: make lokal
 		double RLXOLD;
 		int IPRED, IFREEZ;
 		int IFRZ;
@@ -609,8 +611,6 @@ private:
 		//  the code fails (due to a singular matrix or storage limitations)
 		while (true) {
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "while:\n");
-
 				// initialization for a new mesh
 				ITER = 0;
 				if (NONLIN <= 0) {
@@ -634,8 +634,6 @@ private:
 					if (MSING == 0)
 						goto n400;
 				n30:
-					//fmt::print(fg(fmt::color::cornflower_blue), "30:\n");
-
 					if (MSING >= 0) {
 						if (IPRINT < 1) {
 							fmt::print(fg(fmt::color::red), "A LOCAL ELIMINATION MATRIX IS SINGULAR\n");
@@ -685,7 +683,6 @@ private:
 			}
 		n60:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "60:\n");
 				// solve for the next iterate .
 				// the value of ifreez determines whether this is a full
 				// newton step (=0) or a fixed jacobian iteration (=1).
@@ -701,8 +698,6 @@ private:
 			}
 		n70:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "70:\n");
-
 				// check for a singular matrix
 				if (MSING != 0)
 					goto n30;
@@ -745,8 +740,6 @@ private:
 			}
 		n110:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "110:\n");
-
 				// verify that the linear convergence with fixed jacobian
 				// is fast enough.
 				IFRZ = IFRZ + 1;
@@ -769,8 +762,6 @@ private:
 			}
 		n130:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "130:\n");
-
 				// convergence of fixed jacobian iteration failed.
 				if (IPRINT < 0)
 					fmt::print("ITERATION = {}, NORM(RHS) = {}\nSWITCH TO DAMPED NEWTON ITERATION\n", ITER, RNORM);
@@ -791,7 +782,6 @@ private:
 			}
 		n160:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "160:\n");
 				// no previous convergence has been obtained. proceed
 				// with the damped newton method.
 				// evaluate rhs and find the first newton correction.
@@ -826,7 +816,6 @@ private:
 			}
 		n170:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "170:\n");
 				// main iteration loop
 				RNOLD = RNORM;
 				if (ITER >= LIMIT)
@@ -872,7 +861,7 @@ private:
 						ANDIF = ANDIF + pow((DQDMZ[i-1] - DELDMZ[i-1]) * DSCALE[i-1], 2);
 
 					ANDIF = sqrt(ANDIF / double(NZ + NDMZ) + PRECIS);
-					RELAX = RELAX * ANSCL / ANDIF;
+					RELAX *= ANSCL / ANDIF;
 					if (RELAX > 1.0)  RELAX = 1.0;
 					RLXOLD = RELAX;
 					IPRED = 1;
@@ -880,8 +869,7 @@ private:
 			}
 		n220:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "220:\n");
-				ITER = ITER + 1;
+				ITER++;
 
 				// determine a new  z and dmz  and find new  rhs  and its norm
 				for (int i = 1; i <= NZ; ++i)
@@ -892,21 +880,11 @@ private:
 			}
 		n250:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "250:\n");
-
-				/*for (int i = 1; i <= NZ; ++i) {
-					fmt::print("+ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
-				}*/
-
 				LSYSLV(MSING, XI, XIOLD, Z, DMZ,
 					DQZ, DQDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM, 2,
 					fsub, dfsub, gsub, dgsub, guess, ISING);
-
-				/*for (int i = 1; i <= NZ; ++i) {
-					fmt::print("++ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
-				}*/
 
 				// compute a fixed jacobian iterate (used to control relax)
 				LSYSLV(MSING, XI, XIOLD, Z, DMZ,
@@ -915,22 +893,16 @@ private:
 					INTEGS, IPVTG, IPVTW, RNORM, 4,
 					fsub, dfsub, gsub, dgsub, guess, ISING);
 
-				//for (int i = 1; i <= NZ; ++i) {
-				//	fmt::print("+++ DQZ[i-1]={:10.6f}\n", DQZ[i-1]);
-				//}
-
 				// find scaled norms of various terms used to correct relax
 				ANORM = 0.0;
 				ANFIX = 0.0;
 				for (int i = 1; i <= NZ; ++i) {
-					//fmt::print("---- DQZ[i-1]={:10.6f}, SCALE[i-1]={:10.6f}\n", DQZ[i-1], SCALE[i-1]);
-					ANORM = ANORM + pow(DELZ[i-1] * SCALE[i-1], 2);
-					ANFIX = ANFIX + pow(DQZ[i-1] * SCALE[i-1], 2);
+					ANORM += pow(DELZ[i-1] * SCALE[i-1], 2);
+					ANFIX += pow(DQZ[i-1] * SCALE[i-1], 2);
 				}
 				for (int i = 1; i <= NDMZ; ++i) {
-					//fmt::print("---- DQDMZ[i-1]={:10.6f}, DSCALE[i-1]={:10.6f}\n", DQDMZ[i-1], DSCALE[i-1]);
-					ANORM = ANORM + pow(DELDMZ[i-1] * DSCALE[i-1], 2);
-					ANFIX = ANFIX + pow(DQDMZ[i-1] * DSCALE[i-1], 2);
+					ANORM += pow(DELDMZ[i-1] * DSCALE[i-1], 2);
+					ANFIX += pow(DQDMZ[i-1] * DSCALE[i-1], 2);
 				}
 				ANORM = sqrt(ANORM / double(NZ + NDMZ));
 				ANFIX = sqrt(ANFIX / double(NZ + NDMZ));
@@ -984,7 +956,7 @@ private:
 							goto n170;
 						if (FACTOR < 0.50)
 							FACTOR = 0.5;
-						RELAX = RELAX / FACTOR;
+						RELAX /= FACTOR;
 					}
 					else {
 						if (RELAX >= .9)
@@ -1007,7 +979,6 @@ private:
 					}
 				n350:
 					{
-						//fmt::print(fg(fmt::color::cornflower_blue), "350:\n");
 						// check convergence (iconv = 0).
 						for (int IT = 1; IT <= NTOL; ++IT) {
 							int INZ = LTOL[IT-1];
@@ -1031,7 +1002,6 @@ private:
 					}
 				n390:
 					{
-						//fmt::print(fg(fmt::color::cornflower_blue), "390:\n");
 						if ((ANFIX < PRECIS || RNORM < PRECIS) && IPRINT < 1)
 							fmt::print("CONVERGENCE AFTER {} ITERATIONS\n", ITER);
 						ICONV = 1;
@@ -1039,7 +1009,6 @@ private:
 					}
 				n400:
 					{
-						//fmt::print(fg(fmt::color::cornflower_blue), "400:\n");
 						// if full output has been requested, print values of the
 						// solution components   z  at the meshpoints and  y  at
 						// collocation points.
@@ -1060,7 +1029,6 @@ private:
 					}
 				n420:
 					{
-						//fmt::print(fg(fmt::color::cornflower_blue), "420:\n");
 						// check for error tolerance satisfaction
 						int IFIN = 1;
 						if (IMESH == 2)
@@ -1070,9 +1038,7 @@ private:
 						iflag = output_t::normal;
 						return;
 					}
-				n430:;
-					//fmt::print(fg(fmt::color::cornflower_blue), "430:\n");
-
+				n430:
 					// diagnostics for failure of nonlinear iteration.
 					if (IPRINT < 1)
 						fmt::print("NO CONVERGENCE AFTER {} ITERATIONS\n", ITER);
@@ -1094,8 +1060,7 @@ private:
 			}
 		n460:
 			{
-				//fmt::print(fg(fmt::color::cornflower_blue), "460:\n");
-					// update old mesh
+				// update old mesh
 				for (int i = 1; i <= N + 1; ++i)
 					XIOLD[i-1] = XI[i-1];
 				NOLD = N;
@@ -1108,11 +1073,7 @@ private:
 				if (MSHALT >= MSHLMT && MSHNUM < MSHLMT)
 					MSHALT = 1;
 
-				int NYCB;
-				if (NY == 0)
-					NYCB = 1;
-				else
-					NYCB = NY;
+                int NYCB = (NY == 0 ? 1 : NY);
 
 
 				NEWMSH(IMESH, XI, XIOLD, Z, DMZ,
@@ -1831,14 +1792,14 @@ private:
 			COEF[j - 1 + (j - 1) * K] = 1.0;
 			VMONDE(COEF+(j - 1) * K, K);
 		}
-		RKBAS(1.0, K, MMAX, B, nullptr, 0);
+		RKBAS(1.0, COEF, K, MMAX, B, nullptr, 0);
 		for (int i = 1; i <= K; ++i)
-			RKBAS(RHO[i-1], K, MMAX, ACOL+(i-1)*28, nullptr, 0);
+			RKBAS(RHO[i-1], COEF, K, MMAX, ACOL+(i-1)*28, nullptr, 0);
 
-		RKBAS(1.0 / 6.0, K, MMAX, ASAVE + (0) * 28, nullptr, 0);
-		RKBAS(1.0 / 3.0, K, MMAX, ASAVE + (1) * 28, nullptr, 0);
-		RKBAS(2.0 / 3.0, K, MMAX, ASAVE + (2) * 28, nullptr, 0);
-		RKBAS(5.0 / 6.0, K, MMAX, ASAVE + (3) * 28, nullptr, 0);
+		RKBAS(1.0 / 6.0, COEF, K, MMAX, ASAVE + (0) * 28, nullptr, 0);
+		RKBAS(1.0 / 3.0, COEF, K, MMAX, ASAVE + (1) * 28, nullptr, 0);
+		RKBAS(2.0 / 3.0, COEF, K, MMAX, ASAVE + (2) * 28, nullptr, 0);
+		RKBAS(5.0 / 6.0, COEF, K, MMAX, ASAVE + (3) * 28, nullptr, 0);
 
 	}
 
@@ -2023,11 +1984,7 @@ private:
 		double AT[28], CB[400];
 		int IPVTCB[20];
 
-		int NYCB;
-		if (NY == 0)
-			NYCB = 1;
-		else
-			NYCB = NY;
+		int NYCB = (NY == 0 ? 1 : NY);
 
 		int INFC = (MSTAR + NY) * NCOMP;
 		int M1 = MODE + 1;
@@ -2229,7 +2186,7 @@ private:
 						else {
 							if (MODE == 1) {
 								APPROX(IOLD, XI1, ZVAL, YVAL, AT,
-									COEF, // here IOLD gets changed! simon
+									COEF,
 									XIOLD, NOLD, Z, DMZ,
 									K, NCOMP, NY, MMAX,
 									MT, MSTAR, 2, nullptr, 1);
@@ -2240,7 +2197,6 @@ private:
 										XIOLD, NOLD, Z,
 										DMZ, K, NCOMP, NY, MMAX,
 										MT, MSTAR, 1, nullptr, 0);
-									NOLD = temp - 1; // TODO probably useless
 								}
 							}
 							else {
@@ -2582,7 +2538,7 @@ private:
 		I1 = I0 + 1;
 		int I2 = I0 + NCY;
 
-		// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh // TODO duplicate?
+		// evaluate  dmzo = dmzo - df * (zval,yval)  once for a new mesh
 		if (NONLIN != 0 && ITER <= 0) {
 			for (int j = 0; j < MSTAR + NY; ++j) {
 				if (j + 1 <= MSTAR)
@@ -2706,7 +2662,6 @@ private:
 			for (int i = 0; i < NCOMP; ++i)
 				for (int j = 0; j < MSTAR + NY; ++j)
 					FC[i + j*NCY] = 0.0;
-			return;
 		}
 		else{
 			//  form projected cb
@@ -2898,8 +2853,7 @@ private:
                     //  if index=2 then form projection matrices directly
                     //  otherwise use svd to define appropriate projection
                     if (INDEX == 0) {
-                        PRJSVD(FC, DF, CB, // TODO wieso ändert sich die erste Dimension von CB hier?
-                               U, V, IPVTCB, ISING, 1); // TODO warum haben wir U,V?
+                        PRJSVD(FC, DF, CB, U, V, IPVTCB, ISING, 1);
                         if (ISING != 0)
                             return;
                     } else {
@@ -2961,21 +2915,21 @@ private:
                     }
                 }
 
-                //  prepare extra rhs piece; two if new mesh TODO carefully check indices here
+                //  prepare extra rhs piece; two if new mesh
                 if (INDEX == 1 || NY == 0)
                     return;
                 for (int JCOL = 1; JCOL <= 2; ++JCOL) {
                     for (int i = 0; i < NCOMP; ++i) {
                         FACT = 0;
-                        for (int l = 1; l <= NY; ++l)
-                            FACT += FC[i + (l + MSTAR - 1) * NCOMP] * F[l + NCOMP - 1];
+                        for (int l = 0; l < NY; ++l)
+                            FACT += FC[i + (l + MSTAR) * NCOMP] * F[l + NCOMP];
                         FC[i + (JCOL + MSTAR + NY - 1) * NCOMP] = FACT;
                     }
 
                     if (MODL != 1 || JCOL == 2)
                         return;
-                    for (int i = 1 + NCOMP; i <= NY + NCOMP; ++i)
-                        F[i - 1] = 0;
+                    for (int i = NCOMP; i < NY + NCOMP; ++i)
+                        F[i] = 0;
                     for (int j = 0; j < MSTAR; ++j) {
                         FACT = -ZVAL[j];
                         for (int i = NCOMP; i < NY + NCOMP; ++i)
@@ -2991,7 +2945,7 @@ private:
                 int IR = IROW;
                 for (int JCOMP = 1; JCOMP <= NCOMP; ++JCOMP) {
                     int MJ = MT[JCOMP - 1];
-                    IR = IR + MJ;
+                    IR += MJ;
                     for (int l = 1; l <= MJ; ++l) {
                         int IND = JCOMP;
                         double RSUM = 0.0;
@@ -3050,7 +3004,7 @@ private:
 				these are evaluated if mode > 0.
 
 	* **********************************************************************/
-	void RKBAS(const double S, const int k, const int M, dmat RKB, dvec DM, const int MODE)
+	void RKBAS(const double S, cdmat coef, const int k, const int M, dmat RKB, dvec DM, const int MODE)
 	{
 		//COEF(k, k);
 		//RKB(7, 1);
@@ -3064,18 +3018,18 @@ private:
 			for (int l = 0; l < M; ++l) {
 				int LB = k + l + 2;
 				for (int i = 0; i < k; ++i) {
-					double P = COEF[0+ i*K];
+					double P = coef[0+ i*K];
 					for (int j = 2; j <= k; ++j)
-						P = P * T[LB - j - 1] + COEF[j-1 + i * K];
+						P = P * T[LB - j - 1] + coef[j-1 + i * K];
 					RKB[i + l*7] = P;
 				}
 			}
 			if (MODE == 0)
 				return;
 			for (int i = 0; i < k; ++i) {
-				double P = COEF[0 + i * K];
+				double P = coef[0 + i * K];
 				for (int j = 2; j <= k; ++j)
-					P = P * T[k - j] + COEF[j-1 + i * K];
+					P = P * T[k - j] + coef[j-1 + i * K];
 				DM[i] = P;
 			}
 			return;
@@ -3129,7 +3083,7 @@ private:
 	void APPROX(int& i, double& X, dvec ZVAL, dvec YVAL, dmat A, cdvec coef, cdvec XI,
 			const int n, cdvec Z, cdvec DMZ, const int k, const int ncomp, const int ny, const int mmax, civec M,
 			const int mstar, const int MODE, dvec DMVAL, const int MODM) 
-	{ // TODO check the use of coef inside this function
+	{
 		//A(7, 1);
 
 		AutoTimer at(g_timer, _FUNC_);
@@ -3183,7 +3137,7 @@ private:
 		case 3:	 {
 			//  mode = 2 or 3, compute mesh independent rk - basis.
 			double S = (X - XI[i-1]) / (XI[i] - XI[i-1]);
-			RKBAS(S, k, mmax, A, DM, MODM);
+			RKBAS(S, coef, k, mmax, A, DM, MODM);
 			}
 			[[fallthrough]];
 		case 4: {
