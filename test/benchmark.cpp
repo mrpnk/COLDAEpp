@@ -38,7 +38,6 @@ TEST(Benchmarks, algebraic) {
     opts.ltol = {1,2};
     opts.tol = {0.0001, 0.0001};
 
-    opts.numFixedPoints = 0;
     }
     benchmarkSolution(sys3{}, opts,50000);
 }

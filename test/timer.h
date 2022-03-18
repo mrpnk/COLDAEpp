@@ -12,7 +12,6 @@
 #include <functional>
 #include <memory>
 #include <algorithm>
-#include <omp.h>
 
 #if defined(__linux__ )
 inline std::string _normal_func_name(std::string full) {
