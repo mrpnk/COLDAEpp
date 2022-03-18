@@ -3,9 +3,11 @@
 # Coldae++
 Coldae++ is a C++ port of NetLib's COLDAE.
 
-COLDAE uses a collocation (COL) method to solve semi-explicit differential-algebraic equations (DAE).
+COLDAE uses a collocation (COL) method to solve semi-explicit differential-algebraic equations (DAE) of the form
 
-It supports boundary values of type
+![equation_1](D:\Simon\Dokumente\Entwicklung\coldae++\equation_1.png)
+
+
 
 
 
@@ -19,9 +21,9 @@ Initialize the {fmt} submodule :
 
 `git submodule update --init --recursive`
 
+
+
 ### Benchmark
 
-The C++ version takes (117+-2)% of time and about 10 times the memory of the original version (without fast-math).
-
-60% with fast-math
+The C++ version takes about 20% less time than the original version but much more memory.
 

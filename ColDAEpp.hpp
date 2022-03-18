@@ -13,14 +13,6 @@
 namespace coldae
 {
 
-/* Define callback function types */
-using fsub_t  = void (*)(double x, double const z[], double const y[], double f[]);
-using dfsub_t = void (*)(double x, double const z[], double const y[], double df[]);
-using gsub_t  = void (*)(int i,    double const z[],                   double& g);
-using dgsub_t = void (*)(int i,    double const z[],                   double dg[]);
-using guess_t = void (*)(double x, double const z[], double const y[], double dmval[]);
-
-
 enum class printMode {
 	full = -1,
 	selected = 0,
@@ -99,24 +91,37 @@ struct systemParams {
 
 /* Options for the solver */
 struct options {
-	int numCollPoints;	   // no. of collocation points per subinterval
-	int numSubIntervals;   // no. of subintervals in the initial mesh
-	int fdim;              // dimension of fspace
-	int idim;              // dimension of ispace
-	printMode printLevel;  // output control
-	meshMode meshSource;   // mesh control
-	guessMode guessSource; // guess control
+	int numCollPoints = 0;	 // no. of collocation points per subinterval (0=auto)
+	int numSubIntervals = 0; // no. of subintervals in the initial mesh (0=auto)
+	int fdim;                // dimension of fspace
+	int idim;                // dimension of ispace
+	printMode printLevel;    // output control
+	meshMode meshSource;     // mesh control
+	guessMode guessSource;   // guess control
 	
 	std::vector<int> ltol;      // what component of z the tolerances are for
 	std::vector<double> tol;    // the tolerances tol
 
-	int numFixedPoints;         // no. of fixed points in the mesh other than aleft and aright.
-	std::vector<double> fixpnt; // the fixed points
+	std::vector<double> fixpnt; // the fixed points other than aleft and aright.
 };
 
 
+/* Define guess callback function type */
+using guess_t = void (*)(double x, double const z[], double const y[], double dmval[]);
+
+/* Define a system of equations */
+struct system {
+    systemParams params;
+    virtual void fsub( double x, double const z[2], double const y[1], double f[2])  const = 0;
+    virtual void dfsub(double x, double const z[2], double const y[1], double df[6]) const = 0;
+    virtual void gsub( int i,    double const z[2],                    double &g)    const = 0;
+    virtual void dgsub(int i,    double const z[2],                    double dg[2]) const = 0;
+};
+
+
+
 /* Short notation for pointers. 
-   Matrices are stores one-dimensional, column-wise.
+   Matrices are stored one-dimensional, column-wise.
    Use restrict for 4% performance increase (g++). */
 using dvec = double* const __restrict;
 using ivec = int* const __restrict;
@@ -127,7 +132,6 @@ using cdvec = double const * const __restrict;
 using civec = int const * const __restrict;
 using cdmat = double const * const __restrict;
 using cimat = int const * const __restrict;
-
 
 
 /* Class that holds the solver state. */
@@ -176,17 +180,19 @@ class cda{
 	double B[7*4];
 	double ACOL[28*7];
 	double ASAVE[28*4];
-	
+
+    system const * sys;
 
 public:
 	result_t COLDAE(systemParams const& params, options const& opts,
                     ivec ispace, dvec fspace,
-                    fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+                    system const& sys, guess_t guess)
 	{
 		this->NCOMP = params.ncomp;
 		this->NY = params.ny;
 		this->TLEFT = params.left;
 		this->TRIGHT = params.right;
+        this->sys = &sys;
 
 		if (opts.ltol.size() != opts.tol.size()) {
 			return result_t::inputError;
@@ -253,7 +259,7 @@ public:
 		NTOL = static_cast<int>(opts.tol.size());
 		int NDIMF = opts.fdim;
 		int NDIMI = opts.idim;
-		int NFXPNT = opts.numFixedPoints;
+		int NFXPNT = opts.fixpnt.size();
 		IPRINT = static_cast<int>(opts.printLevel);
 		INDEX = static_cast<int>(params.index);
 		if (NY == 0) INDEX = 0;
@@ -442,11 +448,10 @@ public:
 		//  initialize collocation points, constants, mesh.
 		CONSTS();
 		int NYCB = (NY == 0 ? 1 : NY);
-
 		int meshmode = 3 + IREAD;
 		NEWMSH(meshmode, fspace+(LXI-1), fspace+(LXIOLD-1),
 			nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-			NFXPNT, opts.fixpnt.data(), nullptr, dfsub, nullptr, nullptr, NYCB);
+			NFXPNT, opts.fixpnt.data(), nullptr,nullptr, nullptr, NYCB);
 
 		//  determine first approximation, if the problem is nonlinear.
 		if (IGUESS < 2) {
@@ -471,7 +476,7 @@ public:
 			fspace+(LDQDMZ-1), fspace+(LG-1), fspace+(LW-1), fspace+(LV-1), fspace+(LFC-1),
 			fspace+(LVALST-1), fspace+(LSLOPE-1), fspace+(LSCL-1), fspace+(LDSCL-1),
 			fspace+(LACCUM-1), ispace+(LPVTG-1), ispace+(LINTEG-1), ispace+(LPVTW-1),
-			NFXPNT, opts.fixpnt.data(), iflag, fsub, dfsub, gsub, dgsub, guess);
+			NFXPNT, opts.fixpnt.data(), iflag, guess);
 
 		//  prepare output
 		ispace[1-1] = N;
@@ -506,7 +511,7 @@ public:
 	//           approximate solution  z = z(u(x)), y = y(x)  at a
 	//           point x(it has been computed by a call to  coldae).
 	//           the parameters needed for  approx  are retrieved
-	//           from the work arrays  ispaceand fspace .
+	//           from the work arrays  ispace  and  fspace .
 	//
 	//*****************************************************************
 	void APPSLN(double& X, dvec Z, dvec Y, cdvec FSPACE, civec ISPACE)
@@ -578,7 +583,7 @@ private:
 	void CONTRL(dvec XI, dvec XIOLD, dvec Z, dvec DMZ, dvec DMV, dvec RHS, dvec DELZ, dvec DELDMZ,
                 dvec DQZ, dvec DQDMZ, dvec G, dvec W, dvec V, dvec FC, dvec VALSTR, dvec SLOPE, dvec SCALE, dvec DSCALE,
                 dvec ACCUM, ivec IPVTG, ivec INTEGS, ivec IPVTW, const int NFXPNT, cdvec FIXPNT, result_t& iflag,
-                fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess)
+                guess_t guess)
 	{
 		double DF[800];
 		std::vector<double> FCSP(NCOMP * 60);
@@ -624,7 +629,7 @@ private:
 						Z, DMZ, G,
 						W, V, FC, RHS,
 						nullptr, INTEGS, IPVTG, IPVTW,
-						RNORM, 0, fsub, dfsub, gsub, dgsub, guess, ISING);
+						RNORM, 0,guess, ISING);
 
 					// check for a singular matrix
 					if (ISING != 0) {
@@ -674,7 +679,7 @@ private:
 					DELZ, DELDMZ, G,
 					W, V, FC, RHS,
 					DQDMZ, INTEGS, IPVTG, IPVTW,
-					RNOLD, 1, fsub, dfsub, gsub, dgsub, guess, ISING);
+					RNOLD, 1, guess, ISING);
 
 				if (IPRINT < 0) {
 					fmt::print("FIXED JACOBIAN ITERATIONS\n");
@@ -697,7 +702,7 @@ private:
 					DELZ, DELDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM,
-					3 + IFREEZ, fsub, dfsub, gsub, dgsub, guess, ISING);
+					3 + IFREEZ,guess, ISING);
 			}
 		n70:
 			{
@@ -727,7 +732,7 @@ private:
 					DELZ, DELDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM, 2,
-					fsub, dfsub, gsub, dgsub, guess, ISING);
+					 guess, ISING);
 
 				//       check monotonicity. if the norm of  rhs  gets smaller,
 				//       proceed with a fixed jacobian; else proceed cautiously,
@@ -794,7 +799,7 @@ private:
 					DELZ, DELDMZ, G,
 					W, V, FC, RHS,
 					DQDMZ, INTEGS, IPVTG, IPVTW,
-					RNOLD, 1, fsub, dfsub, gsub, dgsub, guess, ISING);
+					RNOLD, 1,  guess, ISING);
 
 				// check for a singular matrix
 				if (MSING != 0)
@@ -842,7 +847,7 @@ private:
 					DELZ, DELDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM, 3,
-					fsub, dfsub, gsub, dgsub, guess, ISING);
+					guess, ISING);
 
 				// check for a singular matrix
 				if (MSING != 0)
@@ -887,14 +892,14 @@ private:
 					DQZ, DQDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM, 2,
-					fsub, dfsub, gsub, dgsub, guess, ISING);
+					guess, ISING);
 
 				// compute a fixed jacobian iterate (used to control relax)
 				LSYSLV(MSING, XI, XIOLD, Z, DMZ,
 					DQZ, DQDMZ, G,
 					W, V, FC, RHS, nullptr,
 					INTEGS, IPVTG, IPVTW, RNORM, 4,
-					fsub, dfsub, gsub, dgsub, guess, ISING);
+					guess, ISING);
 
 				// find scaled norms of various terms used to correct relax
 				ANORM = 0.0;
@@ -1082,7 +1087,7 @@ private:
 				NEWMSH(IMESH, XI, XIOLD, Z, DMZ,
 					DMV, VALSTR,
 					SLOPE, ACCUM, NFXPNT,
-					FIXPNT, DF, dfsub,
+					FIXPNT, DF,
                     FCSP.data(), CBSP, NYCB);
 
 				// exit if expected n is too large (but may try n=nmax once)
@@ -1245,7 +1250,7 @@ private:
 		cdvec Z, cdvec DMZ, dvec DMV,
 		dvec VALSTR, dvec SLOPE, dvec ACCUM, 
 		const int NFXPNT, cdvec FIXPNT,
-		dmat DF, dfsub_t dfsub, dmat FC,
+		dmat DF, dmat FC,
 		dmat CB, const int NYCB)
 	{
 		//XIOLD(NOLD + 1);
@@ -1429,7 +1434,7 @@ private:
 						APPROX(i, XI1, ZVAL, YVAL, A,
 							COEF, XIOLD, NOLD, Z, DMZ,
 							K, NCOMP, NY, MMAX, MT, MSTAR, 3, nullptr, 1);
-						dfsub(XI1, ZVAL, YVAL, DF);
+                        sys->dfsub(XI1, ZVAL, YVAL, DF);
 
 						// if index=2, form projection matrices directly
 						// otherwise use svd to define appropriate projection
@@ -1979,7 +1984,7 @@ private:
 	void LSYSLV(int& MSING, cdvec XI, cdvec XIOLD, dvec Z, dvec DMZ, dvec DELZ, dvec DELDMZ,
 		dvec G, dvec W, dvec V, dvec FC, dvec RHS, dvec DMZO,
 		imat INTEGS, ivec IPVTG, ivec IPVTW, double& RNORM,
-		const int MODE, fsub_t fsub, dfsub_t dfsub, gsub_t gsub, dgsub_t dgsub, guess_t guess, int& ISING)
+		const int MODE, guess_t guess, int& ISING)
 	{
 		//INTEGS(3, 1);
 
@@ -2090,13 +2095,13 @@ private:
 					}
 					// find  rhs  boundary value.
 					double GVAL;
-					gsub(IZETA, ZVAL, GVAL);
+					sys->gsub(IZETA, ZVAL, GVAL);
 					RHS[NDMZ + IZETA - 1] = -GVAL;
 					RNORM += GVAL * GVAL;
 					if (MODE != 2) {
 					n120:
 						// build a row of  a  corresponding to a boundary point
-						GDERIV(G + (IG - 1), NROW, IZETA, ZVAL, DGZ, 1, dgsub);
+						GDERIV(G + (IG - 1), NROW, IZETA, ZVAL, DGZ, 1);
 					}
 					IZETA++;
 				}
@@ -2128,7 +2133,7 @@ private:
 							DMZO + (IRHS - 1), 2);
 
 					n170:
-						fsub(XCOL, ZVAL, YVAL, F);
+                        sys->fsub(XCOL, ZVAL, YVAL, F);
 						for (int JJ = NCOMP; JJ < NCY; ++JJ)
 							DMZO[IRHS + JJ - 1] = 0.0;
 
@@ -2152,7 +2157,7 @@ private:
 							goto n210;
 
 						// fill in  rhs  values (and accumulate its norm).
-						fsub(XCOL, ZVAL, DMZ + (IRHS + NCOMP - 1), F);
+                        sys->fsub(XCOL, ZVAL, DMZ + (IRHS + NCOMP - 1), F);
 						for (int JJ = 0; JJ < NCY; ++JJ) {
 							double VALUE = F[JJ];
 							if (JJ + 1 <= NCOMP)
@@ -2165,14 +2170,14 @@ private:
 
 					n200:
 						// the linear case
-						fsub(XCOL, ZVAL, YVAL, RHS + (IRHS - 1));
+                        sys->fsub(XCOL, ZVAL, YVAL, RHS + (IRHS - 1));
 						IRHS += NCY;
 					}
 				n210:
 
 					// fill in ncy rows of  w and v
 					VWBLOK(XCOL, HRHO, j, W + (IW - 1), V + (IV - 1), IPVTW + (IDMZ - 1), ZVAL, YVAL, DF,
-						ACOL + (j-1) * 28, DMZO + (IDMZO - 1), dfsub, MSING);
+						ACOL + (j-1) * 28, DMZO + (IDMZO - 1), MSING);
 
 					if (MSING != 0)
 						return;
@@ -2221,14 +2226,14 @@ private:
 					}
 
 					// find rhs at next mesh point (also for linear case)
-					fsub(XI1, ZVAL, YVAL, F);
+					sys->fsub(XI1, ZVAL, YVAL, F);
 				}
 
 				GBLOCK(H, G + (IG - 1), NROW, IZETA, W + (IW - 1), V + (IV - 1),
 					nullptr, DELDMZ + (IDMZ - 1),
 					IPVTW + (IDMZ - 1), 1, MODE, XI1, ZVAL, YVAL,
 					F, DF,
-					CB, IPVTCB, FC + (IFC - 1), dfsub, ISING, NYCB);
+					CB, IPVTCB, FC + (IFC - 1), ISING, NYCB);
 
 				if (ISING != 0)
 					return;
@@ -2267,14 +2272,14 @@ private:
 
 						// find  rhs  boundary value.
 						double GVAL;
-						gsub(IZETA, ZVAL, GVAL);
+                        sys->gsub(IZETA, ZVAL, GVAL);
 						RHS[NDMZ + IZETA - 1] = -GVAL;
 						RNORM = RNORM + GVAL * GVAL;
 						if (MODE != 2) {
 						n260:
 							// build a row of  a  corresponding to a boundary point
 							GDERIV(G + (IG - 1), NROW, IZETA + MSTAR, ZVAL,
-								DGZ, 2, dgsub);
+								DGZ, 2);
 						}
 						IZETA++;
 					}
@@ -2334,7 +2339,7 @@ private:
 					DELDMZ + (IDMZ - 1),
 					IPVTW + (IDMZ - 1), 2, MODE, XI1, ZVAL, YVAL,
 					FC + (IFC + INFC - 1),
-					DF, CB, IPVTCB, FC + (IFC - 1), dfsub, ISING, NYCB);
+					DF, CB, IPVTCB, FC + (IFC - 1), ISING, NYCB);
 
 				IZ = IZ + MSTAR;
 				IDMZ = IDMZ + KDY;
@@ -2384,7 +2389,7 @@ private:
 				GBLOCK(H, G, NROW, IZETA, W+(IW-1),
 					DF, Z+(IZ-1), DMZ+(IDMZ-1), IPVTW+(IDMZ-1), 2, MODE, XI1,
 					ZVAL, YVAL,	FC+(IFC + INFC + NCOMP-1),
-					DF, CB, IPVTCB, FC+(IFC-1), dfsub, ISING, NYCB);
+					DF, CB, IPVTCB, FC+(IFC-1),  ISING, NYCB);
 				IZ = IZ + MSTAR;
 				IDMZ = IDMZ + KDY;
 				IW = IW + KDY * KDY;
@@ -2430,7 +2435,7 @@ private:
 	//      dg     - the derivatives of the side condition.
 	//
 	//**********************************************************************
-	void GDERIV(dmat GI, const int NROW, const int IROW, dvec ZVAL, dvec DGZ, const int MODE, dgsub_t dgsub) const
+	void GDERIV(dmat GI, const int NROW, const int IROW, dvec ZVAL, dvec DGZ, const int MODE) const
 	{
 		//GI(NROW, 1);
 
@@ -2441,7 +2446,7 @@ private:
 			DG[j] = 0.0;
 
 		//  evaluate jacobian dg
-		dgsub(IZETA, ZVAL, DG);
+        sys->dgsub(IZETA, ZVAL, DG);
 
 		//  evaluate  dgz = dg * zval  once for a new mesh
 		if (NONLIN != 0 && ITER <= 0) {
@@ -2497,7 +2502,7 @@ private:
 	//
 	//**********************************************************************
 	void VWBLOK(const double XCOL, const double HRHO, const int JJ, dmat WI, dmat VI, ivec IPVTW,
-		cdvec ZVAL, cdvec YVAL, dmat DF, cdmat acol, dvec DMZO, dfsub_t dfsub, int& MSING)
+		cdvec ZVAL, cdvec YVAL, dmat DF, cdmat acol, dvec DMZO, int& MSING)
 	{
 		//WI(KDY, 1);
 		//VI(KDY, 1);
@@ -2536,7 +2541,7 @@ private:
 		//   id
 		//        -  df(id,mstar+1)*u(1) - ... - df(id,mstar+ny)*y(ny)
 		//  for id = 1 to ncy  (m(id)=0 for id > ncomp).
-		dfsub(XCOL, ZVAL, YVAL, DF);
+        sys->dfsub(XCOL, ZVAL, YVAL, DF);
 		int I0 = (JJ - 1) * NCY;
 		I1 = I0 + 1;
 		int I2 = I0 + NCY;
@@ -2784,7 +2789,7 @@ private:
 	void GBLOCK(const double H, dmat GI, const int NROW, const int IROW,
 		dvec  WI, cdmat VI, dvec RHSZ, dvec RHSDMZ, ivec IPVTW, const int MODE,
 		const int MODL, const double XI1, cdvec ZVAL, cdvec YVAL, dvec F,
-		dmat DF, dmat CB, ivec IPVTCB, dmat FC, dfsub_t dfsub, int& ISING, const int NYCB)
+		dmat DF, dmat CB, ivec IPVTCB, dmat FC,  int& ISING, const int NYCB)
     {
         // TODO RHSZ aliases with CB
         // double const * WI (dgesl)
@@ -2851,7 +2856,7 @@ private:
 
                     //  projected collocation
                     //  set up projection matrix and update gi-block
-                    dfsub(XI1, ZVAL, YVAL, DF);
+                    sys->dfsub(XI1, ZVAL, YVAL, DF);
 
                     //  if index=2 then form projection matrices directly
                     //  otherwise use svd to define appropriate projection
@@ -3007,7 +3012,7 @@ private:
 				these are evaluated if mode > 0.
 
 	* **********************************************************************/
-	void RKBAS(const double S, cdmat coef, const int k, const int M, dmat RKB, dvec DM, const int MODE)
+	void RKBAS(const double S, cdmat coef, const int k, const int M, dmat RKB, dvec DM, const int MODE) const
 	{
 		//COEF(k, k);
 		//RKB(7, 1);

@@ -6,18 +6,17 @@
 
 
 template<typename T>
-void compareSolution(T const& sys, options const& opts, std::string comparisonFile) {
+void compareSolution(T const& sys, coldae::options const& opts, std::string comparisonFile) {
     std::vector<int> ispace(opts.idim);
     std::vector<double> fspace(opts.fdim);
 
-    cda solver{};
-    result_t iflag;
+    coldae::cda solver{};
+    coldae::result_t iflag;
 
     iflag = solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(),
-                          T::fsub, T::dfsub, T::gsub,
-                          T::dgsub, nullptr);
+                          sys, nullptr);
 
-    ASSERT_EQ(iflag, result_t::normal) << "COLDAE did not return normally.\n";
+    ASSERT_EQ(iflag, coldae::result_t::normal) << "COLDAE did not return normally.\n";
 
 //    std::ofstream outfile("out.txt");
 //    for(int i=1;i<=ispace[0]+1;++i) {
@@ -59,62 +58,47 @@ void compareSolution(T const& sys, options const& opts, std::string comparisonFi
 
 
 TEST(BasicUses, firstOrder) {
-    options opts;
+    coldae::options opts;
     {
-        opts.numCollPoints = 0;
-        opts.numSubIntervals = 0;
-
         opts.fdim = 10000;
         opts.idim = 10000;
 
-        opts.printLevel = printMode::none;
-        opts.meshSource = meshMode::generate;
-        opts.guessSource = guessMode::none;
+        opts.printLevel = coldae::printMode::none;
+        opts.meshSource = coldae::meshMode::generate;
+        opts.guessSource = coldae::guessMode::none;
 
         opts.ltol = {1};
         opts.tol = {0.1};
-
-        opts.numFixedPoints = 0;
     }
     compareSolution(sys1{}, opts, "original/result1.txt");
 }
 TEST(BasicUses, twoComponents) {
-    options opts;
+    coldae::options opts;
     {
-        opts.numCollPoints = 0;
-        opts.numSubIntervals = 0;
-
         opts.fdim = 10000;
         opts.idim = 10000;
 
-        opts.printLevel = printMode::none;
-        opts.meshSource = meshMode::generate;
-        opts.guessSource = guessMode::none;
+        opts.printLevel = coldae::printMode::none;
+        opts.meshSource = coldae::meshMode::generate;
+        opts.guessSource = coldae::guessMode::none;
 
         opts.ltol = {1};
         opts.tol = {0.0001};
-
-        opts.numFixedPoints = 0;
     }
     compareSolution(sys2{}, opts, "original/result2.txt");
 }
 TEST(BasicUses, algebraic) {
-    options opts;
+    coldae::options opts;
     {
-        opts.numCollPoints = 0;
-        opts.numSubIntervals = 0;
-
         opts.fdim = 1000000;
         opts.idim = 100000;
 
-        opts.printLevel = printMode::none;
-        opts.meshSource = meshMode::generate;
-        opts.guessSource = guessMode::none;
+        opts.printLevel = coldae::printMode::none;
+        opts.meshSource = coldae::meshMode::generate;
+        opts.guessSource = coldae::guessMode::none;
 
         opts.ltol = {1,2};
         opts.tol = {0.0001, 0.0001};
-
-        opts.numFixedPoints = 0;
     }
     compareSolution(sys3{}, opts, "original/result3.txt");
 }

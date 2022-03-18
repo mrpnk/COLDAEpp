@@ -1,0 +1,41 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{a4paper, margin=3cm}
+
+
+\title{Coldae++}
+
+\begin{document}
+	\maketitle
+	
+
+	\begin{align}
+		\left(\partial/\partial x\right)^{m_i} u_i &= f_i(x,\mathbf{z}, \mathbf{y}), \quad 1\leq i \leq n_c\\
+		0 &= f_i(x,\mathbf{z}, \mathbf{y}), \quad n_c+1\leq i \leq n_c+n_y\\
+		0 &= g_j(\zeta_j, \mathbf{z} ), \quad 1 \leq j \leq m_\star
+	\end{align}
+	where 
+	\begin{equation}\label{key}
+		m_\star = m_1+...+m_{n_c}
+	\end{equation}
+	\begin{equation}\label{key}
+		\mathbf{u} = \left(u_1,...,u_{n_c}\right), \quad \mathbf{y} = \left(y_1,...,y_{n_y}\right)
+	\end{equation}
+	\begin{equation}\label{key}
+		\mathbf{z} = \left(u_1(x),...,u_1^{(m_1-1)}(x),...,u_{n_c}^{(m_{n_c}-1)}(x)\right)
+	\end{equation}
+	Restrictions are
+	\begin{align}\label{key}
+		1 \leq m_i \leq 4,\\
+		0 \leq n_c \leq 20\\
+		0 \leq n_y \leq 20\\
+		1 \leq m_\star \leq 40
+	\end{align}
+	
+	
+	
+	
+	
+\end{document}

@@ -4,8 +4,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 
-template<typename T>
-void benchmarkSolution(T const& sys, coldae::options const& opts, int nRuns) {
+void benchmarkSolution(coldae::system const& sys, coldae::options const& opts, int nRuns) {
     std::vector<int> ispace(opts.idim);
     std::vector<double> fspace(opts.fdim);
 
@@ -15,8 +14,7 @@ void benchmarkSolution(T const& sys, coldae::options const& opts, int nRuns) {
     auto t0 = high_resolution_clock::now();
     for(int i = 0; i<nRuns; ++i) {
         solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(),
-                      T::fsub, T::dfsub, T::gsub,
-                      T::dgsub, nullptr);
+                      sys, nullptr);
     }
     auto t1 = high_resolution_clock::now();
     fmt::print(fg(fmt::color::cornflower_blue),
