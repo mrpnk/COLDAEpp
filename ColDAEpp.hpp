@@ -5,6 +5,8 @@
 #include "fmt/include/fmt/ranges.h"
 #include "fmt/include/fmt/color.h"
 
+#include <vector>
+
 namespace coldae {
 
     enum class printMode {

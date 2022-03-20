@@ -1,3 +1,5 @@
 vs/
+.vs/
+out/
 .idea/
 bin/

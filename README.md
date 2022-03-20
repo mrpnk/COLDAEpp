@@ -5,9 +5,9 @@ Coldae++ is a C++ port of NetLib's COLDAE.
 
 COLDAE uses a collocation (COL) method to solve semi-explicit differential-algebraic equations (DAE) of the form
 
-![equation_1](D:\Simon\Dokumente\Entwicklung\coldae++\equation_1.png)
-
-
+<p align="middle">
+  <img width=450 src=/doc/equation_1.jpg>
+</p>
 
 
 
@@ -17,11 +17,15 @@ The original Fortran 77 code by Uri Ascher and Ray Spiteri is available on [Netl
 
 
 
-Initialize the {fmt} submodule :
+### How to use it
 
-`git submodule update --init --recursive`
+- Initialize the {fmt} submodule :
+  `git submodule update --init --recursive`
+- `#include "ColDAEpp.hpp"`
+- Derive a class from `coldae::system` and provide the subroutines. (see `test\systems.hpp`)
+- Create a `coldae::solver` instance and call `COLDAE()` on it. The parameters  have the same meaning as in the original. (see `test\test.hpp`)
 
-
+ 
 
 ### Benchmark
 
