@@ -10,7 +10,7 @@ void compareSolution(T const& sys, coldae::options const& opts, std::string comp
     std::vector<int> ispace(opts.idim);
     std::vector<double> fspace(opts.fdim);
 
-    coldae::cda solver{};
+    coldae::solver solver{};
     coldae::result_t iflag;
 
     iflag = solver.COLDAE(sys.params, opts, ispace.data(), fspace.data(),

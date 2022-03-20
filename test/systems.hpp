@@ -1,4 +1,5 @@
 #pragma once
+#include "linpack/linpack_d.hpp"
 #include "../ColDAEpp.hpp"
 
 
@@ -12,7 +13,7 @@ struct sys1 : public coldae::system {
         params.right = 1;
         params.bcpoints = { 0 };
         params.isNonLinear = false;
-        params.regularity = coldae::regularControl::regular;
+        params.regularity = coldae::regularityControl::regular;
     }
 
     void fsub(double x, const double z[1], const double y[0], double f[1]) const override {
@@ -40,7 +41,7 @@ struct sys2 : public coldae::system {
         params.right = 1;
         params.bcpoints = { 0, 1 };
         params.isNonLinear = true;
-        params.regularity = coldae::regularControl::regular;
+        params.regularity = coldae::regularityControl::regular;
         params.index = coldae::indexControl::automatic; // not used
     }
 
@@ -85,7 +86,7 @@ struct sys3 : public coldae::system {
         params.right = 5;
         params.bcpoints = { 0, 5 };
         params.isNonLinear = true;
-        params.regularity = coldae::regularControl::regular;
+        params.regularity = coldae::regularityControl::regular;
         params.index = coldae::indexControl::automatic;
     }
 

@@ -24,7 +24,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable (testAll test/test.cpp ${SOURCES})
+add_executable (testAll test/tests.cpp ${SOURCES})
 target_link_libraries(testAll gtest_main)
 target_compile_features(testAll PRIVATE cxx_std_20)
 
